@@ -24,7 +24,10 @@ Logical device created successfully!
 Swap chain created successfully with 3 images!
 ```
 
-A black window titled "VulkanMon - Hello Triangle" will appear and stay open until you close it.
+A window titled "VulkanMon - Hello Triangle" will appear showing:
+- **Phase 1 Complete**: RGB gradient triangle (Red top, Blue bottom-right, Green bottom-left)  
+- **Phase 2 Partial**: Additional horizontal gradient overlay from texture coordinates
+- The triangle now has both vertex color gradients AND texture coordinate gradients combined
 
 ## Quick Rebuild (after source changes)
 ```bash
@@ -58,6 +61,12 @@ Debug/vulkanmon.exe
 ### If build fails with missing extensions
 - Update your graphics drivers
 - Verify GPU supports Vulkan: `vulkaninfo --summary`
+
+### If application crashes or segfaults
+- Current implementation has texture loading code commented out due to stability issues
+- If you uncommented texture loading functions, recomment them in `src/main.cpp`
+- Look for lines containing `createTextureImage()` and `createDescriptorSetLayout()` - they should be commented out
+- The working implementation only uses texture coordinates for gradient effects, not actual texture loading
 
 ## Development Workflow
 
@@ -118,9 +127,13 @@ Debug/vulkanmon.exe
 See [TESTING.md](TESTING.md) for detailed testing strategy and philosophy.
 
 ## Current Status
-✅ **COMPLETE**: Vulkan Hello Triangle with vertex buffers - ALL 16 STEPS DONE!  
-🎊 **Achievement**: Beautiful RGB gradient triangle rendering  
-🚀 **Ready**: Phase 2 - 3D Graphics Foundation
+✅ **Phase 1 COMPLETE**: Vulkan Hello Triangle with vertex buffers - ALL 16 STEPS DONE!  
+🚧 **Phase 2 IN PROGRESS**: Step 22 (Texture System) partially implemented
+- ✅ Texture coordinates added to vertex structure
+- ✅ Shaders updated to handle texture coordinates  
+- ✅ Visual gradient effect using texture coordinates working
+- ❌ Actual texture loading/sampling not implemented (commented out due to segfaults)
+🎊 **Current Visual**: RGB gradient triangle with texture coordinate-based gradient overlay
 
 ---
 *Keep this file updated as we add more build steps and features!*
