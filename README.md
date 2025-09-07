@@ -123,6 +123,21 @@ cmake --build .
 ./vulkanmon
 ```
 
+## Development Philosophy
+
+VulkanMon follows three core tenants:
+
+### 🎯 **"Simple is Powerful"**
+We favor clear, straightforward solutions over complex ones. Code should be easy to understand, maintain, and extend.
+
+### 🧪 **"Test, Test, Test"**  
+Confidence comes from thorough testing at every level - from unit tests to visual validation on real hardware.
+
+### 📚 **"Document Often"**
+Good documentation is as important as good code. We document the "why" not just the "what".
+
+*See [DEVELOPMENT_PHILOSOPHY.md](DEVELOPMENT_PHILOSOPHY.md) for detailed guidelines.*
+
 ## Contributing
 
 We welcome contributions from developers of all skill levels! Here's how you can help:

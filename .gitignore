@@ -67,3 +67,18 @@ cmake_install.cmake
 # OS files
 .DS_Store
 Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.env
+.coverage
+.pytest_cache/
+.python-version
+
