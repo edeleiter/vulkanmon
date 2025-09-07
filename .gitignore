@@ -44,11 +44,17 @@
 build/
 out/
 
-# vcpkg build files (keep vcpkg directory but ignore build artifacts)
+# vcpkg build artifacts (keep vcpkg directory structure for easy setup)
 vcpkg/buildtrees/
 vcpkg/downloads/
 vcpkg/packages/
 vcpkg/installed/
+
+# Optional: Exclude vcpkg repo maintenance files if they exist
+vcpkg/.git/
+vcpkg/.github/
+vcpkg/docs/
+vcpkg/versions/
 
 # Visual Studio
 .vs/
@@ -67,3 +73,18 @@ cmake_install.cmake
 # OS files
 .DS_Store
 Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.env
+.coverage
+.pytest_cache/
+.python-version
+

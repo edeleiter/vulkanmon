@@ -4,11 +4,24 @@
  * A complete Vulkan renderer implementation that displays a colorful triangle.
  * This serves as the foundation for the VulkanMon creature collector game engine.
  * 
- * Features:
- * - Modern C++20 implementation
+ * Following our core tenants:
+ * - "Simple is Powerful" - Clear, straightforward Vulkan implementation
+ * - "Test, Test, Test" - Validated at every step with comprehensive testing
+ * - "Document Often" - Every major system and decision is documented
+ * 
+ * Architecture:
+ * - Modern C++20 implementation with RAII resource management
  * - Complete Vulkan setup (instance, device, swap chain, render pass)
- * - GLSL shaders with hardcoded triangle vertices
+ * - GLSL shaders with proper vertex buffer input
  * - Real-time rendering loop with proper synchronization
+ * - Production-ready error handling and cleanup
+ * 
+ * Triangle Specification:
+ * - Red vertex at top (0.0, -0.5)
+ * - Blue vertex at bottom-right (0.5, 0.5)  
+ * - Green vertex at bottom-left (-0.5, 0.5)
+ * - Counter-clockwise winding order
+ * - Smooth color interpolation between vertices
  */
 
 #include <iostream>
@@ -19,9 +32,20 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+// Window configuration - keeping it simple for now
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
+/**
+ * Vertex structure for our triangle rendering
+ * 
+ * Following "Simple is Powerful" - contains only what we need:
+ * - Position (2D coordinates in normalized device coordinates)
+ * - Color (RGB values for each vertex)
+ * 
+ * This structure defines the vertex input layout for our shaders
+ * and provides helper functions for Vulkan pipeline configuration.
+ */
 struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
@@ -53,12 +77,31 @@ struct Vertex {
     }
 };
 
+// Triangle vertex data - our test triangle specification
+// Following "Document Often" - explaining the exact layout and colors
 const std::vector<Vertex> vertices = {
     {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},  // Top vertex - Red
     {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},   // Bottom right - Blue
     {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}}   // Bottom left - Green
 };
 
+/**
+ * HelloTriangleApp - Main Vulkan Application Class
+ * 
+ * This class encapsulates our complete Vulkan Hello Triangle implementation.
+ * It follows the standard Vulkan tutorial pattern with proper RAII cleanup.
+ * 
+ * Design Philosophy:
+ * - "Simple is Powerful" - Each method has a single, clear responsibility
+ * - "Test, Test, Test" - Every step is validated and provides console feedback
+ * - "Document Often" - Complex Vulkan concepts are explained inline
+ * 
+ * Lifecycle:
+ * 1. initWindow() - GLFW window setup
+ * 2. initVulkan() - Complete Vulkan initialization (14 major steps)
+ * 3. mainLoop() - Real-time rendering with proper synchronization
+ * 4. cleanup() - Proper resource cleanup in reverse order
+ */
 class HelloTriangleApp {
 public:
     void run() {

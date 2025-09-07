@@ -57,15 +57,15 @@ VulkanMon aims to be a high-performance, cross-platform game engine that combine
 - **Languages**: C++20 (core), Cython (scripting interface), Python (game logic)
 - **Version Control**: Git with GitHub Actions for CI/CD
 - **Documentation**: Doxygen for code documentation
-- **Testing**: Google Test for unit testing
+- **Testing**: Modern pytest framework with 14 comprehensive tests
 
 ## Development Roadmap
 
-### Phase 1: Foundation (Months 1-3)
+### Phase 1: Foundation ✅ COMPLETE!
 - [x] Project setup and build system
-- [ ] Vulkan hello triangle
-- [ ] Basic resource management
-- [ ] Logging and debugging systems
+- [x] **Vulkan hello triangle** - Beautiful RGB gradient triangle rendering!
+- [x] **Modern testing framework** - 14 comprehensive tests with pytest
+- [x] **Documentation and philosophy** - Core tenants established
 
 ### Phase 2: Core Rendering (Months 4-6)
 - [ ] 3D model loading and rendering
@@ -111,17 +111,34 @@ VulkanMon aims to be a high-performance, cross-platform game engine that combine
 git clone https://github.com/yourusername/vulkanmon.git
 cd vulkanmon
 
-# Install dependencies (using vcpkg)
-vcpkg install glfw3 glm assimp bullet3 openal-soft
-
-# Build the project
+# Build the project (dependencies managed by vcpkg)
 mkdir build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build .
 
-# Run the demo
-./vulkanmon
+# Run the hello triangle demo
+Debug/vulkanmon.exe
+
+# Run the test suite
+cd ../tests
+pip install -r requirements.txt
+python -m pytest
 ```
+
+## Development Philosophy
+
+VulkanMon follows three core tenants:
+
+### 🎯 **"Simple is Powerful"**
+We favor clear, straightforward solutions over complex ones. Code should be easy to understand, maintain, and extend.
+
+### 🧪 **"Test, Test, Test"**  
+Confidence comes from thorough testing at every level - from unit tests to visual validation on real hardware. We now have 14 comprehensive tests covering build, runtime, and integration!
+
+### 📚 **"Document Often"**
+Good documentation is as important as good code. We document the "why" not just the "what".
+
+*See [DEVELOPMENT_PHILOSOPHY.md](DEVELOPMENT_PHILOSOPHY.md) for detailed guidelines.*
 
 ## Contributing
 
@@ -132,7 +149,7 @@ We welcome contributions from developers of all skill levels! Here's how you can
 - **Game Logic**: Python/Cython scripting for gameplay features
 - **Art & Assets**: 3D models, textures, animations, audio
 - **Documentation**: Tutorials, API docs, examples
-- **Testing**: Unit tests, integration tests, performance testing
+- **Testing**: Extend our comprehensive pytest framework with more test cases
 
 ### Development Guidelines
 - Follow modern C++20 best practices
