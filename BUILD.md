@@ -53,6 +53,8 @@ Debug/vulkanmon.exe
 - Make sure vcpkg is properly bootstrapped: `cd vcpkg && ./bootstrap-vcpkg.sh`
 - Reinstall dependencies: `cd vcpkg && ./vcpkg install glfw3 glm`
 
+**Note**: Our vcpkg directory is optimized - we exclude build artifacts (~108MB) while keeping essential files for easy contribution setup.
+
 ### If build fails with missing extensions
 - Update your graphics drivers
 - Verify GPU supports Vulkan: `vulkaninfo --summary`
