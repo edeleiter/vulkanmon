@@ -109,7 +109,7 @@ def test_vertex_shader_ubo_binding():
     # Verify vertex shader has UBO binding
     assert "layout(binding = 0) uniform UniformBufferObject" in shader_content
     assert "mat4 model;" in shader_content
-    assert "ubo.model * vec4(inPosition, 0.0, 1.0)" in shader_content
+    assert "ubo.model * vec4(inPosition, depth, 1.0)" in shader_content
     
     # Verify shader version and structure
     assert "#version 450" in shader_content
