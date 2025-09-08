@@ -156,6 +156,15 @@ const std::vector<uint16_t> indices = {
  */
 class HelloTriangleApp {
 public:
+    // Static key callback for hot shader reloading (Phase 2.5)
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+        HelloTriangleApp* app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
+        if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+            std::cout << "\nHot reloading shaders..." << std::endl;
+            app->reloadShaders();
+        }
+    }
+
     void run() {
         initWindow();
         initVulkan();
@@ -208,13 +217,24 @@ private:
     VkImage depthImage = VK_NULL_HANDLE;
     VkDeviceMemory depthImageMemory = VK_NULL_HANDLE;
     VkImageView depthImageView = VK_NULL_HANDLE;
+    
+    // Camera system for WASD movement (Phase 2.5)
+    glm::vec3 cameraPos = glm::vec3(2.0f, 2.0f, 2.0f);
+    glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 cameraUp = glm::vec3(0.0f, 0.0f, 1.0f);
+    float cameraSpeed = 2.5f; // units per second
+    std::chrono::high_resolution_clock::time_point lastFrameTime;
 
     void initWindow() {
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         
-        window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "VulkanMon - Hello Triangle", nullptr, nullptr);
+        window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "VulkanMon - Interactive Dev", nullptr, nullptr);
+        
+        // Set up hot reload key callback (Phase 2.5)
+        glfwSetWindowUserPointer(window, this);
+        glfwSetKeyCallback(window, keyCallback);
     }
 
     void initVulkan() {
@@ -532,6 +552,53 @@ private:
         fragShaderModule = createShaderModule(fragShaderCode);
 
         std::cout << "Shaders loaded successfully!\n";
+    }
+
+    bool recompileShaderFiles() {
+        std::cout << "Recompiling vertex shader..." << std::endl;
+        // Go up one directory from build/ to access shaders/
+        int vertResult = std::system("cd ../shaders && glslc triangle.vert -o vert.spv");
+        if (vertResult != 0) {
+            std::cout << "Vertex shader compilation failed with code: " << vertResult << std::endl;
+            return false;
+        }
+        
+        std::cout << "Recompiling fragment shader..." << std::endl;
+        int fragResult = std::system("cd ../shaders && glslc triangle.frag -o frag.spv");
+        if (fragResult != 0) {
+            std::cout << "Fragment shader compilation failed with code: " << fragResult << std::endl;
+            return false;
+        }
+        
+        std::cout << "Shaders recompiled successfully!" << std::endl;
+        return true;
+    }
+
+    void reloadShaders() {
+        try {
+            // 1. Recompile shader files
+            if (!recompileShaderFiles()) {
+                std::cout << "Shader compilation failed, keeping current shaders." << std::endl;
+                return;
+            }
+            
+            // 2. Wait for device to be idle
+            vkDeviceWaitIdle(device);
+            
+            // 3. Destroy old pipeline and shader modules
+            vkDestroyPipeline(device, graphicsPipeline, nullptr);
+            vkDestroyShaderModule(device, vertShaderModule, nullptr);
+            vkDestroyShaderModule(device, fragShaderModule, nullptr);
+            
+            // 4. Recreate shader modules and pipeline
+            createShaderModules();
+            createGraphicsPipeline();
+            
+            std::cout << "Shaders reloaded successfully!" << std::endl;
+        } catch (const std::exception& e) {
+            std::cout << "Shader reload failed: " << e.what() << std::endl;
+            std::cout << "Application may be in an unstable state." << std::endl;
+        }
     }
 
     void createGraphicsPipeline() {
@@ -895,6 +962,7 @@ private:
         vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
         vkResetFences(device, 1, &inFlightFence);
 
+        handleCameraInput();
         updateUniformBuffer();
 
         uint32_t imageIndex;
@@ -1310,6 +1378,45 @@ private:
         std::cout << "Uniform buffer created successfully!" << std::endl;
     }
 
+    void handleCameraInput() {
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        if (lastFrameTime.time_since_epoch().count() == 0) {
+            lastFrameTime = currentTime;
+            return;
+        }
+        
+        float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastFrameTime).count();
+        lastFrameTime = currentTime;
+        
+        float velocity = cameraSpeed * deltaTime;
+        
+        // Calculate camera direction vectors
+        glm::vec3 cameraDirection = glm::normalize(cameraTarget - cameraPos);
+        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraDirection, cameraUp));
+        
+        // Handle WASD input
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            cameraPos += velocity * cameraDirection;
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            cameraPos -= velocity * cameraDirection;
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            cameraPos -= velocity * cameraRight;
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            cameraPos += velocity * cameraRight;
+        }
+        
+        // Optional: Add Q/E for up/down movement
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+            cameraPos -= velocity * cameraUp;
+        }
+        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+            cameraPos += velocity * cameraUp;
+        }
+    }
+
     void updateUniformBuffer() {
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
@@ -1321,8 +1428,8 @@ private:
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(45.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         ubo.model = glm::rotate(ubo.model, time * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         
-        // View matrix: position camera back from origin
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        // View matrix: use dynamic camera position from WASD input
+        ubo.view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         
         // Projection matrix: perspective projection
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);

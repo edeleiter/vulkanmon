@@ -45,6 +45,14 @@ A comprehensive step-by-step plan from Vulkan Hello Triangle to Pokemon-like cre
 
 **🎉 Phase 2 Achievement Unlocked: Beautiful 3D rotating cube with vertex colors and depth testing! 🎉**
 
+## 🚀 Phase 2.5: Developer Experience Enhancements (Steps 27.1-27.2)
+
+### Interactive Development Features  
+- [ ] 27.1. Implement WASD camera movement controls for 3D exploration
+- [ ] 27.2. Add hot shader reloading with 'R' key for instant development feedback
+
+**Goal**: Transform our 3D foundation into an interactive development environment with real-time camera movement and instant shader iteration. These quality-of-life features will dramatically accelerate Phase 3 development.
+
 ## Phase 3: Core Engine Systems (Steps 28-37)
 
 ### Engine Architecture
@@ -99,13 +107,14 @@ A comprehensive step-by-step plan from Vulkan Hello Triangle to Pokemon-like cre
 ## Current Status
 
 **🎉 PHASE 2 COMPLETE! 🎉** ALL Steps 1-27 DONE!
-**Achievement Unlocked**: Beautiful 3D rotating cube with vertex colors, depth testing, and MVP transformations!
+**🚀 PHASE 2.5 IN PROGRESS! 🚀** Developer Experience Enhancements!
 
 ### Progress Summary
 ✅ **Phase 1 COMPLETE (Steps 1-21)**: Vulkan Hello Triangle with comprehensive testing framework!
-✅ **Phase 2 COMPLETE (Steps 22-27)**: 3D Graphics Foundation with textured cube, UBOs, depth buffer, and MVP matrices!
-🎊 **Result**: Real-time 3D cube rendering with proper depth testing and camera perspective
-🚀 **Next**: Ready for Phase 3 - Core Engine Systems!
+✅ **Phase 2 COMPLETE (Steps 22-27)**: 3D Graphics Foundation with cube, UBOs, depth buffer, and MVP matrices!
+🔥 **Phase 2.5 IN PROGRESS (Steps 27.1-27.2)**: Interactive camera controls and hot shader reloading for enhanced development workflow!
+🎊 **Result**: Interactive 3D development environment with real-time camera movement and instant shader feedback
+🚀 **Next**: Phase 3 - Core Engine Systems with enhanced development tools!
 
 ## Notes
 
