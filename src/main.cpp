@@ -148,13 +148,13 @@ private:
     VkDeviceMemory vertexBufferMemory;
     
     // Texture resources
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSet descriptorSet;
+    VkImage textureImage = VK_NULL_HANDLE;
+    VkDeviceMemory textureImageMemory = VK_NULL_HANDLE;
+    VkImageView textureImageView = VK_NULL_HANDLE;
+    VkSampler textureSampler = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 
     void initWindow() {
         glfwInit();
@@ -171,17 +171,17 @@ private:
         createLogicalDevice();
         createSwapChain();
         createRenderPass();
-        // createDescriptorSetLayout();  // Temporarily disabled
+        createDescriptorSetLayout();
         createShaderModules();
         createGraphicsPipeline();
-        // createTextureImage();         // Temporarily disabled
-        // createTextureImageView();     // Temporarily disabled  
-        // createTextureSampler();       // Temporarily disabled
-        // createDescriptorPool();       // Temporarily disabled
-        // createDescriptorSet();        // Temporarily disabled
         createFramebuffers();
         createCommandPool();
         createVertexBuffer();
+        createTextureImage();
+        createTextureImageView();
+        createTextureSampler();
+        createDescriptorPool();
+        createDescriptorSet();
         createCommandBuffers();
         recordCommandBuffers();
         createSyncObjects();
@@ -441,10 +441,17 @@ private:
     }
 
     void createShaderModules() {
+        std::cout << "Loading vertex shader...\n";
         auto vertShaderCode = readFile("shaders/triangle_vert.spv");
+        std::cout << "Vertex shader read, size: " << vertShaderCode.size() << " bytes\n";
+        
+        std::cout << "Loading fragment shader...\n";
         auto fragShaderCode = readFile("shaders/triangle_frag.spv");
+        std::cout << "Fragment shader read, size: " << fragShaderCode.size() << " bytes\n";
 
+        std::cout << "Creating vertex shader module...\n";
         vertShaderModule = createShaderModule(vertShaderCode);
+        std::cout << "Creating fragment shader module...\n";
         fragShaderModule = createShaderModule(fragShaderCode);
 
         std::cout << "Shaders loaded successfully!\n";
@@ -534,7 +541,8 @@ private:
         // Pipeline layout
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 0;  // Temporarily disable descriptor sets
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 0;
 
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -712,8 +720,7 @@ private:
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
             
-            // Temporarily disabled descriptor set binding
-            // vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
             
             VkBuffer vertexBuffers[] = {vertexBuffer};
             VkDeviceSize offsets[] = {0};
@@ -1130,13 +1137,13 @@ private:
     }
 
     void cleanup() {
-        // Cleanup texture resources
-        vkDestroySampler(device, textureSampler, nullptr);
-        vkDestroyImageView(device, textureImageView, nullptr);
-        vkDestroyImage(device, textureImage, nullptr);
-        vkFreeMemory(device, textureImageMemory, nullptr);
-        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+        // Cleanup texture resources (with null checks)
+        if (textureSampler != VK_NULL_HANDLE) vkDestroySampler(device, textureSampler, nullptr);
+        if (textureImageView != VK_NULL_HANDLE) vkDestroyImageView(device, textureImageView, nullptr);
+        if (textureImage != VK_NULL_HANDLE) vkDestroyImage(device, textureImage, nullptr);
+        if (textureImageMemory != VK_NULL_HANDLE) vkFreeMemory(device, textureImageMemory, nullptr);
+        if (descriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+        if (descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
         
         // Cleanup other resources
         vkDestroyBuffer(device, vertexBuffer, nullptr);
