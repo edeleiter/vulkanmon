@@ -441,17 +441,10 @@ private:
     }
 
     void createShaderModules() {
-        std::cout << "Loading vertex shader...\n";
         auto vertShaderCode = readFile("shaders/triangle_vert.spv");
-        std::cout << "Vertex shader read, size: " << vertShaderCode.size() << " bytes\n";
-        
-        std::cout << "Loading fragment shader...\n";
         auto fragShaderCode = readFile("shaders/triangle_frag.spv");
-        std::cout << "Fragment shader read, size: " << fragShaderCode.size() << " bytes\n";
 
-        std::cout << "Creating vertex shader module...\n";
         vertShaderModule = createShaderModule(vertShaderCode);
-        std::cout << "Creating fragment shader module...\n";
         fragShaderModule = createShaderModule(fragShaderCode);
 
         std::cout << "Shaders loaded successfully!\n";
