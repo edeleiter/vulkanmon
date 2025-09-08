@@ -142,8 +142,8 @@ def test_shader_texture_binding():
     with open(shader_path, 'r') as f:
         shader_content = f.read()
     
-    # Verify fragment shader has texture sampler binding
-    assert "layout(binding = 0) uniform sampler2D texSampler;" in shader_content
+    # Verify fragment shader has texture sampler binding (moved to binding 1 for UBOs)
+    assert "layout(binding = 1) uniform sampler2D texSampler;" in shader_content
     assert "texture(texSampler, fragTexCoord)" in shader_content
     
     # Verify shader version and inputs
