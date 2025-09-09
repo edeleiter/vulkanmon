@@ -67,9 +67,13 @@ VulkanMon aims to be a high-performance, cross-platform game engine that combine
 - [x] **Modern testing framework** - 14 comprehensive tests with pytest
 - [x] **Documentation and philosophy** - Core tenants established
 
-### Phase 2: Core Rendering (Months 4-6)
-- [ ] 3D model loading and rendering
-- [ ] Camera system and controls
+### Phase 2: 3D Graphics Foundation 🚀 IN PROGRESS
+- [ ] **Texture loading and sampling** - Apply textures to our triangle
+- [ ] **Uniform Buffer Objects (UBOs)** - Pass 3D transformation data to shaders
+- [ ] **Depth testing and depth buffer** - Proper 3D rendering depth sorting  
+- [ ] **3D model rendering** - Replace triangle with a spinning textured cube
+- [ ] **Camera system** - WASD movement and mouse look controls
+- [ ] **Model-View-Projection matrices** - Full 3D transformation pipeline
 - [ ] Basic lighting and materials
 - [ ] Texture management
 

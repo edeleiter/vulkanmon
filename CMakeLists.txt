@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
+find_package(Stb REQUIRED)
 
 # Create executable
 add_executable(vulkanmon
@@ -24,6 +25,7 @@ target_link_libraries(vulkanmon PRIVATE
 # Include directories
 target_include_directories(vulkanmon PRIVATE
     ${Vulkan_INCLUDE_DIRS}
+    ${Stb_INCLUDE_DIR}
 )
 
 # Enable debug info

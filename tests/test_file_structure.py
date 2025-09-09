@@ -28,8 +28,8 @@ def test_shader_files(project_root):
     required_shader_files = [
         "shaders/triangle.vert",
         "shaders/triangle.frag", 
-        "shaders/triangle_vert.spv",
-        "shaders/triangle_frag.spv",
+        "shaders/vert.spv",
+        "shaders/frag.spv",
     ]
     
     for file_path in required_shader_files:
