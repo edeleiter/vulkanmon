@@ -13,6 +13,8 @@ find_package(Stb REQUIRED)
 # Create executable
 add_executable(vulkanmon
     src/main.cpp
+    src/Camera.cpp
+    src/Utils.cpp
 )
 
 # Link libraries

@@ -33,12 +33,23 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 
+#include "Camera.h"
+#include "Utils.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-// Window configuration - keeping it simple for now
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
+// Configuration constants - keeping it simple for now
+constexpr int WINDOW_WIDTH = 800;
+constexpr int WINDOW_HEIGHT = 600;
+constexpr float CAMERA_SPEED = 2.5f;
+constexpr float CAMERA_FOV = 45.0f;
+constexpr float NEAR_PLANE = 0.1f;
+constexpr float FAR_PLANE = 10.0f;
+constexpr const char* VERTEX_SHADER_SOURCE = "shaders/triangle.vert";
+constexpr const char* FRAGMENT_SHADER_SOURCE = "shaders/triangle.frag";
+constexpr const char* VERTEX_SHADER_COMPILED = "shaders/vert.spv";
+constexpr const char* FRAGMENT_SHADER_COMPILED = "shaders/frag.spv";
 
 /**
  * Vertex structure for 3D cube rendering
@@ -160,7 +171,7 @@ public:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         HelloTriangleApp* app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
         if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-            std::cout << "\nHot reloading shaders..." << std::endl;
+            std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
             app->reloadShaders();
         }
     }
@@ -219,11 +230,7 @@ private:
     VkImageView depthImageView = VK_NULL_HANDLE;
     
     // Camera system for WASD movement (Phase 2.5)
-    glm::vec3 cameraPos = glm::vec3(2.0f, 2.0f, 2.0f);
-    glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 cameraUp = glm::vec3(0.0f, 0.0f, 1.0f);
-    float cameraSpeed = 2.5f; // units per second
-    std::chrono::high_resolution_clock::time_point lastFrameTime;
+    Camera camera;
 
     void initWindow() {
         glfwInit();
@@ -492,43 +499,6 @@ private:
         std::cout << "Render pass created successfully!\n";
     }
 
-    static std::vector<char> readFile(const std::string& filename) {
-        // Try multiple common locations for shader files
-        std::vector<std::string> searchPaths = {
-            filename,                    // Direct path (current working directory)
-            "../" + filename,           // One level up (if running from build/)
-            "../../" + filename,        // Two levels up
-            "./" + filename             // Explicit current directory
-        };
-        
-        std::ifstream file;
-        std::string foundPath;
-        
-        for (const auto& path : searchPaths) {
-            file.open(path, std::ios::ate | std::ios::binary);
-            if (file.is_open()) {
-                foundPath = path;
-                break;
-            }
-        }
-        
-        if (!file.is_open()) {
-            std::string errorMsg = "Failed to open file: " + filename + "\nSearched paths:\n";
-            for (const auto& path : searchPaths) {
-                errorMsg += "  - " + path + "\n";
-            }
-            throw std::runtime_error(errorMsg);
-        }
-
-        size_t fileSize = (size_t) file.tellg();
-        std::vector<char> buffer(fileSize);
-
-        file.seekg(0);
-        file.read(buffer.data(), fileSize);
-        file.close();
-
-        return buffer;
-    }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         VkShaderModuleCreateInfo createInfo{};
@@ -545,8 +515,8 @@ private:
     }
 
     void createShaderModules() {
-        auto vertShaderCode = readFile("shaders/vert.spv");
-        auto fragShaderCode = readFile("shaders/frag.spv");
+        auto vertShaderCode = Utils::readFile(VERTEX_SHADER_COMPILED);
+        auto fragShaderCode = Utils::readFile(FRAGMENT_SHADER_COMPILED);
 
         vertShaderModule = createShaderModule(vertShaderCode);
         fragShaderModule = createShaderModule(fragShaderCode);
@@ -554,31 +524,12 @@ private:
         std::cout << "Shaders loaded successfully!\n";
     }
 
-    bool recompileShaderFiles() {
-        std::cout << "Recompiling vertex shader..." << std::endl;
-        // Go up one directory from build/ to access shaders/
-        int vertResult = std::system("cd ../shaders && glslc triangle.vert -o vert.spv");
-        if (vertResult != 0) {
-            std::cout << "Vertex shader compilation failed with code: " << vertResult << std::endl;
-            return false;
-        }
-        
-        std::cout << "Recompiling fragment shader..." << std::endl;
-        int fragResult = std::system("cd ../shaders && glslc triangle.frag -o frag.spv");
-        if (fragResult != 0) {
-            std::cout << "Fragment shader compilation failed with code: " << fragResult << std::endl;
-            return false;
-        }
-        
-        std::cout << "Shaders recompiled successfully!" << std::endl;
-        return true;
-    }
 
     void reloadShaders() {
         try {
             // 1. Recompile shader files
-            if (!recompileShaderFiles()) {
-                std::cout << "Shader compilation failed, keeping current shaders." << std::endl;
+            if (!Utils::recompileShaders()) {
+                std::cout << "[ERROR] Hot reload failed - keeping current shaders active" << std::endl;
                 return;
             }
             
@@ -594,10 +545,10 @@ private:
             createShaderModules();
             createGraphicsPipeline();
             
-            std::cout << "Shaders reloaded successfully!" << std::endl;
+            std::cout << "[SUCCESS] Hot reload complete - new shaders active!" << std::endl;
         } catch (const std::exception& e) {
-            std::cout << "Shader reload failed: " << e.what() << std::endl;
-            std::cout << "Application may be in an unstable state." << std::endl;
+            std::cout << "[ERROR] Hot reload failed: " << e.what() << std::endl;
+            std::cout << "[WARN] Application continuing with previous shaders" << std::endl;
         }
     }
 
@@ -1379,42 +1330,7 @@ private:
     }
 
     void handleCameraInput() {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        if (lastFrameTime.time_since_epoch().count() == 0) {
-            lastFrameTime = currentTime;
-            return;
-        }
-        
-        float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastFrameTime).count();
-        lastFrameTime = currentTime;
-        
-        float velocity = cameraSpeed * deltaTime;
-        
-        // Calculate camera direction vectors
-        glm::vec3 cameraDirection = glm::normalize(cameraTarget - cameraPos);
-        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraDirection, cameraUp));
-        
-        // Handle WASD input
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            cameraPos += velocity * cameraDirection;
-        }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            cameraPos -= velocity * cameraDirection;
-        }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            cameraPos -= velocity * cameraRight;
-        }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            cameraPos += velocity * cameraRight;
-        }
-        
-        // Optional: Add Q/E for up/down movement
-        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
-            cameraPos -= velocity * cameraUp;
-        }
-        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
-            cameraPos += velocity * cameraUp;
-        }
+        camera.processInput(window);
     }
 
     void updateUniformBuffer() {
@@ -1425,14 +1341,14 @@ private:
         UniformBufferObject ubo{};
         
         // Model matrix: 3D rotation around both X and Y axes for full 3D effect
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(45.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(CAMERA_FOV), glm::vec3(1.0f, 0.0f, 0.0f));
         ubo.model = glm::rotate(ubo.model, time * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         
         // View matrix: use dynamic camera position from WASD input
-        ubo.view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        ubo.view = camera.getViewMatrix();
         
         // Projection matrix: perspective projection
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent.width / (float) swapChainExtent.height, NEAR_PLANE, FAR_PLANE);
         
         // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
         ubo.proj[1][1] *= -1;
