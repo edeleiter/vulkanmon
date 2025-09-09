@@ -1,26 +1,40 @@
 /*
  * VulkanMon - 3D Graphics Engine
  * 
- * Complete 3D Vulkan renderer with textured rotating cube and depth testing.
- * Foundation for the VulkanMon creature collector game engine.
+ * Complete 3D Vulkan renderer with advanced core engine systems.
+ * Production-ready foundation for the VulkanMon creature collector game engine.
  * 
- * Phase 2 Complete - 3D Graphics Foundation:
- * ✅ Step 22: Texture Loading and Sampling
- * ✅ Step 23: Uniform Buffer Objects (UBOs)  
- * ✅ Step 24: Depth Testing and Depth Buffer
- * ✅ Step 25: 3D Cube Rendering with Index Buffers
+ * ✅ Phase 1 COMPLETE: Foundation & Hello Triangle
+ * ✅ Phase 2 COMPLETE: 3D Graphics Foundation (Steps 22-27) 
+ * ✅ Phase 2.5 COMPLETE: Interactive Development (WASD camera, hot shader reload)
+ * ✅ Phase 3 COMPLETE: Core Engine Systems (Steps 28-31)
+ * 
+ * Phase 3 - Core Engine Systems:
+ * ✅ Step 28: Resource Management System - RAII wrappers for all Vulkan resources
+ * ✅ Step 29: Logging System - Thread-safe logging with multiple levels and outputs
+ * ✅ Step 30: Asset Loading Pipeline - Texture loading, caching, organized asset directories
+ * ✅ Step 31: Assimp Integration - Load 40+ 3D model formats (.obj, .fbx, .gltf, etc.)
  * 
  * Following our core principles:
- * - "Simple is Powerful" - Clean, maintainable Vulkan implementation
- * - "Test, Test, Test" - 25/25 tests passing, validated at every step
- * - "Document Often" - Every major system and decision documented
+ * - "Simple is Powerful" - Clean APIs, clear separation of concerns, modern C++20
+ * - "Test, Test, Test" - Comprehensive logging, error handling, resource validation
+ * - "Document Often" - Detailed system documentation and clear code organization
  * 
  * Current Features:
- * - Modern C++20 with RAII resource management
- * - Complete Vulkan 3D pipeline (MVP matrices, depth testing)
- * - Textured 3D cube with 6 colored faces and proper depth ordering
- * - Real-time rotation animation via UBO matrix updates
- * - Production-ready error handling and resource cleanup
+ * - Modern C++20 with comprehensive RAII resource management
+ * - Complete Vulkan 3D pipeline with MVP matrices and depth testing
+ * - Professional logging system with performance monitoring
+ * - Asset management system with texture loading and caching
+ * - Full Assimp integration for loading 3D models from assets/models/
+ * - Interactive camera controls (WASD+QE) and hot shader reloading (R key)
+ * - Production-ready error handling and automatic resource cleanup
+ * 
+ * Architecture:
+ * - ResourceManager: RAII wrappers for VkBuffer, VkImage, memory management
+ * - Logger: Thread-safe logging with console/file output and performance tracking
+ * - AssetManager: Texture loading, caching, asset discovery and validation
+ * - ModelLoader: Assimp-based 3D model loading with material and texture support
+ * - Camera: Interactive WASD movement with mouse look (Phase 2.5)
  */
 
 #include <iostream>
@@ -35,9 +49,15 @@
 
 #include "Camera.h"
 #include "Utils.h"
+#include "Logger.h"
+#include "ResourceManager.h" 
+#include "AssetManager.h"
+#include "ModelLoader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+using namespace VulkanMon;
 
 // Configuration constants - keeping it simple for now
 constexpr int WINDOW_WIDTH = 800;
@@ -231,6 +251,12 @@ private:
     
     // Camera system for WASD movement (Phase 2.5)
     Camera camera;
+    
+    // Phase 3: Core Engine Systems
+    std::shared_ptr<ResourceManager> resourceManager;
+    std::shared_ptr<AssetManager> assetManager;
+    std::shared_ptr<ModelLoader> modelLoader;
+    std::unique_ptr<Model> currentModel;
 
     void initWindow() {
         glfwInit();
@@ -245,6 +271,11 @@ private:
     }
 
     void initVulkan() {
+        // Initialize logging system
+        Logger::getInstance().enableConsoleOutput(true);
+        Logger::getInstance().setLogLevel(LogLevel::INFO);
+        VKMON_INFO("VulkanMon Phase 3 - Initializing Core Engine Systems");
+        
         createInstance();
         createSurface();
         pickPhysicalDevice();
@@ -257,8 +288,13 @@ private:
         createDepthResources();
         createFramebuffers();
         createCommandPool();
-        createVertexBuffer();
-        createIndexBuffer();
+        
+        // Initialize Phase 3 systems (after command pool creation)
+        initCoreEngineSystems();
+        
+        // Load 3D model with new model system
+        loadTestModel();
+        
         createUniformBuffer();
         createTextureImage();
         createTextureImageView();
@@ -568,9 +604,9 @@ private:
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-        // Vertex input (from vertex buffer)
-        auto bindingDescription = Vertex::getBindingDescription();
-        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+        // Vertex input (Phase 3: using ModelVertex structure)
+        auto bindingDescription = ModelVertex::getBindingDescription();
+        auto attributeDescriptions = ModelVertex::getAttributeDescriptions();
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -868,12 +904,19 @@ private:
             
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
             
-            VkBuffer vertexBuffers[] = {vertexBuffer};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            
-            vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            // Phase 3: Render loaded 3D model instead of hardcoded geometry
+            if (currentModel && !currentModel->meshes.empty()) {
+                for (const auto& mesh : currentModel->meshes) {
+                    if (mesh->vertexBuffer && mesh->indexBuffer) {
+                        VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
+                        VkDeviceSize offsets[] = {0};
+                        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+                        vkCmdBindIndexBuffer(commandBuffers[i], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                        
+                        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
+                    }
+                }
+            }
             vkCmdEndRenderPass(commandBuffers[i]);
 
             if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -1393,8 +1436,60 @@ private:
 
         std::cout << "Depth buffer created successfully!" << std::endl;
     }
+    
+    // Phase 3: Core Engine System Initialization
+    void initCoreEngineSystems() {
+        VKMON_INFO("Initializing ResourceManager...");
+        resourceManager = std::make_shared<ResourceManager>(device, physicalDevice);
+        
+        VKMON_INFO("Initializing AssetManager...");
+        assetManager = std::make_shared<AssetManager>(device, physicalDevice, commandPool, graphicsQueue);
+        
+        VKMON_INFO("Initializing ModelLoader...");
+        modelLoader = std::make_shared<ModelLoader>(resourceManager, assetManager);
+        
+        VKMON_INFO("Core engine systems initialized successfully!");
+    }
+    
+    void loadTestModel() {
+        VKMON_INFO("Loading test model...");
+        
+        try {
+            // Try to load the test cube we created
+            currentModel = modelLoader->loadModel("test_cube.obj");
+            VKMON_INFO("Test cube model loaded successfully!");
+        } catch (const std::exception& e) {
+            VKMON_WARNING("Failed to load test_cube.obj, creating procedural cube: " + std::string(e.what()));
+            // Fallback to procedural cube
+            currentModel = modelLoader->createTestCube();
+            VKMON_INFO("Procedural test cube created successfully!");
+        }
+    }
 
     void cleanup() {
+        VKMON_INFO("Beginning VulkanMon cleanup...");
+        
+        // Phase 3: Cleanup core engine systems
+        if (currentModel) {
+            VKMON_INFO("Cleaning up loaded model...");
+            currentModel.reset();
+        }
+        
+        if (modelLoader) {
+            modelLoader->printLoadingSummary();
+            modelLoader.reset();
+        }
+        
+        if (assetManager) {
+            assetManager->printAssetSummary();
+            assetManager.reset();
+        }
+        
+        if (resourceManager) {
+            resourceManager->printResourceSummary();
+            resourceManager.reset();
+        }
+        
         // Cleanup depth buffer resources (with null checks)
         if (depthImageView != VK_NULL_HANDLE) vkDestroyImageView(device, depthImageView, nullptr);
         if (depthImage != VK_NULL_HANDLE) vkDestroyImage(device, depthImage, nullptr);
