@@ -12,24 +12,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find packages (vcpkg will handle these automatically)
-find_package(Vulkan REQUIRED)
+find_package(Vulkan REQUIRED COMPONENTS glslangValidator)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 
 # Create executable
-# Find glslangValidator for shader compilation
-find_program(GLSL_VALIDATOR glslangValidator 
-    HINTS 
-        $ENV{VULKAN_SDK}/bin
-        ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-windows/tools/glslang
-        ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-linux/tools/glslang
-        ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/glslang
-)
-if(NOT GLSL_VALIDATOR)
+# Use CMake's Vulkan component for glslangValidator
+if(NOT Vulkan_glslangValidator_FOUND)
     message(FATAL_ERROR "glslangValidator not found! Make sure Vulkan SDK is installed or vcpkg glslang package is available.")
 endif()
+set(GLSL_VALIDATOR ${Vulkan_GLSLANG_VALIDATOR_EXECUTABLE})
 
 # Function to compile shaders
 function(compile_shader SOURCE_FILE TARGET_FILE)
