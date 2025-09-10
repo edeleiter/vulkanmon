@@ -31,6 +31,9 @@ void main() {
     // Normalize the interpolated normal
     vec3 normal = normalize(fragNormal);
     
+    // Sample texture for base color (optional - can be used to modulate materials)
+    vec3 textureColor = texture(texSampler, fragTexCoord).rgb;
+    
     // Calculate ambient lighting with material ambient property
     vec3 ambient = lighting.ambientColor * lighting.ambientIntensity * material.ambient.xyz;
     
@@ -39,14 +42,17 @@ void main() {
     float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = diff * lighting.directionalLightColor * lighting.directionalLightIntensity * material.diffuse.xyz;
     
-    // Calculate specular lighting with material specular property
+    // Calculate specular lighting with material specular property (Blinn-Phong)
     vec3 viewDir = normalize(cameraPos - worldPos);
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    vec3 halfwayDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
     vec3 specular = spec * lighting.directionalLightColor * lighting.directionalLightIntensity * material.specular.xyz;
     
-    // Combine lighting components with material properties
-    vec3 result = (ambient + diffuse + specular) * fragColor;
+    // Combine lighting components - material properties ARE the color
+    vec3 result = ambient + diffuse + specular;
+    
+    // Optionally modulate with texture (can be disabled for pure material testing)
+    // result *= textureColor;
     
     outColor = vec4(result, 1.0);
     

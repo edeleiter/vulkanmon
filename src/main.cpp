@@ -1429,35 +1429,35 @@ private:
         
         switch (currentLightingPreset) {
             case 0: // Default lighting
-                lighting.directionalLight.direction = glm::vec3(0.0f, -1.0f, -0.3f);
-                lighting.directionalLight.intensity = 1.0f;
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(0.2f, -1.0f, -0.3f));
+                lighting.directionalLight.intensity = 1.2f;
                 lighting.directionalLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
-                lighting.ambientColor = glm::vec3(0.2f, 0.2f, 0.3f);
-                lighting.ambientIntensity = 0.3f;
+                lighting.ambientColor = glm::vec3(0.15f, 0.15f, 0.2f);
+                lighting.ambientIntensity = 0.25f;
                 std::cout << "[LIGHTING] Preset: Default" << std::endl;
                 break;
             case 1: // Bright daylight
-                lighting.directionalLight.direction = glm::vec3(0.2f, -1.0f, -0.1f);
-                lighting.directionalLight.intensity = 1.5f;
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(0.3f, -1.0f, -0.2f));
+                lighting.directionalLight.intensity = 1.8f;
                 lighting.directionalLight.color = glm::vec3(1.0f, 0.95f, 0.8f);
-                lighting.ambientColor = glm::vec3(0.4f, 0.4f, 0.5f);
-                lighting.ambientIntensity = 0.4f;
+                lighting.ambientColor = glm::vec3(0.3f, 0.3f, 0.4f);
+                lighting.ambientIntensity = 0.35f;
                 std::cout << "[LIGHTING] Preset: Bright Daylight" << std::endl;
                 break;
             case 2: // Warm sunset
-                lighting.directionalLight.direction = glm::vec3(1.0f, -0.5f, 0.0f);
-                lighting.directionalLight.intensity = 0.8f;
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(1.0f, -0.6f, 0.2f));
+                lighting.directionalLight.intensity = 1.0f;
                 lighting.directionalLight.color = glm::vec3(1.0f, 0.6f, 0.3f);
-                lighting.ambientColor = glm::vec3(0.3f, 0.2f, 0.1f);
-                lighting.ambientIntensity = 0.5f;
+                lighting.ambientColor = glm::vec3(0.25f, 0.15f, 0.1f);
+                lighting.ambientIntensity = 0.4f;
                 std::cout << "[LIGHTING] Preset: Warm Sunset" << std::endl;
                 break;
             case 3: // Cool moonlight
-                lighting.directionalLight.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
-                lighting.directionalLight.intensity = 0.4f;
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, 0.3f));
+                lighting.directionalLight.intensity = 0.6f;
                 lighting.directionalLight.color = glm::vec3(0.6f, 0.7f, 1.0f);
-                lighting.ambientColor = glm::vec3(0.1f, 0.1f, 0.2f);
-                lighting.ambientIntensity = 0.2f;
+                lighting.ambientColor = glm::vec3(0.05f, 0.05f, 0.15f);
+                lighting.ambientIntensity = 0.15f;
                 std::cout << "[LIGHTING] Preset: Cool Moonlight" << std::endl;
                 break;
         }
