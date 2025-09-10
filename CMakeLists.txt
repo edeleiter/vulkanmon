@@ -9,10 +9,17 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(Stb REQUIRED)
+find_package(assimp REQUIRED)
 
 # Create executable
 add_executable(vulkanmon
     src/main.cpp
+    src/Camera.cpp
+    src/Utils.cpp
+    src/ResourceManager.cpp
+    src/Logger.cpp
+    src/AssetManager.cpp
+    src/ModelLoader.cpp
 )
 
 # Link libraries
@@ -20,6 +27,7 @@ target_link_libraries(vulkanmon PRIVATE
     Vulkan::Vulkan
     glfw
     glm::glm
+    assimp::assimp
 )
 
 # Include directories
@@ -31,4 +39,10 @@ target_include_directories(vulkanmon PRIVATE
 # Enable debug info
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(vulkanmon PRIVATE DEBUG)
+endif()
+
+# Add tests subdirectory (optional - can be disabled for release builds)
+option(BUILD_TESTS "Build unit tests" ON)
+if(BUILD_TESTS)
+    add_subdirectory(tests_cpp)
 endif()

@@ -1,26 +1,40 @@
 /*
  * VulkanMon - 3D Graphics Engine
  * 
- * Complete 3D Vulkan renderer with textured rotating cube and depth testing.
- * Foundation for the VulkanMon creature collector game engine.
+ * Complete 3D Vulkan renderer with advanced core engine systems.
+ * Production-ready foundation for the VulkanMon creature collector game engine.
  * 
- * Phase 2 Complete - 3D Graphics Foundation:
- * ✅ Step 22: Texture Loading and Sampling
- * ✅ Step 23: Uniform Buffer Objects (UBOs)  
- * ✅ Step 24: Depth Testing and Depth Buffer
- * ✅ Step 25: 3D Cube Rendering with Index Buffers
+ * ✅ Phase 1 COMPLETE: Foundation & Hello Triangle
+ * ✅ Phase 2 COMPLETE: 3D Graphics Foundation (Steps 22-27) 
+ * ✅ Phase 2.5 COMPLETE: Interactive Development (WASD camera, hot shader reload)
+ * ✅ Phase 3 COMPLETE: Core Engine Systems (Steps 28-31)
+ * 
+ * Phase 3 - Core Engine Systems:
+ * ✅ Step 28: Resource Management System - RAII wrappers for all Vulkan resources
+ * ✅ Step 29: Logging System - Thread-safe logging with multiple levels and outputs
+ * ✅ Step 30: Asset Loading Pipeline - Texture loading, caching, organized asset directories
+ * ✅ Step 31: Assimp Integration - Load 40+ 3D model formats (.obj, .fbx, .gltf, etc.)
  * 
  * Following our core principles:
- * - "Simple is Powerful" - Clean, maintainable Vulkan implementation
- * - "Test, Test, Test" - 25/25 tests passing, validated at every step
- * - "Document Often" - Every major system and decision documented
+ * - "Simple is Powerful" - Clean APIs, clear separation of concerns, modern C++20
+ * - "Test, Test, Test" - Comprehensive logging, error handling, resource validation
+ * - "Document Often" - Detailed system documentation and clear code organization
  * 
  * Current Features:
- * - Modern C++20 with RAII resource management
- * - Complete Vulkan 3D pipeline (MVP matrices, depth testing)
- * - Textured 3D cube with 6 colored faces and proper depth ordering
- * - Real-time rotation animation via UBO matrix updates
- * - Production-ready error handling and resource cleanup
+ * - Modern C++20 with comprehensive RAII resource management
+ * - Complete Vulkan 3D pipeline with MVP matrices and depth testing
+ * - Professional logging system with performance monitoring
+ * - Asset management system with texture loading and caching
+ * - Full Assimp integration for loading 3D models from assets/models/
+ * - Interactive camera controls (WASD+QE) and hot shader reloading (R key)
+ * - Production-ready error handling and automatic resource cleanup
+ * 
+ * Architecture:
+ * - ResourceManager: RAII wrappers for VkBuffer, VkImage, memory management
+ * - Logger: Thread-safe logging with console/file output and performance tracking
+ * - AssetManager: Texture loading, caching, asset discovery and validation
+ * - ModelLoader: Assimp-based 3D model loading with material and texture support
+ * - Camera: Interactive WASD movement with mouse look (Phase 2.5)
  */
 
 #include <iostream>
@@ -33,12 +47,29 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 
+#include "Camera.h"
+#include "Utils.h"
+#include "Logger.h"
+#include "ResourceManager.h" 
+#include "AssetManager.h"
+#include "ModelLoader.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-// Window configuration - keeping it simple for now
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
+using namespace VulkanMon;
+
+// Configuration constants - keeping it simple for now
+constexpr int WINDOW_WIDTH = 800;
+constexpr int WINDOW_HEIGHT = 600;
+constexpr float CAMERA_SPEED = 2.5f;
+constexpr float CAMERA_FOV = 45.0f;
+constexpr float NEAR_PLANE = 0.1f;
+constexpr float FAR_PLANE = 10.0f;
+constexpr const char* VERTEX_SHADER_SOURCE = "shaders/triangle.vert";
+constexpr const char* FRAGMENT_SHADER_SOURCE = "shaders/triangle.frag";
+constexpr const char* VERTEX_SHADER_COMPILED = "shaders/vert.spv";
+constexpr const char* FRAGMENT_SHADER_COMPILED = "shaders/frag.spv";
 
 /**
  * Vertex structure for 3D cube rendering
@@ -160,7 +191,7 @@ public:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         HelloTriangleApp* app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
         if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-            std::cout << "\nHot reloading shaders..." << std::endl;
+            std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
             app->reloadShaders();
         }
     }
@@ -219,11 +250,13 @@ private:
     VkImageView depthImageView = VK_NULL_HANDLE;
     
     // Camera system for WASD movement (Phase 2.5)
-    glm::vec3 cameraPos = glm::vec3(2.0f, 2.0f, 2.0f);
-    glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 cameraUp = glm::vec3(0.0f, 0.0f, 1.0f);
-    float cameraSpeed = 2.5f; // units per second
-    std::chrono::high_resolution_clock::time_point lastFrameTime;
+    Camera camera;
+    
+    // Phase 3: Core Engine Systems
+    std::shared_ptr<ResourceManager> resourceManager;
+    std::shared_ptr<AssetManager> assetManager;
+    std::shared_ptr<ModelLoader> modelLoader;
+    std::unique_ptr<Model> currentModel;
 
     void initWindow() {
         glfwInit();
@@ -238,6 +271,11 @@ private:
     }
 
     void initVulkan() {
+        // Initialize logging system
+        Logger::getInstance().enableConsoleOutput(true);
+        Logger::getInstance().setLogLevel(LogLevel::INFO);
+        VKMON_INFO("VulkanMon Phase 3 - Initializing Core Engine Systems");
+        
         createInstance();
         createSurface();
         pickPhysicalDevice();
@@ -250,8 +288,13 @@ private:
         createDepthResources();
         createFramebuffers();
         createCommandPool();
-        createVertexBuffer();
-        createIndexBuffer();
+        
+        // Initialize Phase 3 systems (after command pool creation)
+        initCoreEngineSystems();
+        
+        // Load 3D model with new model system
+        loadTestModel();
+        
         createUniformBuffer();
         createTextureImage();
         createTextureImageView();
@@ -492,43 +535,6 @@ private:
         std::cout << "Render pass created successfully!\n";
     }
 
-    static std::vector<char> readFile(const std::string& filename) {
-        // Try multiple common locations for shader files
-        std::vector<std::string> searchPaths = {
-            filename,                    // Direct path (current working directory)
-            "../" + filename,           // One level up (if running from build/)
-            "../../" + filename,        // Two levels up
-            "./" + filename             // Explicit current directory
-        };
-        
-        std::ifstream file;
-        std::string foundPath;
-        
-        for (const auto& path : searchPaths) {
-            file.open(path, std::ios::ate | std::ios::binary);
-            if (file.is_open()) {
-                foundPath = path;
-                break;
-            }
-        }
-        
-        if (!file.is_open()) {
-            std::string errorMsg = "Failed to open file: " + filename + "\nSearched paths:\n";
-            for (const auto& path : searchPaths) {
-                errorMsg += "  - " + path + "\n";
-            }
-            throw std::runtime_error(errorMsg);
-        }
-
-        size_t fileSize = (size_t) file.tellg();
-        std::vector<char> buffer(fileSize);
-
-        file.seekg(0);
-        file.read(buffer.data(), fileSize);
-        file.close();
-
-        return buffer;
-    }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         VkShaderModuleCreateInfo createInfo{};
@@ -545,8 +551,8 @@ private:
     }
 
     void createShaderModules() {
-        auto vertShaderCode = readFile("shaders/vert.spv");
-        auto fragShaderCode = readFile("shaders/frag.spv");
+        auto vertShaderCode = Utils::readFile(VERTEX_SHADER_COMPILED);
+        auto fragShaderCode = Utils::readFile(FRAGMENT_SHADER_COMPILED);
 
         vertShaderModule = createShaderModule(vertShaderCode);
         fragShaderModule = createShaderModule(fragShaderCode);
@@ -554,31 +560,12 @@ private:
         std::cout << "Shaders loaded successfully!\n";
     }
 
-    bool recompileShaderFiles() {
-        std::cout << "Recompiling vertex shader..." << std::endl;
-        // Go up one directory from build/ to access shaders/
-        int vertResult = std::system("cd ../shaders && glslc triangle.vert -o vert.spv");
-        if (vertResult != 0) {
-            std::cout << "Vertex shader compilation failed with code: " << vertResult << std::endl;
-            return false;
-        }
-        
-        std::cout << "Recompiling fragment shader..." << std::endl;
-        int fragResult = std::system("cd ../shaders && glslc triangle.frag -o frag.spv");
-        if (fragResult != 0) {
-            std::cout << "Fragment shader compilation failed with code: " << fragResult << std::endl;
-            return false;
-        }
-        
-        std::cout << "Shaders recompiled successfully!" << std::endl;
-        return true;
-    }
 
     void reloadShaders() {
         try {
             // 1. Recompile shader files
-            if (!recompileShaderFiles()) {
-                std::cout << "Shader compilation failed, keeping current shaders." << std::endl;
+            if (!Utils::recompileShaders()) {
+                std::cout << "[ERROR] Hot reload failed - keeping current shaders active" << std::endl;
                 return;
             }
             
@@ -594,10 +581,10 @@ private:
             createShaderModules();
             createGraphicsPipeline();
             
-            std::cout << "Shaders reloaded successfully!" << std::endl;
+            std::cout << "[SUCCESS] Hot reload complete - new shaders active!" << std::endl;
         } catch (const std::exception& e) {
-            std::cout << "Shader reload failed: " << e.what() << std::endl;
-            std::cout << "Application may be in an unstable state." << std::endl;
+            std::cout << "[ERROR] Hot reload failed: " << e.what() << std::endl;
+            std::cout << "[WARN] Application continuing with previous shaders" << std::endl;
         }
     }
 
@@ -617,9 +604,9 @@ private:
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-        // Vertex input (from vertex buffer)
-        auto bindingDescription = Vertex::getBindingDescription();
-        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+        // Vertex input (Phase 3: using ModelVertex structure)
+        auto bindingDescription = ModelVertex::getBindingDescription();
+        auto attributeDescriptions = ModelVertex::getAttributeDescriptions();
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -917,12 +904,19 @@ private:
             
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
             
-            VkBuffer vertexBuffers[] = {vertexBuffer};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            
-            vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            // Phase 3: Render loaded 3D model instead of hardcoded geometry
+            if (currentModel && !currentModel->meshes.empty()) {
+                for (const auto& mesh : currentModel->meshes) {
+                    if (mesh->vertexBuffer && mesh->indexBuffer) {
+                        VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
+                        VkDeviceSize offsets[] = {0};
+                        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+                        vkCmdBindIndexBuffer(commandBuffers[i], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                        
+                        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
+                    }
+                }
+            }
             vkCmdEndRenderPass(commandBuffers[i]);
 
             if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -1379,42 +1373,7 @@ private:
     }
 
     void handleCameraInput() {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        if (lastFrameTime.time_since_epoch().count() == 0) {
-            lastFrameTime = currentTime;
-            return;
-        }
-        
-        float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastFrameTime).count();
-        lastFrameTime = currentTime;
-        
-        float velocity = cameraSpeed * deltaTime;
-        
-        // Calculate camera direction vectors
-        glm::vec3 cameraDirection = glm::normalize(cameraTarget - cameraPos);
-        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraDirection, cameraUp));
-        
-        // Handle WASD input
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            cameraPos += velocity * cameraDirection;
-        }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            cameraPos -= velocity * cameraDirection;
-        }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            cameraPos -= velocity * cameraRight;
-        }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            cameraPos += velocity * cameraRight;
-        }
-        
-        // Optional: Add Q/E for up/down movement
-        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
-            cameraPos -= velocity * cameraUp;
-        }
-        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
-            cameraPos += velocity * cameraUp;
-        }
+        camera.processInput(window);
     }
 
     void updateUniformBuffer() {
@@ -1425,14 +1384,14 @@ private:
         UniformBufferObject ubo{};
         
         // Model matrix: 3D rotation around both X and Y axes for full 3D effect
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(45.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(CAMERA_FOV), glm::vec3(1.0f, 0.0f, 0.0f));
         ubo.model = glm::rotate(ubo.model, time * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         
         // View matrix: use dynamic camera position from WASD input
-        ubo.view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        ubo.view = camera.getViewMatrix();
         
         // Projection matrix: perspective projection
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent.width / (float) swapChainExtent.height, NEAR_PLANE, FAR_PLANE);
         
         // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
         ubo.proj[1][1] *= -1;
@@ -1477,8 +1436,60 @@ private:
 
         std::cout << "Depth buffer created successfully!" << std::endl;
     }
+    
+    // Phase 3: Core Engine System Initialization
+    void initCoreEngineSystems() {
+        VKMON_INFO("Initializing ResourceManager...");
+        resourceManager = std::make_shared<ResourceManager>(device, physicalDevice);
+        
+        VKMON_INFO("Initializing AssetManager...");
+        assetManager = std::make_shared<AssetManager>(device, physicalDevice, commandPool, graphicsQueue);
+        
+        VKMON_INFO("Initializing ModelLoader...");
+        modelLoader = std::make_shared<ModelLoader>(resourceManager, assetManager);
+        
+        VKMON_INFO("Core engine systems initialized successfully!");
+    }
+    
+    void loadTestModel() {
+        VKMON_INFO("Loading test model...");
+        
+        try {
+            // Try to load the test cube we created
+            currentModel = modelLoader->loadModel("test_cube.obj");
+            VKMON_INFO("Test cube model loaded successfully!");
+        } catch (const std::exception& e) {
+            VKMON_WARNING("Failed to load test_cube.obj, creating procedural cube: " + std::string(e.what()));
+            // Fallback to procedural cube
+            currentModel = modelLoader->createTestCube();
+            VKMON_INFO("Procedural test cube created successfully!");
+        }
+    }
 
     void cleanup() {
+        VKMON_INFO("Beginning VulkanMon cleanup...");
+        
+        // Phase 3: Cleanup core engine systems
+        if (currentModel) {
+            VKMON_INFO("Cleaning up loaded model...");
+            currentModel.reset();
+        }
+        
+        if (modelLoader) {
+            modelLoader->printLoadingSummary();
+            modelLoader.reset();
+        }
+        
+        if (assetManager) {
+            assetManager->printAssetSummary();
+            assetManager.reset();
+        }
+        
+        if (resourceManager) {
+            resourceManager->printResourceSummary();
+            resourceManager.reset();
+        }
+        
         // Cleanup depth buffer resources (with null checks)
         if (depthImageView != VK_NULL_HANDLE) vkDestroyImageView(device, depthImageView, nullptr);
         if (depthImage != VK_NULL_HANDLE) vkDestroyImage(device, depthImage, nullptr);
