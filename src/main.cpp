@@ -1387,16 +1387,9 @@ private:
     void loadTestModel() {
         VKMON_INFO("Loading test model...");
         
-        try {
-            // Try to load the test cube we created
-            currentModel = modelLoader->loadModel("test_cube.obj");
-            VKMON_INFO("Test cube model loaded successfully!");
-        } catch (const std::exception& e) {
-            VKMON_WARNING("Failed to load test_cube.obj, creating procedural cube: " + std::string(e.what()));
-            // Fallback to procedural cube
-            currentModel = modelLoader->createTestCube();
-            VKMON_INFO("Procedural test cube created successfully!");
-        }
+        // Load the test cube - fail if it doesn't exist
+        currentModel = modelLoader->loadModel("test_cube.obj");
+        VKMON_INFO("Test cube model loaded successfully!");
         
         // Create a default material for the model
         createDefaultMaterial();
