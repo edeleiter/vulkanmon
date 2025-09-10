@@ -40,7 +40,7 @@ jobs:
           cmake
 
     - name: Cache vcpkg dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ${{ github.workspace }}/vcpkg
@@ -94,7 +94,7 @@ jobs:
         $TESTS_EXEC "[ModelLoader]" || true
 
     - name: Upload test artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ env.BUILD_TYPE }}
