@@ -101,12 +101,12 @@ public:
                     
                 case GLFW_KEY_5:
                     // Increase material shininess
-                    app->adjustMaterialShininess(5.0f);
+                    app->adjustMaterialShininess(10.0f);
                     break;
                     
                 case GLFW_KEY_6:
                     // Decrease material shininess
-                    app->adjustMaterialShininess(-5.0f);
+                    app->adjustMaterialShininess(-10.0f);
                     break;
             }
         }
@@ -1497,9 +1497,11 @@ private:
     // Material Control Methods
     
     void adjustMaterialShininess(float delta) {
+        float oldShininess = currentMaterialData.shininess;
         currentMaterialData.shininess = std::max(1.0f, std::min(256.0f, currentMaterialData.shininess + delta));
         updateMaterialBuffer(); // Update the simple material buffer
-        std::cout << "[MATERIAL] Shininess: " << currentMaterialData.shininess << std::endl;
+        std::cout << "\n[MATERIAL SHININESS] " << oldShininess << " -> " << currentMaterialData.shininess 
+                  << " (delta: " << delta << ")" << std::endl;
     }
     
     int currentMaterialPreset = 0;
