@@ -79,7 +79,8 @@ Debug/vulkanmon_tests.exe "[MaterialSystem]"   # MaterialSystem unit tests (pend
 - ✅ **Phase 3 COMPLETE**: Core engine systems (logging, assets, model loading)
 - ✅ **Phase 3.1 COMPLETE**: C++ Unit Testing Framework (Sweet Spot approach)
 - ✅ **Phase 4.1 COMPLETE**: MaterialSystem implementation and integration
-- 🚧 **Phase 4.2 IN PROGRESS**: Lighting system refinement and material-lighting integration
+- ✅ **Phase 4.2 COMPLETE**: Lighting system refinement and material-lighting integration
+- 🚧 **Phase 5.1 IN PROGRESS**: Testing framework expansion and code architecture refactoring
 
 ### Phase 4.1 Milestone: MaterialSystem Integration (COMPLETE)
 
@@ -103,22 +104,56 @@ Debug/vulkanmon_tests.exe "[MaterialSystem]"   # MaterialSystem unit tests (pend
 - Integrated with existing descriptor set management
 - Comprehensive logging and error handling
 
-### Phase 4.2 Next Steps: Lighting System Refinement
+### Phase 4.2 Milestone: Lighting System Refinement (COMPLETE)
 
-**Current Status**: Material data successfully reaches shaders, but lighting calculations need optimization.
+**Achievement**: Successfully implemented complete material-lighting integration with realistic rendering.
 
-**Planned Improvements:**
-1. **Lighting-Material Integration**: Fine-tune how materials interact with lighting
-2. **Specular Lighting Refinement**: Optimize specular calculations for realistic highlights
-3. **Light Direction Calibration**: Ensure proper light direction and intensity
-4. **Camera-Lighting Synchronization**: Perfect camera position usage in specular calculations
-5. **Material Response Tuning**: Calibrate how different materials respond to lighting
+**Key Accomplishments:**
+- **Material-Lighting Integration**: Fixed fragment shader to properly combine material properties with lighting
+- **Blinn-Phong Specular Model**: Implemented more realistic specular highlights than standard Phong
+- **Calibrated Lighting Presets**: Normalized light directions and optimized intensities for 4 lighting scenarios
+- **Enhanced Interactive Controls**: Improved shininess adjustment with clear visual feedback
+- **Realistic Material Response**: Materials now show distinct characteristics under lighting
+
+**Interactive Controls:**
+- **M Key**: Cycle through 5 material presets (Default, Gold, Ruby, Chrome, Emerald)
+- **5/6 Keys**: Adjust material shininess (±10.0 increments) with console feedback
+- **1/2 Keys**: Adjust directional light intensity
+- **3 Key**: Cycle through 4 lighting presets (Default, Daylight, Sunset, Moonlight)
+- **4 Key**: Toggle ambient lighting on/off
+- **L Key**: Print detailed lighting debug information
+- **R Key**: Hot reload shaders during development
+
+**Technical Achievements:**
+- Fixed material multiplication issue in fragment shader
+- Implemented Blinn-Phong specular calculations for better performance and realism
+- Normalized all directional light vectors with proper GLM integration
+- Enhanced console feedback for real-time parameter adjustment
+- Verified all material presets show distinct visual characteristics
+
+### Phase 5.1 Next Steps: Testing Framework Expansion and Architecture Refactoring
+
+**Current Priority**: Expand testing coverage and refactor main.cpp architecture for better scalability.
+
+**Phase 5.1 Goals:**
+1. **Complete Unit Test Coverage**: Add missing LightingSystem and MaterialSystem tests
+2. **Architecture Refactoring**: Extract Application, VulkanRenderer, InputHandler classes from main.cpp
+3. **Resource Management Consistency**: Migrate remaining Vulkan resources to ResourceManager
+4. **Integration Test Enhancement**: Add material-lighting validation tests
+
+**Phase 5.2 Planning:**
+1. **Scene Management System**: Implement scene graph and multi-object rendering
+2. **Performance Monitoring**: Add GPU performance counters and profiling tools
+3. **Enhanced Asset Management**: Asset dependency tracking and hot-reloading
 
 **Success Criteria:**
-- Materials show distinct visual characteristics under lighting
-- Specular highlights appear and move correctly with camera
-- Gold appears metallic, Ruby appears gemlike, Chrome appears reflective
-- Lighting responds appropriately to material properties
+- 100% unit test coverage for all core systems
+- main.cpp reduced from 1,641 lines to manageable application entry point
+- All Vulkan resources managed through ResourceManager RAII system
+- Clear separation of concerns between rendering, input, and application logic
+
+**Detailed Planning:**
+See [docs/PHASE_5_PLAN.md](docs/PHASE_5_PLAN.md) for comprehensive Phase 5 development strategy, implementation timeline, and architectural decisions.
 
 ## Development Workflow
 
