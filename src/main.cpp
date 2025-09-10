@@ -52,6 +52,7 @@
 #include "Logger.h"
 #include "ResourceManager.h" 
 #include "AssetManager.h"
+#include "LightingSystem.h"
 #include "ModelLoader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -187,12 +188,41 @@ const std::vector<uint16_t> indices = {
  */
 class HelloTriangleApp {
 public:
-    // Static key callback for hot shader reloading (Phase 2.5)
+    // Static key callback for hot shader reloading and lighting controls (Phase 2.5 + Phase 4)
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         HelloTriangleApp* app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
-        if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-            std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
-            app->reloadShaders();
+        
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_R:
+                    std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
+                    app->reloadShaders();
+                    break;
+                    
+                case GLFW_KEY_1:
+                    // Adjust directional light intensity
+                    app->adjustDirectionalLightIntensity(0.1f);
+                    break;
+                    
+                case GLFW_KEY_2:
+                    app->adjustDirectionalLightIntensity(-0.1f);
+                    break;
+                    
+                case GLFW_KEY_3:
+                    // Cycle through preset lighting configurations
+                    app->cycleLightingPreset();
+                    break;
+                    
+                case GLFW_KEY_4:
+                    // Toggle ambient lighting
+                    app->toggleAmbientLighting();
+                    break;
+                    
+                case GLFW_KEY_L:
+                    // Print lighting debug info
+                    app->printLightingInfo();
+                    break;
+            }
         }
     }
 
@@ -257,6 +287,9 @@ private:
     std::shared_ptr<AssetManager> assetManager;
     std::shared_ptr<ModelLoader> modelLoader;
     std::unique_ptr<Model> currentModel;
+    
+    // Phase 4: Lighting System
+    std::shared_ptr<LightingSystem> lightingSystem;
 
     void initWindow() {
         glfwInit();
@@ -273,7 +306,7 @@ private:
     void initVulkan() {
         // Initialize logging system
         Logger::getInstance().enableConsoleOutput(true);
-        Logger::getInstance().setLogLevel(LogLevel::INFO);
+        Logger::getInstance().setLogLevel(LogLevel::INFO_LEVEL);
         VKMON_INFO("VulkanMon Phase 3 - Initializing Core Engine Systems");
         
         createInstance();
@@ -1184,15 +1217,23 @@ private:
         uboLayoutBinding.pImmutableSamplers = nullptr;
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        // Texture sampler binding (binding 1 - moved from 0)
+        // Texture sampler binding (binding 1)
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
         samplerLayoutBinding.descriptorCount = 1;
         samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        
+        // Lighting uniform binding (binding 2)
+        VkDescriptorSetLayoutBinding lightingLayoutBinding{};
+        lightingLayoutBinding.binding = 2;
+        lightingLayoutBinding.descriptorCount = 1;
+        lightingLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        lightingLayoutBinding.pImmutableSamplers = nullptr;
+        lightingLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+        std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, samplerLayoutBinding, lightingLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1293,9 +1334,9 @@ private:
 
     void createDescriptorPool() {
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
-        // UBO descriptor
+        // UBO descriptors (main UBO + lighting UBO)
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = 1;
+        poolSizes[0].descriptorCount = 2;
         // Texture sampler descriptor
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = 1;
@@ -1336,8 +1377,14 @@ private:
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = textureImageView;
         imageInfo.sampler = textureSampler;
+        
+        // Lighting descriptor write (binding 2)
+        VkDescriptorBufferInfo lightingBufferInfo{};
+        lightingBufferInfo.buffer = lightingSystem->getLightingBuffer();
+        lightingBufferInfo.offset = 0;
+        lightingBufferInfo.range = VK_WHOLE_SIZE;
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
         // UBO descriptor write
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1356,6 +1403,15 @@ private:
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
+        
+        // Lighting descriptor write
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptorSet;
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pBufferInfo = &lightingBufferInfo;
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
@@ -1448,6 +1504,10 @@ private:
         VKMON_INFO("Initializing ModelLoader...");
         modelLoader = std::make_shared<ModelLoader>(resourceManager, assetManager);
         
+        VKMON_INFO("Initializing LightingSystem...");
+        lightingSystem = std::make_shared<LightingSystem>(resourceManager);
+        lightingSystem->createLightingBuffers();
+        
         VKMON_INFO("Core engine systems initialized successfully!");
     }
     
@@ -1464,6 +1524,84 @@ private:
             currentModel = modelLoader->createTestCube();
             VKMON_INFO("Procedural test cube created successfully!");
         }
+    }
+    
+    // Phase 4: Lighting Control Methods
+    void adjustDirectionalLightIntensity(float delta) {
+        auto& lighting = lightingSystem->getCurrentLighting();
+        lighting.directionalLight.intensity = std::max(0.0f, std::min(3.0f, lighting.directionalLight.intensity + delta));
+        lightingSystem->updateLighting(lighting);
+        std::cout << "[LIGHTING] Directional light intensity: " << lighting.directionalLight.intensity << std::endl;
+    }
+    
+    int currentLightingPreset = 0;
+    void cycleLightingPreset() {
+        currentLightingPreset = (currentLightingPreset + 1) % 4;
+        auto& lighting = lightingSystem->getCurrentLighting();
+        
+        switch (currentLightingPreset) {
+            case 0: // Default lighting
+                lighting.directionalLight.direction = glm::vec3(0.0f, -1.0f, -0.3f);
+                lighting.directionalLight.intensity = 1.0f;
+                lighting.directionalLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
+                lighting.ambientColor = glm::vec3(0.2f, 0.2f, 0.3f);
+                lighting.ambientIntensity = 0.3f;
+                std::cout << "[LIGHTING] Preset: Default" << std::endl;
+                break;
+            case 1: // Bright daylight
+                lighting.directionalLight.direction = glm::vec3(0.2f, -1.0f, -0.1f);
+                lighting.directionalLight.intensity = 1.5f;
+                lighting.directionalLight.color = glm::vec3(1.0f, 0.95f, 0.8f);
+                lighting.ambientColor = glm::vec3(0.4f, 0.4f, 0.5f);
+                lighting.ambientIntensity = 0.4f;
+                std::cout << "[LIGHTING] Preset: Bright Daylight" << std::endl;
+                break;
+            case 2: // Warm sunset
+                lighting.directionalLight.direction = glm::vec3(1.0f, -0.5f, 0.0f);
+                lighting.directionalLight.intensity = 0.8f;
+                lighting.directionalLight.color = glm::vec3(1.0f, 0.6f, 0.3f);
+                lighting.ambientColor = glm::vec3(0.3f, 0.2f, 0.1f);
+                lighting.ambientIntensity = 0.5f;
+                std::cout << "[LIGHTING] Preset: Warm Sunset" << std::endl;
+                break;
+            case 3: // Cool moonlight
+                lighting.directionalLight.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
+                lighting.directionalLight.intensity = 0.4f;
+                lighting.directionalLight.color = glm::vec3(0.6f, 0.7f, 1.0f);
+                lighting.ambientColor = glm::vec3(0.1f, 0.1f, 0.2f);
+                lighting.ambientIntensity = 0.2f;
+                std::cout << "[LIGHTING] Preset: Cool Moonlight" << std::endl;
+                break;
+        }
+        lightingSystem->updateLighting(lighting);
+    }
+    
+    void toggleAmbientLighting() {
+        auto& lighting = lightingSystem->getCurrentLighting();
+        lighting.ambientIntensity = (lighting.ambientIntensity > 0.0f) ? 0.0f : 0.3f;
+        lightingSystem->updateLighting(lighting);
+        std::cout << "[LIGHTING] Ambient lighting: " << (lighting.ambientIntensity > 0.0f ? "ON" : "OFF") << std::endl;
+    }
+    
+    void printLightingInfo() {
+        const auto& lighting = lightingSystem->getCurrentLighting();
+        std::cout << "\n[LIGHTING DEBUG INFO]" << std::endl;
+        std::cout << "Directional Light:" << std::endl;
+        std::cout << "  Direction: (" << lighting.directionalLight.direction.x << ", " 
+                  << lighting.directionalLight.direction.y << ", " << lighting.directionalLight.direction.z << ")" << std::endl;
+        std::cout << "  Intensity: " << lighting.directionalLight.intensity << std::endl;
+        std::cout << "  Color: (" << lighting.directionalLight.color.r << ", " 
+                  << lighting.directionalLight.color.g << ", " << lighting.directionalLight.color.b << ")" << std::endl;
+        std::cout << "Ambient Light:" << std::endl;
+        std::cout << "  Color: (" << lighting.ambientColor.r << ", " 
+                  << lighting.ambientColor.g << ", " << lighting.ambientColor.b << ")" << std::endl;
+        std::cout << "  Intensity: " << lighting.ambientIntensity << std::endl;
+        std::cout << "\nControls:" << std::endl;
+        std::cout << "  1/2: Adjust directional light intensity" << std::endl;
+        std::cout << "  3: Cycle lighting presets" << std::endl;
+        std::cout << "  4: Toggle ambient lighting" << std::endl;
+        std::cout << "  L: Show this debug info" << std::endl;
+        std::cout << "  R: Reload shaders" << std::endl << std::endl;
     }
 
     void cleanup() {
@@ -1483,6 +1621,10 @@ private:
         if (assetManager) {
             assetManager->printAssetSummary();
             assetManager.reset();
+        }
+        
+        if (lightingSystem) {
+            lightingSystem.reset();
         }
         
         if (resourceManager) {

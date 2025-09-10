@@ -142,6 +142,9 @@ public:
     // Helper methods for memory type finding
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     
+    // Device access
+    VkDevice getDevice() const { return device_; }
+    
     // Statistics and debugging
     size_t getBufferCount() const { return bufferCount_; }
     size_t getImageCount() const { return imageCount_; }

@@ -20,6 +20,7 @@ add_executable(vulkanmon
     src/Logger.cpp
     src/AssetManager.cpp
     src/ModelLoader.cpp
+    src/LightingSystem.cpp
 )
 
 # Link libraries
