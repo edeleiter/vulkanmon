@@ -47,6 +47,7 @@ jobs:
           vulkan-tools \
           vulkan-utility-libraries-dev \
           spirv-tools \
+          glslang-tools \
           mesa-vulkan-drivers
         
         # Set VULKAN_SDK environment variable for compatibility
