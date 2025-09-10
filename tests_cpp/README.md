@@ -4,9 +4,10 @@
 
 This testing framework follows our **"Sweet Spot"** approach - maximum value with minimal complexity. We focus on testing the most critical components with the least setup overhead.
 
-**Current Status**: ✅ **Framework Operational!**
+**Current Status**: **Framework Operational and Ready for Phase 4!**
 - Logger Tests: 4/4 passing
-- Camera Tests: 5/6 passing (2 edge case bugs found!)
+- Camera Tests: 6/6 passing (edge case bugs FIXED!)
+- Phase 4 Ready: Framework prepared for lighting and graphics testing
 - Total Runtime: < 1 second
 
 ## Philosophy Alignment
@@ -196,12 +197,38 @@ Test assets are located in `fixtures/test_assets/`:
 
 ## Integration with Main Project
 
-This C++ testing framework complements the existing Python pytest framework:
+This C++ testing framework provides comprehensive unit testing for VulkanMon:
 
-- **Python tests**: Integration testing, build validation, end-to-end testing
-- **C++ tests**: Unit testing, class-level validation, performance testing
+- **C++ unit tests**: Class-level validation, performance testing, system integration
+- **GitHub Actions CI/CD**: Automated build validation and test execution
 
-Both frameworks can be run independently and provide different levels of confidence in the system.
+The testing framework is integrated with GitHub Actions CI/CD for automated validation on every push to main.
+
+## Phase 4 Testing Expansion
+
+### New Test Categories for Advanced Graphics
+```bash
+# Graphics and rendering tests
+Debug/vulkanmon_tests.exe "[Lighting]"      # Lighting system tests
+Debug/vulkanmon_tests.exe "[Materials]"     # Material system tests  
+Debug/vulkanmon_tests.exe "[Shadows]"       # Shadow mapping tests
+Debug/vulkanmon_tests.exe "[Performance]"   # Graphics performance tests
+Debug/vulkanmon_tests.exe "[Visual]"        # Visual regression tests
+```
+
+### Phase 4 Testing Strategy
+- **Lighting Math Tests**: Validate directional, point, and spot light calculations
+- **Material Property Tests**: Test PBR material property calculations
+- **Performance Regression Tests**: Ensure 60+ FPS with advanced graphics
+- **Visual Validation Tests**: Screenshot comparison for rendering accuracy
+- **Shader Compilation Tests**: Validate lighting/material shader compilation
+
+### Planned Test Implementation
+- **Step 32**: Add directional lighting calculation tests
+- **Step 33**: Add point light attenuation tests  
+- **Step 35**: Add PBR material property tests
+- **Step 38**: Add shadow mapping validation tests
+- **All Steps**: Performance impact measurement tests
 
 ---
 

@@ -155,6 +155,28 @@ This framework will:
 
 ---
 
-**Implementation Status:** Ready to begin Phase 1: Framework Setup
+## Phase 4 Testing Extensions
+
+### NEW: Visual Rendering Tests
+With Phase 4 (Advanced Graphics), we need visual validation:
+
+```cpp
+// Phase 4 Test Categories
+TEST_CASE("Directional Lighting Math", "[Lighting][Math]")     // Step 32
+TEST_CASE("Point Light Attenuation", "[Lighting][Math]")       // Step 33  
+TEST_CASE("PBR Material Properties", "[Materials][Math]")      // Step 35
+TEST_CASE("Shadow Map Generation", "[Shadows][Visual]")        // Step 38
+TEST_CASE("Rendering Performance", "[Performance][Graphics]")  // All steps
+```
+
+### Visual Regression Testing Strategy
+- **Screenshot Comparison**: Capture frames, compare with golden references
+- **Lighting Validation**: Test light calculations produce expected results  
+- **Performance Monitoring**: Ensure 60+ FPS with advanced graphics
+- **Shader Testing**: Validate lighting/material shader calculations
+
+**Implementation Status:** 
+- **Phase 3.1 COMPLETE**: Sweet Spot C++ testing framework operational
+- **Phase 4 READY**: Advanced graphics testing extensions planned
 
 *Following VulkanMon's core philosophy: "Simple is Powerful", "Test, Test, Test", "Document Often"*

@@ -57,49 +57,83 @@ VulkanMon aims to be a high-performance, cross-platform game engine that combine
 - **Languages**: C++20 (core), Cython (scripting interface), Python (game logic)
 - **Version Control**: Git with GitHub Actions for CI/CD
 - **Documentation**: Doxygen for code documentation
-- **Testing**: Modern pytest framework with 14 comprehensive tests
+- **Testing**: Comprehensive C++ unit testing with Catch2 framework
 
 ## Development Roadmap
 
 ### Phase 1: Foundation ✅ COMPLETE!
-- [x] Project setup and build system
+- [x] Project setup and build system with vcpkg dependency management
 - [x] **Vulkan hello triangle** - Beautiful RGB gradient triangle rendering!
-- [x] **Modern testing framework** - 14 comprehensive tests with pytest
+- [x] **Modern testing framework** - Comprehensive C++ unit tests with Catch2
 - [x] **Documentation and philosophy** - Core tenants established
 
-### Phase 2: 3D Graphics Foundation 🚀 IN PROGRESS
-- [ ] **Texture loading and sampling** - Apply textures to our triangle
-- [ ] **Uniform Buffer Objects (UBOs)** - Pass 3D transformation data to shaders
-- [ ] **Depth testing and depth buffer** - Proper 3D rendering depth sorting  
-- [ ] **3D model rendering** - Replace triangle with a spinning textured cube
-- [ ] **Camera system** - WASD movement and mouse look controls
-- [ ] **Model-View-Projection matrices** - Full 3D transformation pipeline
-- [ ] Basic lighting and materials
-- [ ] Texture management
+### Phase 2: 3D Graphics Foundation ✅ COMPLETE!
+- [x] **Texture loading and sampling** - Full texture support with STB integration
+- [x] **Uniform Buffer Objects (UBOs)** - Complete 3D transformation pipeline
+- [x] **Depth testing and depth buffer** - Proper 3D rendering with depth sorting  
+- [x] **3D model rendering** - Assimp-based model loading with material support
+- [x] **Camera system** - Interactive WASD movement and mouse look controls
+- [x] **Model-View-Projection matrices** - Full 3D transformation pipeline
 
-### Phase 3: Advanced Graphics (Months 7-9)
-- [ ] PBR material system
-- [ ] Skeletal animation
-- [ ] Instanced rendering
-- [ ] Post-processing effects
+### Phase 2.5: Interactive Development ✅ COMPLETE!
+- [x] **Hot shader reloading** - Press 'R' to reload shaders during development
+- [x] **Interactive camera controls** - Smooth WASD movement with mouse look
+- [x] **Performance monitoring** - Logger system with frame timing
 
-### Phase 4: Game Systems (Months 10-12)
-- [ ] Physics integration
-- [ ] Audio system
-- [ ] Cython scripting layer
-- [ ] Basic gameplay framework
+### Phase 3: Core Engine Systems ✅ COMPLETE!
+- [x] **ResourceManager** - RAII-based Vulkan resource management
+- [x] **Logger System** - Thread-safe logging with console/file output
+- [x] **AssetManager** - Texture caching and asset discovery
+- [x] **ModelLoader** - Assimp integration for 40+ 3D model formats
+- [x] **Camera System** - Complete interactive 3D camera implementation
 
-### Phase 5: Creature Systems (Months 13-15)
-- [ ] Creature data structures
-- [ ] Battle system
-- [ ] AI behavior trees
-- [ ] Save/load functionality
+### Phase 3.1: Testing Framework ✅ COMPLETE!
+- [x] **C++ Unit Testing** - Sweet Spot approach with 100% core system coverage
+- [x] **Integration Testing** - Python-based build and runtime validation
+- [x] **Visual Validation** - Real hardware rendering verification
 
-### Phase 6: Polish & Release (Months 16-18)
-- [ ] UI systems
-- [ ] Performance optimization
-- [ ] Documentation and tutorials
-- [ ] Community tools and modding support
+### Phase 4.1: MaterialSystem ✅ COMPLETE!
+- [x] **Material Management** - Complete material property system
+- [x] **Real-time Material Switching** - Interactive controls with 5 presets
+- [x] **Vulkan Integration** - Proper descriptor management and GPU alignment
+- [x] **Material Presets** - Realistic Gold, Ruby, Chrome, Emerald materials
+
+### Phase 4.2: Lighting Integration ✅ COMPLETE!
+- [x] **LightingSystem** - Directional and ambient lighting with descriptor management
+- [x] **Material-Lighting Integration** - Fixed shader calculations for realistic rendering
+- [x] **Blinn-Phong Specular** - Advanced specular highlighting model
+- [x] **Interactive Lighting Controls** - 4 lighting presets with real-time adjustment
+- [x] **Realistic Material Response** - Materials show distinct characteristics under lighting
+
+### Phase 5.1: Testing & Architecture 🚀 IN PROGRESS
+- [ ] **Complete Unit Test Coverage** - Add LightingSystem and MaterialSystem tests
+- [ ] **Architecture Refactoring** - Extract Application, VulkanRenderer, InputHandler classes
+- [ ] **Resource Management Consistency** - Migrate all resources to ResourceManager
+- [ ] **Integration Test Enhancement** - Material-lighting validation tests
+
+### Phase 5.2: Scene Management (Next)
+- [ ] **Scene Graph System** - Multi-object rendering with transforms
+- [ ] **Component Architecture** - Flexible game object composition
+- [ ] **Performance Monitoring** - GPU performance counters and profiling
+- [ ] **Enhanced Asset Management** - Dependency tracking and hot-reloading
+
+### Phase 6: Advanced Graphics
+- [ ] **PBR Material System** - Physically-based rendering materials
+- [ ] **Multi-Light Support** - Point lights, spot lights, shadows
+- [ ] **Skeletal Animation** - Character animation system
+- [ ] **Post-processing Effects** - Bloom, tone mapping, anti-aliasing
+
+### Phase 7: Game Systems
+- [ ] **Physics Integration** - Bullet Physics integration
+- [ ] **Audio System** - 3D positioned audio with OpenAL
+- [ ] **Scripting Layer** - Python/Cython integration
+- [ ] **Save/Load System** - Persistent game state
+
+### Phase 8: Creature Systems
+- [ ] **Creature Framework** - Core creature data structures
+- [ ] **Battle System** - Turn-based combat mechanics  
+- [ ] **AI Behavior** - Decision trees and creature AI
+- [ ] **Collection Mechanics** - Catching and training system
 
 ## Getting Started
 
@@ -123,10 +157,9 @@ cmake --build .
 # Run the hello triangle demo
 Debug/vulkanmon.exe
 
-# Run the test suite
-cd ../tests
-pip install -r requirements.txt
-python -m pytest
+# Run the C++ unit test suite
+cd build/tests_cpp
+Debug/vulkanmon_tests.exe
 ```
 
 ## Development Philosophy
@@ -137,7 +170,7 @@ VulkanMon follows three core tenants:
 We favor clear, straightforward solutions over complex ones. Code should be easy to understand, maintain, and extend.
 
 ### 🧪 **"Test, Test, Test"**  
-Confidence comes from thorough testing at every level - from unit tests to visual validation on real hardware. We now have 14 comprehensive tests covering build, runtime, and integration!
+Confidence comes from thorough testing at every level - from unit tests to visual validation on real hardware. We have comprehensive C++ unit tests covering all core engine systems!
 
 ### 📚 **"Document Often"**
 Good documentation is as important as good code. We document the "why" not just the "what".
@@ -153,7 +186,7 @@ We welcome contributions from developers of all skill levels! Here's how you can
 - **Game Logic**: Python/Cython scripting for gameplay features
 - **Art & Assets**: 3D models, textures, animations, audio
 - **Documentation**: Tutorials, API docs, examples
-- **Testing**: Extend our comprehensive pytest framework with more test cases
+- **Testing**: Complete C++ unit test coverage for all engine systems
 
 ### Development Guidelines
 - Follow modern C++20 best practices

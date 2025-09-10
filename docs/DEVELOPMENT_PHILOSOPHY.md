@@ -2,7 +2,7 @@
 
 ## Core Tenants
 
-### 🎯 **"Simple is Powerful"**
+### **"Simple is Powerful"**
 - **Principle**: Favor clear, straightforward solutions over complex ones
 - **Application**: 
   - Write code that's easy to understand and maintain
@@ -14,7 +14,7 @@
   - Clear function names like `createRenderPass()` vs `initRP()`
   - One responsibility per function
 
-### 🧪 **"Test, Test, Test"**
+### **"Test, Test, Test"**
 - **Principle**: Confidence comes from thorough testing at every level
 - **Application**:
   - Test each component as it's built
@@ -28,7 +28,7 @@
   - Cross-platform build testing
   - Performance profiling on target hardware
 
-### 📚 **"Document Often"**
+### **"Document Often"**
 - **Principle**: Good documentation is as important as good code
 - **Application**:
   - Document the "why" not just the "what"
@@ -44,19 +44,19 @@
 
 ## Development Practices
 
-### 🔄 **Iterative Development**
+### **Iterative Development**
 1. **Get it working** - Focus on functionality first
 2. **Make it right** - Refactor for clarity and correctness  
 3. **Make it fast** - Optimize when and where needed
 4. **Make it beautiful** - Polish the user experience
 
-### 🛡️ **Quality Gates**
+### **Quality Gates**
 - **Before each commit**: Code builds cleanly
 - **Before each push**: All tests pass
 - **Before each merge**: Documentation is updated
 - **Before each release**: Cross-platform validation
 
-### 🎮 **Game Development Specific**
+### **Game Development Specific**
 - **Performance matters**: Target 60 FPS minimum
 - **Memory management**: No leaks, efficient allocation
 - **Cross-platform first**: Write portable code from day one

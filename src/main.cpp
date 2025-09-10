@@ -4,37 +4,13 @@
  * Complete 3D Vulkan renderer with advanced core engine systems.
  * Production-ready foundation for the VulkanMon creature collector game engine.
  * 
- * ✅ Phase 1 COMPLETE: Foundation & Hello Triangle
- * ✅ Phase 2 COMPLETE: 3D Graphics Foundation (Steps 22-27) 
- * ✅ Phase 2.5 COMPLETE: Interactive Development (WASD camera, hot shader reload)
- * ✅ Phase 3 COMPLETE: Core Engine Systems (Steps 28-31)
- * 
- * Phase 3 - Core Engine Systems:
- * ✅ Step 28: Resource Management System - RAII wrappers for all Vulkan resources
- * ✅ Step 29: Logging System - Thread-safe logging with multiple levels and outputs
- * ✅ Step 30: Asset Loading Pipeline - Texture loading, caching, organized asset directories
- * ✅ Step 31: Assimp Integration - Load 40+ 3D model formats (.obj, .fbx, .gltf, etc.)
- * 
- * Following our core principles:
- * - "Simple is Powerful" - Clean APIs, clear separation of concerns, modern C++20
- * - "Test, Test, Test" - Comprehensive logging, error handling, resource validation
- * - "Document Often" - Detailed system documentation and clear code organization
- * 
- * Current Features:
- * - Modern C++20 with comprehensive RAII resource management
- * - Complete Vulkan 3D pipeline with MVP matrices and depth testing
- * - Professional logging system with performance monitoring
- * - Asset management system with texture loading and caching
- * - Full Assimp integration for loading 3D models from assets/models/
- * - Interactive camera controls (WASD+QE) and hot shader reloading (R key)
- * - Production-ready error handling and automatic resource cleanup
- * 
  * Architecture:
  * - ResourceManager: RAII wrappers for VkBuffer, VkImage, memory management
  * - Logger: Thread-safe logging with console/file output and performance tracking
  * - AssetManager: Texture loading, caching, asset discovery and validation
  * - ModelLoader: Assimp-based 3D model loading with material and texture support
- * - Camera: Interactive WASD movement with mouse look (Phase 2.5)
+ * - LightingSystem: Directional and ambient lighting with descriptor management
+ * - Camera: Interactive WASD movement with mouse look
  */
 
 #include <iostream>
@@ -52,6 +28,8 @@
 #include "Logger.h"
 #include "ResourceManager.h" 
 #include "AssetManager.h"
+#include "LightingSystem.h"
+#include "MaterialSystem.h"
 #include "ModelLoader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -66,133 +44,71 @@ constexpr float CAMERA_SPEED = 2.5f;
 constexpr float CAMERA_FOV = 45.0f;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 10.0f;
-constexpr const char* VERTEX_SHADER_SOURCE = "shaders/triangle.vert";
-constexpr const char* FRAGMENT_SHADER_SOURCE = "shaders/triangle.frag";
 constexpr const char* VERTEX_SHADER_COMPILED = "shaders/vert.spv";
 constexpr const char* FRAGMENT_SHADER_COMPILED = "shaders/frag.spv";
 
-/**
- * Vertex structure for 3D cube rendering
- * 
- * Contains essential data for each vertex:
- * - Position: 2D coordinates (Z depth assigned in vertex shader)
- * - Color: RGB values for face identification and interpolation
- * - TexCoord: UV coordinates for texture sampling
- * 
- * Provides Vulkan vertex input layout configuration.
- */
-struct Vertex {
-    glm::vec2 pos;
-    glm::vec3 color;
-    glm::vec2 texCoord;  // Add texture coordinates
 
-    static VkVertexInputBindingDescription getBindingDescription() {
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        return bindingDescription;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-
-        // Position attribute
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        // Color attribute
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        // Texture coordinate attribute
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
-};
-
-/**
- * UniformBufferObject - UBO structure for 3D transformations
- * 
- * Following "Simple is Powerful" - contains essential transformation matrices:
- * - model: Object transformation (rotation, scale, position)
- * - view: Camera/view transformation
- * - proj: Perspective projection transformation
- * 
- * This structure defines the uniform buffer layout that will be passed
- * to shaders for proper 3D transformations with MVP matrices.
- */
 struct UniformBufferObject {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+    glm::vec3 cameraPos;
+    float _padding;
 };
 
-// 3D Cube geometry - Step 25: Load and Render 3D Models  
-// NOTE: Still using 2D vertex positions for now, Z depth handled in shader
-// Following "Document Often" - explaining the 3D cube setup
-const std::vector<Vertex> vertices = {
-    // Front face (closer)
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},  // Bottom left - Red
-    {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // Bottom right - Green
-    {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},  // Top right - Blue
-    {{-0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},  // Top left - Yellow
 
-    // Back face (farther)
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},  // Bottom left - Magenta
-    {{ 0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // Bottom right - Cyan
-    {{ 0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},  // Top right - White
-    {{-0.5f,  0.5f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}}   // Top left - Gray
-};
-
-const std::vector<uint16_t> indices = {
-    // Front face
-    0, 1, 2, 2, 3, 0,
-    // Back face  
-    4, 5, 6, 6, 7, 4,
-    // Left face
-    7, 3, 0, 0, 4, 7,
-    // Right face
-    1, 5, 6, 6, 2, 1,
-    // Bottom face
-    0, 1, 5, 5, 4, 0,
-    // Top face
-    3, 2, 6, 6, 7, 3
-};
-
-/**
- * HelloTriangleApp - Main Vulkan Application Class
- * 
- * This class encapsulates our complete Vulkan Hello Triangle implementation.
- * It follows the standard Vulkan tutorial pattern with proper RAII cleanup.
- * 
- * Design Philosophy:
- * - "Simple is Powerful" - Each method has a single, clear responsibility
- * - "Test, Test, Test" - Every step is validated and provides console feedback
- * - "Document Often" - Complex Vulkan concepts are explained inline
- * 
- * Lifecycle:
- * 1. initWindow() - GLFW window setup
- * 2. initVulkan() - Complete Vulkan initialization (14 major steps)
- * 3. mainLoop() - Real-time rendering with proper synchronization
- * 4. cleanup() - Proper resource cleanup in reverse order
- */
 class HelloTriangleApp {
 public:
-    // Static key callback for hot shader reloading (Phase 2.5)
+    // Static key callback for hot shader reloading and lighting controls
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         HelloTriangleApp* app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
-        if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-            std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
-            app->reloadShaders();
+        
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_R:
+                    std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
+                    app->reloadShaders();
+                    break;
+                    
+                case GLFW_KEY_1:
+                    // Adjust directional light intensity
+                    app->adjustDirectionalLightIntensity(0.1f);
+                    break;
+                    
+                case GLFW_KEY_2:
+                    app->adjustDirectionalLightIntensity(-0.1f);
+                    break;
+                    
+                case GLFW_KEY_3:
+                    // Cycle through preset lighting configurations
+                    app->cycleLightingPreset();
+                    break;
+                    
+                case GLFW_KEY_4:
+                    // Toggle ambient lighting
+                    app->toggleAmbientLighting();
+                    break;
+                    
+                case GLFW_KEY_L:
+                    // Print lighting debug info
+                    app->printLightingInfo();
+                    break;
+                    
+                case GLFW_KEY_M:
+                    // Cycle through material presets
+                    app->cycleMaterialPreset();
+                    break;
+                    
+                case GLFW_KEY_5:
+                    // Increase material shininess
+                    app->adjustMaterialShininess(10.0f);
+                    break;
+                    
+                case GLFW_KEY_6:
+                    // Decrease material shininess
+                    app->adjustMaterialShininess(-10.0f);
+                    break;
+            }
         }
     }
 
@@ -226,10 +142,6 @@ private:
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
     VkFence inFlightFence;
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
     
     // Texture resources
     VkImage textureImage = VK_NULL_HANDLE;
@@ -243,6 +155,8 @@ private:
     // Uniform Buffer Object resources
     VkBuffer uniformBuffer = VK_NULL_HANDLE;
     VkDeviceMemory uniformBufferMemory = VK_NULL_HANDLE;
+    VkBuffer materialBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory materialBufferMemory = VK_NULL_HANDLE;
     
     // Depth buffer resources
     VkImage depthImage = VK_NULL_HANDLE;
@@ -252,29 +166,32 @@ private:
     // Camera system for WASD movement (Phase 2.5)
     Camera camera;
     
-    // Phase 3: Core Engine Systems
+    // Core Engine Systems
     std::shared_ptr<ResourceManager> resourceManager;
     std::shared_ptr<AssetManager> assetManager;
     std::shared_ptr<ModelLoader> modelLoader;
     std::unique_ptr<Model> currentModel;
+    
+    // Lighting System
+    std::shared_ptr<LightingSystem> lightingSystem;
+    std::shared_ptr<MaterialSystem> materialSystem;
 
     void initWindow() {
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         
-        window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "VulkanMon - Interactive Dev", nullptr, nullptr);
+        window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "VulkanMon", nullptr, nullptr);
         
-        // Set up hot reload key callback (Phase 2.5)
+        // Set up key callback
         glfwSetWindowUserPointer(window, this);
         glfwSetKeyCallback(window, keyCallback);
     }
 
     void initVulkan() {
-        // Initialize logging system
         Logger::getInstance().enableConsoleOutput(true);
-        Logger::getInstance().setLogLevel(LogLevel::INFO);
-        VKMON_INFO("VulkanMon Phase 3 - Initializing Core Engine Systems");
+        Logger::getInstance().setLogLevel(LogLevel::INFO_LEVEL);
+        VKMON_INFO("VulkanMon - Initializing Core Engine Systems");
         
         createInstance();
         createSurface();
@@ -289,13 +206,14 @@ private:
         createFramebuffers();
         createCommandPool();
         
-        // Initialize Phase 3 systems (after command pool creation)
+        // Initialize core systems (after command pool creation)
         initCoreEngineSystems();
         
         // Load 3D model with new model system
         loadTestModel();
         
         createUniformBuffer();
+        createMaterialBuffer();
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
@@ -604,7 +522,7 @@ private:
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-        // Vertex input (Phase 3: using ModelVertex structure)
+        // Vertex input (using ModelVertex structure)
         auto bindingDescription = ModelVertex::getBindingDescription();
         auto attributeDescriptions = ModelVertex::getAttributeDescriptions();
 
@@ -775,75 +693,6 @@ private:
         throw std::runtime_error("Failed to find suitable memory type!");
     }
 
-    void createVertexBuffer() {
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-        bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create vertex buffer!");
-        }
-
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate vertex buffer memory!");
-        }
-
-        vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
-
-        // Copy vertex data
-        void* data;
-        vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-        memcpy(data, vertices.data(), (size_t) bufferInfo.size);
-        vkUnmapMemory(device, vertexBufferMemory);
-
-        std::cout << "Vertex buffer created successfully!\n";
-    }
-    
-    void createIndexBuffer() {
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = sizeof(indices[0]) * indices.size();
-        bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &indexBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create index buffer!");
-        }
-
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, indexBuffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &indexBufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate index buffer memory!");
-        }
-
-        vkBindBufferMemory(device, indexBuffer, indexBufferMemory, 0);
-
-        // Copy index data
-        void* data;
-        vkMapMemory(device, indexBufferMemory, 0, bufferInfo.size, 0, &data);
-        memcpy(data, indices.data(), (size_t) bufferInfo.size);
-        vkUnmapMemory(device, indexBufferMemory);
-        
-        std::cout << "Index buffer created successfully!\n";
-    }
 
     void createCommandPool() {
         int graphicsQueueFamily = findGraphicsQueueFamily();
@@ -904,7 +753,7 @@ private:
             
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
             
-            // Phase 3: Render loaded 3D model instead of hardcoded geometry
+            // Render loaded 3D model
             if (currentModel && !currentModel->meshes.empty()) {
                 for (const auto& mesh : currentModel->meshes) {
                     if (mesh->vertexBuffer && mesh->indexBuffer) {
@@ -994,7 +843,7 @@ private:
         vkQueuePresentKHR(graphicsQueue, &presentInfo);
     }
 
-    // Helper functions for texture loading
+    // Vulkan helper functions
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1184,15 +1033,31 @@ private:
         uboLayoutBinding.pImmutableSamplers = nullptr;
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        // Texture sampler binding (binding 1 - moved from 0)
+        // Texture sampler binding (binding 1)
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
         samplerLayoutBinding.descriptorCount = 1;
         samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        
+        // Lighting uniform binding (binding 2)
+        VkDescriptorSetLayoutBinding lightingLayoutBinding{};
+        lightingLayoutBinding.binding = 2;
+        lightingLayoutBinding.descriptorCount = 1;
+        lightingLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        lightingLayoutBinding.pImmutableSamplers = nullptr;
+        lightingLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        
+        // Material uniform binding (binding 3)
+        VkDescriptorSetLayoutBinding materialLayoutBinding{};
+        materialLayoutBinding.binding = 3;
+        materialLayoutBinding.descriptorCount = 1;
+        materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        materialLayoutBinding.pImmutableSamplers = nullptr;
+        materialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+        std::array<VkDescriptorSetLayoutBinding, 4> bindings = {uboLayoutBinding, samplerLayoutBinding, lightingLayoutBinding, materialLayoutBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1293,9 +1158,9 @@ private:
 
     void createDescriptorPool() {
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
-        // UBO descriptor
+        // UBO descriptors (main UBO + lighting UBO + material UBO)
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = 1;
+        poolSizes[0].descriptorCount = 3;
         // Texture sampler descriptor
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = 1;
@@ -1336,8 +1201,20 @@ private:
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = textureImageView;
         imageInfo.sampler = textureSampler;
+        
+        // Lighting descriptor write (binding 2)
+        VkDescriptorBufferInfo lightingBufferInfo{};
+        lightingBufferInfo.buffer = lightingSystem->getLightingBuffer();
+        lightingBufferInfo.offset = 0;
+        lightingBufferInfo.range = VK_WHOLE_SIZE;
+        
+        // Material descriptor write (binding 3)
+        VkDescriptorBufferInfo materialBufferInfo{};
+        materialBufferInfo.buffer = materialBuffer;
+        materialBufferInfo.offset = 0;
+        materialBufferInfo.range = sizeof(MaterialData);
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
 
         // UBO descriptor write
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1356,6 +1233,24 @@ private:
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
+        
+        // Lighting descriptor write
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptorSet;
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pBufferInfo = &lightingBufferInfo;
+        
+        // Material descriptor write
+        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3].dstSet = descriptorSet;
+        descriptorWrites[3].dstBinding = 3;
+        descriptorWrites[3].dstArrayElement = 0;
+        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[3].descriptorCount = 1;
+        descriptorWrites[3].pBufferInfo = &materialBufferInfo;
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
@@ -1370,6 +1265,32 @@ private:
                     uniformBuffer, uniformBufferMemory);
 
         std::cout << "Uniform buffer created successfully!" << std::endl;
+    }
+    
+    MaterialData currentMaterialData;
+    void createMaterialBuffer() {
+        VkDeviceSize bufferSize = sizeof(MaterialData);
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    materialBuffer, materialBufferMemory);
+        
+        // Initialize with default material
+        currentMaterialData.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+        currentMaterialData.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);   // Warm brown
+        currentMaterialData.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
+        currentMaterialData.shininess = 32.0f;
+        
+        updateMaterialBuffer();
+
+        std::cout << "Material buffer created successfully!" << std::endl;
+    }
+    
+    void updateMaterialBuffer() {
+        void* data;
+        vkMapMemory(device, materialBufferMemory, 0, sizeof(MaterialData), 0, &data);
+        memcpy(data, &currentMaterialData, sizeof(MaterialData));
+        vkUnmapMemory(device, materialBufferMemory);
     }
 
     void handleCameraInput() {
@@ -1395,6 +1316,10 @@ private:
         
         // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
         ubo.proj[1][1] *= -1;
+        
+        // Camera position for specular lighting calculations
+        ubo.cameraPos = camera.position;
+        ubo._padding = 0.0f;
 
         void* data;
         vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);
@@ -1437,7 +1362,7 @@ private:
         std::cout << "Depth buffer created successfully!" << std::endl;
     }
     
-    // Phase 3: Core Engine System Initialization
+    // Core Engine System Initialization
     void initCoreEngineSystems() {
         VKMON_INFO("Initializing ResourceManager...");
         resourceManager = std::make_shared<ResourceManager>(device, physicalDevice);
@@ -1447,6 +1372,14 @@ private:
         
         VKMON_INFO("Initializing ModelLoader...");
         modelLoader = std::make_shared<ModelLoader>(resourceManager, assetManager);
+        
+        VKMON_INFO("Initializing LightingSystem...");
+        lightingSystem = std::make_shared<LightingSystem>(resourceManager);
+        lightingSystem->createLightingBuffers();
+        
+        VKMON_INFO("Initializing MaterialSystem...");
+        materialSystem = std::make_shared<MaterialSystem>(resourceManager);
+        materialSystem->createMaterialBuffers();
         
         VKMON_INFO("Core engine systems initialized successfully!");
     }
@@ -1464,12 +1397,161 @@ private:
             currentModel = modelLoader->createTestCube();
             VKMON_INFO("Procedural test cube created successfully!");
         }
+        
+        // Create a default material for the model
+        createDefaultMaterial();
+    }
+    
+    uint32_t currentMaterialId = 0;
+    void createDefaultMaterial() {
+        MaterialData defaultMaterial;
+        defaultMaterial.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+        defaultMaterial.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);   // Warm brown
+        defaultMaterial.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
+        defaultMaterial.shininess = 32.0f;
+        
+        currentMaterialId = materialSystem->createMaterial(defaultMaterial);
+        VKMON_INFO("Created default material with ID: " + std::to_string(currentMaterialId));
+    }
+    
+    // Lighting Control Methods
+    void adjustDirectionalLightIntensity(float delta) {
+        auto& lighting = lightingSystem->getCurrentLighting();
+        lighting.directionalLight.intensity = std::max(0.0f, std::min(3.0f, lighting.directionalLight.intensity + delta));
+        lightingSystem->updateLighting(lighting);
+        std::cout << "[LIGHTING] Directional light intensity: " << lighting.directionalLight.intensity << std::endl;
+    }
+    
+    int currentLightingPreset = 0;
+    void cycleLightingPreset() {
+        currentLightingPreset = (currentLightingPreset + 1) % 4;
+        auto& lighting = lightingSystem->getCurrentLighting();
+        
+        switch (currentLightingPreset) {
+            case 0: // Default lighting
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(0.2f, -1.0f, -0.3f));
+                lighting.directionalLight.intensity = 1.2f;
+                lighting.directionalLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
+                lighting.ambientColor = glm::vec3(0.15f, 0.15f, 0.2f);
+                lighting.ambientIntensity = 0.25f;
+                std::cout << "[LIGHTING] Preset: Default" << std::endl;
+                break;
+            case 1: // Bright daylight
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(0.3f, -1.0f, -0.2f));
+                lighting.directionalLight.intensity = 1.8f;
+                lighting.directionalLight.color = glm::vec3(1.0f, 0.95f, 0.8f);
+                lighting.ambientColor = glm::vec3(0.3f, 0.3f, 0.4f);
+                lighting.ambientIntensity = 0.35f;
+                std::cout << "[LIGHTING] Preset: Bright Daylight" << std::endl;
+                break;
+            case 2: // Warm sunset
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(1.0f, -0.6f, 0.2f));
+                lighting.directionalLight.intensity = 1.0f;
+                lighting.directionalLight.color = glm::vec3(1.0f, 0.6f, 0.3f);
+                lighting.ambientColor = glm::vec3(0.25f, 0.15f, 0.1f);
+                lighting.ambientIntensity = 0.4f;
+                std::cout << "[LIGHTING] Preset: Warm Sunset" << std::endl;
+                break;
+            case 3: // Cool moonlight
+                lighting.directionalLight.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, 0.3f));
+                lighting.directionalLight.intensity = 0.6f;
+                lighting.directionalLight.color = glm::vec3(0.6f, 0.7f, 1.0f);
+                lighting.ambientColor = glm::vec3(0.05f, 0.05f, 0.15f);
+                lighting.ambientIntensity = 0.15f;
+                std::cout << "[LIGHTING] Preset: Cool Moonlight" << std::endl;
+                break;
+        }
+        lightingSystem->updateLighting(lighting);
+    }
+    
+    void toggleAmbientLighting() {
+        auto& lighting = lightingSystem->getCurrentLighting();
+        lighting.ambientIntensity = (lighting.ambientIntensity > 0.0f) ? 0.0f : 0.3f;
+        lightingSystem->updateLighting(lighting);
+        std::cout << "[LIGHTING] Ambient lighting: " << (lighting.ambientIntensity > 0.0f ? "ON" : "OFF") << std::endl;
+    }
+    
+    void printLightingInfo() {
+        const auto& lighting = lightingSystem->getCurrentLighting();
+        std::cout << "\n[LIGHTING DEBUG INFO]" << std::endl;
+        std::cout << "Directional Light:" << std::endl;
+        std::cout << "  Direction: (" << lighting.directionalLight.direction.x << ", " 
+                  << lighting.directionalLight.direction.y << ", " << lighting.directionalLight.direction.z << ")" << std::endl;
+        std::cout << "  Intensity: " << lighting.directionalLight.intensity << std::endl;
+        std::cout << "  Color: (" << lighting.directionalLight.color.r << ", " 
+                  << lighting.directionalLight.color.g << ", " << lighting.directionalLight.color.b << ")" << std::endl;
+        std::cout << "Ambient Light:" << std::endl;
+        std::cout << "  Color: (" << lighting.ambientColor.r << ", " 
+                  << lighting.ambientColor.g << ", " << lighting.ambientColor.b << ")" << std::endl;
+        std::cout << "  Intensity: " << lighting.ambientIntensity << std::endl;
+        std::cout << "\nControls:" << std::endl;
+        std::cout << "  1/2: Adjust directional light intensity" << std::endl;
+        std::cout << "  3: Cycle lighting presets" << std::endl;
+        std::cout << "  4: Toggle ambient lighting" << std::endl;
+        std::cout << "  5/6: Adjust material shininess" << std::endl;
+        std::cout << "  M: Cycle material presets" << std::endl;
+        std::cout << "  L: Show this debug info" << std::endl;
+        std::cout << "  R: Reload shaders" << std::endl << std::endl;
+    }
+    
+    // Material Control Methods
+    
+    void adjustMaterialShininess(float delta) {
+        float oldShininess = currentMaterialData.shininess;
+        currentMaterialData.shininess = std::max(1.0f, std::min(256.0f, currentMaterialData.shininess + delta));
+        updateMaterialBuffer(); // Update the simple material buffer
+        std::cout << "\n[MATERIAL SHININESS] " << oldShininess << " -> " << currentMaterialData.shininess 
+                  << " (delta: " << delta << ")" << std::endl;
+    }
+    
+    int currentMaterialPreset = 0;
+    void cycleMaterialPreset() {
+        currentMaterialPreset = (currentMaterialPreset + 1) % 5;
+        
+        switch (currentMaterialPreset) {
+            case 0: // Default material
+                currentMaterialData.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+                currentMaterialData.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);
+                currentMaterialData.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
+                currentMaterialData.shininess = 32.0f;
+                std::cout << "[MATERIAL] Preset: Default (Warm Brown)" << std::endl;
+                break;
+            case 1: // Metallic gold
+                currentMaterialData.ambient = glm::vec4(0.24725f, 0.1995f, 0.0745f, 0.0f);
+                currentMaterialData.diffuse = glm::vec4(0.75164f, 0.60648f, 0.22648f, 0.0f);
+                currentMaterialData.specular = glm::vec4(0.628281f, 0.555802f, 0.366065f, 0.0f);
+                currentMaterialData.shininess = 51.2f;
+                std::cout << "[MATERIAL] Preset: Metallic Gold" << std::endl;
+                break;
+            case 2: // Ruby red
+                currentMaterialData.ambient = glm::vec4(0.1745f, 0.01175f, 0.01175f, 0.0f);
+                currentMaterialData.diffuse = glm::vec4(0.61424f, 0.04136f, 0.04136f, 0.0f);
+                currentMaterialData.specular = glm::vec4(0.727811f, 0.626959f, 0.626959f, 0.0f);
+                currentMaterialData.shininess = 76.8f;
+                std::cout << "[MATERIAL] Preset: Ruby Red" << std::endl;
+                break;
+            case 3: // Chrome
+                currentMaterialData.ambient = glm::vec4(0.25f, 0.25f, 0.25f, 0.0f);
+                currentMaterialData.diffuse = glm::vec4(0.4f, 0.4f, 0.4f, 0.0f);
+                currentMaterialData.specular = glm::vec4(0.774597f, 0.774597f, 0.774597f, 0.0f);
+                currentMaterialData.shininess = 76.8f;
+                std::cout << "[MATERIAL] Preset: Chrome" << std::endl;
+                break;
+            case 4: // Emerald green
+                currentMaterialData.ambient = glm::vec4(0.0215f, 0.1745f, 0.0215f, 0.0f);
+                currentMaterialData.diffuse = glm::vec4(0.07568f, 0.61424f, 0.07568f, 0.0f);
+                currentMaterialData.specular = glm::vec4(0.633f, 0.727811f, 0.633f, 0.0f);
+                currentMaterialData.shininess = 76.8f;
+                std::cout << "[MATERIAL] Preset: Emerald Green" << std::endl;
+                break;
+        }
+        updateMaterialBuffer(); // Update the simple material buffer
     }
 
     void cleanup() {
         VKMON_INFO("Beginning VulkanMon cleanup...");
         
-        // Phase 3: Cleanup core engine systems
+        // Cleanup core engine systems
         if (currentModel) {
             VKMON_INFO("Cleaning up loaded model...");
             currentModel.reset();
@@ -1483,6 +1565,14 @@ private:
         if (assetManager) {
             assetManager->printAssetSummary();
             assetManager.reset();
+        }
+        
+        if (lightingSystem) {
+            lightingSystem.reset();
+        }
+        
+        if (materialSystem) {
+            materialSystem.reset();
         }
         
         if (resourceManager) {
@@ -1507,11 +1597,13 @@ private:
         if (descriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         if (descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
         
-        // Cleanup other resources
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
+        // Cleanup remaining Vulkan resources
+        if (materialBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, materialBuffer, nullptr);
+        }
+        if (materialBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, materialBufferMemory, nullptr);
+        }
         vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
         vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
         vkDestroyFence(device, inFlightFence, nullptr);
