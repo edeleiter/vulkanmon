@@ -13,48 +13,46 @@ env:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+          - os: windows-latest
+            triplet: x64-windows
+    
+    runs-on: ${{ matrix.os }}
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Update system libraries
-      run: sudo apt update
-
-    - name: Install Vulkan SDK and dependencies
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
       run: |
+        sudo apt update
         sudo apt install -y \
           mesa-vulkan-drivers \
           vulkan-tools \
           libvulkan-dev \
           vulkan-validationlayers \
           spirv-tools \
-          libglm-dev \
-          libstb-dev \
-          libglfw3-dev \
-          libassimp-dev \
           build-essential \
-          cmake
+          cmake \
+          ninja-build
 
-    - name: Cache vcpkg dependencies
-      uses: actions/cache@v4
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
       with:
-        path: |
-          ${{ github.workspace }}/vcpkg
-          ${{ github.workspace }}/build/vcpkg_installed
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
-        restore-keys: |
-          ${{ runner.os }}-vcpkg-
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        vcpkgJsonGlob: 'vcpkg.json'
 
-    - name: Configure CMake with vcpkg
-      run: |
-        cmake -B ${{ github.workspace }}/build \
-          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-    - name: Build VulkanMon
-      run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel
+    - name: Configure and Build
+      uses: lukka/run-cmake@v10
+      with:
+        configurePreset: 'ci-${{ matrix.triplet }}'
+        buildPreset: 'ci-${{ matrix.triplet }}'
 
     - name: Run C++ Unit Tests
       working-directory: ${{ github.workspace }}/build/tests_cpp

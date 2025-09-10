@@ -1,0 +1,22 @@
+{
+  "name": "vulkanmon",
+  "version": "0.1.0",
+  "description": "Modern C++20 game engine with Vulkan graphics for Pokemon-style 3D creature collector games",
+  "homepage": "https://github.com/edeleiter/vulkanmon",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "vulkan",
+      "platform": "!osx"
+    },
+    {
+      "name": "molten-vk",
+      "platform": "osx"
+    },
+    "glfw3",
+    "glm",
+    "assimp",
+    "stb",
+    "catch2"
+  ]
+}

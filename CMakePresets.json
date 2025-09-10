@@ -1,0 +1,87 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "ci-x64-linux",
+      "displayName": "CI Linux x64",
+      "description": "Linux x64 configuration for CI",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "ci-x64-windows",
+      "displayName": "CI Windows x64",
+      "description": "Windows x64 configuration for CI",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "dev-windows",
+      "displayName": "Development Windows",
+      "description": "Windows development configuration",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "dev-linux",
+      "displayName": "Development Linux",
+      "description": "Linux development configuration",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "ci-x64-linux",
+      "configurePreset": "ci-x64-linux",
+      "displayName": "Build CI Linux x64"
+    },
+    {
+      "name": "ci-x64-windows",
+      "configurePreset": "ci-x64-windows",
+      "displayName": "Build CI Windows x64"
+    },
+    {
+      "name": "dev-windows",
+      "configurePreset": "dev-windows",
+      "displayName": "Build Development Windows"
+    },
+    {
+      "name": "dev-linux",
+      "configurePreset": "dev-linux",
+      "displayName": "Build Development Linux"
+    }
+  ]
+}
