@@ -38,7 +38,7 @@ jobs:
         sudo apt install -y \
           libvulkan-dev \
           vulkan-tools \
-          vulkan-validationlayers-dev \
+          vulkan-utility-libraries-dev \
           spirv-tools \
           mesa-vulkan-drivers
         
