@@ -49,21 +49,21 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y \
-          build-essential \    # GCC compiler, make, etc.
-          cmake \             # CMake build system
-          ninja-build \       # Ninja generator (faster than make)
-          curl \              # For downloading dependencies
-          zip \               # Archive utilities for vcpkg
+          build-essential \
+          cmake \
+          ninja-build \
+          curl \
+          zip \
           unzip \
           tar \
-          pkg-config \        # Library configuration tool
-          libx11-dev \        # X11 windowing system headers
-          libxinerama-dev \   # Multi-monitor support for GLFW
-          libxcursor-dev \    # Cursor management for GLFW
-          libxi-dev \         # Input extension for GLFW
-          libxrandr-dev \     # Display management for GLFW
-          xorg-dev \          # X11 development libraries
-          libglu1-mesa-dev    # OpenGL utilities (Mesa implementation)
+          pkg-config \
+          libx11-dev \
+          libxinerama-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libxrandr-dev \
+          xorg-dev \
+          libglu1-mesa-dev
 
     # Step 3: Vulkan SDK Installation (Linux Only)
     # Installs Vulkan development environment using Ubuntu system packages
@@ -71,16 +71,14 @@ jobs:
     - name: Install Vulkan development libraries
       if: matrix.os == 'ubuntu-latest'
       run: |
-        # Install Vulkan headers and loader from Ubuntu packages (more reliable for CI)
         sudo apt install -y \
-          libvulkan-dev \                # Vulkan headers and loader library
-          vulkan-tools \                 # vulkaninfo, validation tools
-          vulkan-utility-libraries-dev \ # Vulkan utility libraries
-          spirv-tools \                  # SPIR-V binary utilities
-          glslang-tools \                # GLSL to SPIR-V compiler (glslangValidator)
-          mesa-vulkan-drivers            # Open-source Vulkan drivers
+          libvulkan-dev \
+          vulkan-tools \
+          vulkan-utility-libraries-dev \
+          spirv-tools \
+          glslang-tools \
+          mesa-vulkan-drivers
         
-        # Set VULKAN_SDK environment variable for compatibility with vcpkg
         echo "VULKAN_SDK=/usr" >> $GITHUB_ENV
         echo "VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d" >> $GITHUB_ENV
 
