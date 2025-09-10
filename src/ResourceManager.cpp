@@ -1,6 +1,7 @@
 #include "ResourceManager.h"
 #include <stdexcept>
 #include <iostream>
+#include <cstring>
 
 namespace VulkanMon {
 
