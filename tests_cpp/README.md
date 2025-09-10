@@ -44,20 +44,30 @@ cmake --build .
 ```
 
 ### Running Tests
+
+**From project root:**
 ```bash
 # Run all tests
-./vulkanmon_tests
+cd build/tests_cpp/Debug
+./vulkanmon_tests.exe
 
-# Run specific test categories
-./vulkanmon_tests "[Logger]"
-./vulkanmon_tests "[ResourceManager]"
-./vulkanmon_tests "[AssetManager]" 
-./vulkanmon_tests "[ModelLoader]"
+# Run specific test categories  
+./vulkanmon_tests.exe "[Logger]"
+./vulkanmon_tests.exe "[Camera]" 
 
 # Run tests with specific tags
-./vulkanmon_tests "[Threading]"
-./vulkanmon_tests "[Basic]"
-./vulkanmon_tests "[Vulkan]"
+./vulkanmon_tests.exe "[Threading]"
+./vulkanmon_tests.exe "[Basic]"
+./vulkanmon_tests.exe "[Math]"
+./vulkanmon_tests.exe "[Performance]"
+```
+
+**Alternative: From build/tests_cpp directory:**
+```bash
+cd build/tests_cpp
+Debug/vulkanmon_tests.exe
+Debug/vulkanmon_tests.exe "[Logger]"
+Debug/vulkanmon_tests.exe "[Camera]"
 ```
 
 ### Running with CTest
