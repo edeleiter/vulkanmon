@@ -1,88 +1,119 @@
 # VulkanMon CI/CD Pipeline
-# Builds and tests the VulkanMon game engine with comprehensive C++ unit testing
+# Cross-platform build and test workflow for the VulkanMon game engine
+# Runs comprehensive C++ unit testing on both Linux and Windows platforms
+
 name: VulkanMon CI/CD
 
+# Trigger Conditions:
+# - Push to main or develop branches
+# - Pull requests targeting main branch
 on:
   push:
     branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main" ]
 
+# Global environment variables for all jobs
 env:
-  BUILD_TYPE: Debug  # Use Debug for better test diagnostics
+  BUILD_TYPE: Debug  # Use Debug build for better test diagnostics and symbols
 
 jobs:
+  # Main build and test job that runs on multiple platforms
   build-and-test:
+    # Cross-platform matrix strategy:
+    # - Ubuntu: Uses Ninja generator with system Vulkan packages
+    # - Windows: Uses Visual Studio 2022 with vcpkg-managed dependencies
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            preset: ci-x64-linux
-            test_exe: "./vulkanmon_tests"
+            preset: ci-x64-linux          # CMake preset for Linux builds
+            test_exe: "./vulkanmon_tests" # Linux test executable path
           - os: windows-latest
-            preset: ci-x64-windows
-            test_exe: "Debug/vulkanmon_tests.exe"
+            preset: ci-x64-windows             # CMake preset for Windows builds  
+            test_exe: "Debug/vulkanmon_tests.exe" # Windows test executable path
     
     runs-on: ${{ matrix.os }}
     
     steps:
+    # Step 1: Source Code Checkout
+    # Downloads the repository code including vcpkg submodule
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # Step 2: Linux System Dependencies (Conditional)
+    # Only runs on Ubuntu to install build tools and system libraries
+    # Windows relies on Visual Studio 2022 which is pre-installed on windows-latest
     - name: Install system dependencies
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt update
         sudo apt install -y \
-          build-essential \
-          cmake \
-          ninja-build \
-          curl \
-          zip \
+          build-essential \    # GCC compiler, make, etc.
+          cmake \             # CMake build system
+          ninja-build \       # Ninja generator (faster than make)
+          curl \              # For downloading dependencies
+          zip \               # Archive utilities for vcpkg
           unzip \
           tar \
-          pkg-config \
-          libx11-dev \
-          libxinerama-dev \
-          libxcursor-dev \
-          libxi-dev \
-          libxrandr-dev \
-          xorg-dev \
-          libglu1-mesa-dev
+          pkg-config \        # Library configuration tool
+          libx11-dev \        # X11 windowing system headers
+          libxinerama-dev \   # Multi-monitor support for GLFW
+          libxcursor-dev \    # Cursor management for GLFW
+          libxi-dev \         # Input extension for GLFW
+          libxrandr-dev \     # Display management for GLFW
+          xorg-dev \          # X11 development libraries
+          libglu1-mesa-dev    # OpenGL utilities (Mesa implementation)
 
+    # Step 3: Vulkan SDK Installation (Linux Only)
+    # Installs Vulkan development environment using Ubuntu system packages
+    # More reliable than LunarG repository for CI environments
     - name: Install Vulkan development libraries
       if: matrix.os == 'ubuntu-latest'
       run: |
         # Install Vulkan headers and loader from Ubuntu packages (more reliable for CI)
         sudo apt install -y \
-          libvulkan-dev \
-          vulkan-tools \
-          vulkan-utility-libraries-dev \
-          spirv-tools \
-          glslang-tools \
-          mesa-vulkan-drivers
+          libvulkan-dev \                # Vulkan headers and loader library
+          vulkan-tools \                 # vulkaninfo, validation tools
+          vulkan-utility-libraries-dev \ # Vulkan utility libraries
+          spirv-tools \                  # SPIR-V binary utilities
+          glslang-tools \                # GLSL to SPIR-V compiler (glslangValidator)
+          mesa-vulkan-drivers            # Open-source Vulkan drivers
         
-        # Set VULKAN_SDK environment variable for compatibility
+        # Set VULKAN_SDK environment variable for compatibility with vcpkg
         echo "VULKAN_SDK=/usr" >> $GITHUB_ENV
         echo "VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d" >> $GITHUB_ENV
 
+    # Step 4: vcpkg Dependency Management
+    # Sets up cross-platform C++ package manager
+    # Handles: GLFW, GLM, Assimp, STB, Catch2, and Vulkan (Windows only)
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-        vcpkgJsonGlob: 'vcpkg.json'
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'  # Use repo's vcpkg submodule
+        vcpkgJsonGlob: 'vcpkg.json'                      # Dependency manifest file
 
+    # Step 5: CMake Configuration and Build
+    # Uses platform-specific presets defined in CMakePresets.json
+    # - Linux: ci-x64-linux (Ninja generator)
+    # - Windows: ci-x64-windows (Visual Studio 2022)
     - name: Configure and Build
       uses: lukka/run-cmake@v10
       with:
-        configurePreset: '${{ matrix.preset }}'
-        buildPreset: '${{ matrix.preset }}'
+        configurePreset: '${{ matrix.preset }}'  # Platform-specific CMake preset
+        buildPreset: '${{ matrix.preset }}'      # Platform-specific build preset
 
+    # Step 6: Execute Unit Test Suite
+    # Runs comprehensive C++ unit tests using Catch2 framework
+    # Platform-specific executable paths and validation
     - name: Run Complete Test Suite
       working-directory: ${{ github.workspace }}/build/tests_cpp
       run: |
         echo "Running VulkanMon Complete Test Suite (10 cases, 59 assertions)..."
         
+        # Platform-specific test execution:
+        # Windows: Debug/vulkanmon_tests.exe (Visual Studio output structure)
+        # Linux: vulkanmon_tests (direct executable)
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
           if [ -f "Debug/vulkanmon_tests.exe" ]; then
             Debug/vulkanmon_tests.exe --reporter=console::out=-::colour-mode=ansi
@@ -101,17 +132,23 @@ jobs:
           fi
         fi
 
+    # Step 7: Archive Build Artifacts
+    # Uploads test executables, main application, and build logs for debugging
+    # Runs even if previous steps fail (if: always())
     - name: Upload test artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: ${{ matrix.os }}-test-results
+        name: ${{ matrix.os }}-test-results        # Platform-specific artifact names
         path: |
-          ${{ github.workspace }}/build/tests_cpp/vulkanmon_tests*
-          ${{ github.workspace }}/build/Debug/vulkanmon*
-          ${{ github.workspace }}/build/*.log
+          ${{ github.workspace }}/build/tests_cpp/vulkanmon_tests*  # Test executables
+          ${{ github.workspace }}/build/Debug/vulkanmon*            # Main application
+          ${{ github.workspace }}/build/*.log                       # Build logs
         retention-days: 7
 
+    # Step 8: Generate Build Summary
+    # Creates a summary report visible in GitHub Actions UI
+    # Always runs to provide build information even on failure
     - name: Build summary
       if: always()
       run: |
