@@ -30,7 +30,14 @@ jobs:
           zip \
           unzip \
           tar \
-          pkg-config
+          pkg-config \
+          libx11-dev \
+          libxinerama-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libxrandr-dev \
+          xorg-dev \
+          libglu1-mesa-dev
 
     - name: Install Vulkan development libraries
       run: |
