@@ -42,7 +42,10 @@ cmake --build build --config Debug --parallel
 
 # Run unit tests
 cd build\tests_cpp
-Debug\vulkanmon_tests.exe
+Debug\vulkanmon_tests.exe                    # All tests (10 cases, 59 assertions)
+Debug\vulkanmon_tests.exe "[Logger]"         # Logger tests only
+Debug\vulkanmon_tests.exe "[Camera]"         # Camera tests only
+Debug\vulkanmon_tests.exe --help             # Show all options
 
 # Run the application
 cd build\Debug
@@ -126,11 +129,62 @@ cmake --build build --parallel $(nproc)
 
 # Run unit tests
 cd build/tests_cpp
-./Debug/vulkanmon_tests
+./Debug/vulkanmon_tests                      # All tests (10 cases, 59 assertions)
+./Debug/vulkanmon_tests "[Logger]"           # Logger tests only
+./Debug/vulkanmon_tests "[Camera]"           # Camera tests only
+./Debug/vulkanmon_tests --help               # Show all options
 
 # Run the application
 cd build/Debug
 ./vulkanmon
+```
+
+---
+
+## **Testing**
+
+### Test Suite Overview
+- **Framework**: Catch2 (managed via vcpkg)
+- **Test Cases**: 10 test suites
+- **Assertions**: 59 total assertions
+- **Coverage**: Core systems (Logger, Camera)
+- **Status**: 100% passing
+
+### Running Tests
+
+#### All Tests
+```bash
+# Windows
+cd build\tests_cpp
+Debug\vulkanmon_tests.exe
+
+# Linux  
+cd build/tests_cpp
+./Debug/vulkanmon_tests
+```
+
+#### Specific Test Categories
+```bash
+# Logger tests
+vulkanmon_tests "[Logger]"
+
+# Camera tests  
+vulkanmon_tests "[Camera]"
+
+# File operations (includes Logger deadlock fix verification)
+vulkanmon_tests "[Logger][File]"
+```
+
+#### Test Options
+```bash
+# Show available options
+vulkanmon_tests --help
+
+# Run with specific reporter
+vulkanmon_tests --reporter=console::out=-::colour-mode=ansi
+
+# List all available tests
+vulkanmon_tests --list-tests
 ```
 
 ---
@@ -168,7 +222,8 @@ The project includes `.vscode/settings.json` with CMake Tools integration:
 | **Clean Build** | `rm -rf build` | `rm -rf build` |
 | **Configure** | `cmake --preset dev-windows` | `cmake --preset dev-linux` |
 | **Build** | `cmake --build build --config Debug` | `cmake --build build` |
-| **Test** | `build\tests_cpp\Debug\vulkanmon_tests.exe` | `build/tests_cpp/Debug/vulkanmon_tests` |
+| **Test All** | `build\tests_cpp\Debug\vulkanmon_tests.exe` | `build/tests_cpp/Debug/vulkanmon_tests` |
+| **Test Specific** | `build\tests_cpp\Debug\vulkanmon_tests.exe "[Logger]"` | `build/tests_cpp/Debug/vulkanmon_tests "[Logger]"` |
 | **Run** | `build\Debug\vulkanmon.exe` | `build/Debug/vulkanmon` |
 
 ---

@@ -32,7 +32,8 @@ void Logger::enableFileOutput(const std::string& filename) {
     fileStream_ = std::make_unique<std::ofstream>(filename, std::ios::app);
     if (fileStream_->is_open()) {
         currentLogFile_ = filename;
-        log(LogLevel::INFO_LEVEL, "Log file opened: " + filename);
+        // Log opening message directly to avoid recursive mutex lock
+        std::cout << "[" << getCurrentTimestamp() << "] [INFO] Log file opened: " << filename << std::endl;
     } else {
         fileStream_.reset();
         std::cerr << "[LOGGER ERROR] Failed to open log file: " << filename << std::endl;
@@ -43,7 +44,9 @@ void Logger::disableFileOutput() {
     std::lock_guard<std::mutex> lock(logMutex_);
     
     if (fileStream_) {
-        log(LogLevel::INFO_LEVEL, "Closing log file: " + currentLogFile_);
+        // Log closure message directly to avoid recursive mutex lock
+        std::cout << "[" << getCurrentTimestamp() << "] [INFO] Closing log file: " << currentLogFile_ << std::endl;
+        
         fileStream_->close();
         fileStream_.reset();
         currentLogFile_.clear();

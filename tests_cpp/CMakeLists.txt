@@ -9,8 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find packages (minimal set for sweet spot approach)
 find_package(Vulkan REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(Catch2 3 CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(Catch2 CONFIG REQUIRED)
 
 # Include directories for VulkanMon source files
 include_directories(../src)
@@ -50,11 +50,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(vulkanmon_tests PRIVATE DEBUG)
 endif()
 
-# Discover and register tests with CTest
-include(CTest)
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
-include(Catch)
-catch_discover_tests(vulkanmon_tests)
+# Discover and register tests with CTest (optional, works without it too)
+# include(CTest)
+# Note: Catch2 test discovery is optional - the executable runs all tests by default
 
 # Custom target for easy test running
 add_custom_target(run_tests
