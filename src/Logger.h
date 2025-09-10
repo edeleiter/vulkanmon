@@ -30,11 +30,11 @@ namespace VulkanMon {
  * Log levels in order of severity
  */
 enum class LogLevel {
-    DEBUG = 0,   // Development debugging information
-    INFO = 1,    // General information messages
-    WARNING = 2, // Warning messages (recoverable issues)
-    ERROR = 3,   // Error messages (serious problems)
-    FATAL = 4    // Fatal errors (application will terminate)
+    DEBUG_LEVEL = 0,   // Development debugging information
+    INFO_LEVEL = 1,    // General information messages
+    WARNING_LEVEL = 2, // Warning messages (recoverable issues)
+    ERROR_LEVEL = 3,   // Error messages (serious problems)
+    FATAL_LEVEL = 4    // Fatal errors (application will terminate)
 };
 
 /**
@@ -88,7 +88,7 @@ private:
     void writeToOutputs(const std::string& formattedMessage);
     
     // Configuration
-    LogLevel logLevel_ = LogLevel::INFO;
+    LogLevel logLevel_ = LogLevel::INFO_LEVEL;
     bool consoleOutput_ = true;
     bool timestamps_ = true;
     

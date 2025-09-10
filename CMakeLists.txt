@@ -40,3 +40,9 @@ target_include_directories(vulkanmon PRIVATE
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(vulkanmon PRIVATE DEBUG)
 endif()
+
+# Add tests subdirectory (optional - can be disabled for release builds)
+option(BUILD_TESTS "Build unit tests" ON)
+if(BUILD_TESTS)
+    add_subdirectory(tests_cpp)
+endif()

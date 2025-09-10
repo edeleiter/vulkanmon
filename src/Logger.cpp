@@ -32,7 +32,7 @@ void Logger::enableFileOutput(const std::string& filename) {
     fileStream_ = std::make_unique<std::ofstream>(filename, std::ios::app);
     if (fileStream_->is_open()) {
         currentLogFile_ = filename;
-        log(LogLevel::INFO, "Log file opened: " + filename);
+        log(LogLevel::INFO_LEVEL, "Log file opened: " + filename);
     } else {
         fileStream_.reset();
         std::cerr << "[LOGGER ERROR] Failed to open log file: " << filename << std::endl;
@@ -43,7 +43,7 @@ void Logger::disableFileOutput() {
     std::lock_guard<std::mutex> lock(logMutex_);
     
     if (fileStream_) {
-        log(LogLevel::INFO, "Closing log file: " + currentLogFile_);
+        log(LogLevel::INFO_LEVEL, "Closing log file: " + currentLogFile_);
         fileStream_->close();
         fileStream_.reset();
         currentLogFile_.clear();
@@ -71,23 +71,23 @@ void Logger::log(LogLevel level, const std::string& message) {
 }
 
 void Logger::debug(const std::string& message) {
-    log(LogLevel::DEBUG, message);
+    log(LogLevel::DEBUG_LEVEL, message);
 }
 
 void Logger::info(const std::string& message) {
-    log(LogLevel::INFO, message);
+    log(LogLevel::INFO_LEVEL, message);
 }
 
 void Logger::warning(const std::string& message) {
-    log(LogLevel::WARNING, message);
+    log(LogLevel::WARNING_LEVEL, message);
 }
 
 void Logger::error(const std::string& message) {
-    log(LogLevel::ERROR, message);
+    log(LogLevel::ERROR_LEVEL, message);
 }
 
 void Logger::fatal(const std::string& message) {
-    log(LogLevel::FATAL, message);
+    log(LogLevel::FATAL_LEVEL, message);
     flush(); // Ensure fatal messages are immediately written
 }
 
@@ -132,11 +132,11 @@ void Logger::flush() {
 
 std::string Logger::getLevelString(LogLevel level) const {
     switch (level) {
-        case LogLevel::DEBUG:   return "DEBUG";
-        case LogLevel::INFO:    return "INFO ";
-        case LogLevel::WARNING: return "WARN ";
-        case LogLevel::ERROR:   return "ERROR";
-        case LogLevel::FATAL:   return "FATAL";
+        case LogLevel::DEBUG_LEVEL:   return "DEBUG";
+        case LogLevel::INFO_LEVEL:    return "INFO ";
+        case LogLevel::WARNING_LEVEL: return "WARN ";
+        case LogLevel::ERROR_LEVEL:   return "ERROR";
+        case LogLevel::FATAL_LEVEL:   return "FATAL";
         default:                return "UNKNW";
     }
 }
