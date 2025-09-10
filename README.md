@@ -57,14 +57,14 @@ VulkanMon aims to be a high-performance, cross-platform game engine that combine
 - **Languages**: C++20 (core), Cython (scripting interface), Python (game logic)
 - **Version Control**: Git with GitHub Actions for CI/CD
 - **Documentation**: Doxygen for code documentation
-- **Testing**: Modern pytest framework with 14 comprehensive tests
+- **Testing**: Comprehensive C++ unit testing with Catch2 framework
 
 ## Development Roadmap
 
 ### Phase 1: Foundation ✅ COMPLETE!
 - [x] Project setup and build system with vcpkg dependency management
 - [x] **Vulkan hello triangle** - Beautiful RGB gradient triangle rendering!
-- [x] **Modern testing framework** - 14 comprehensive tests with pytest
+- [x] **Modern testing framework** - Comprehensive C++ unit tests with Catch2
 - [x] **Documentation and philosophy** - Core tenants established
 
 ### Phase 2: 3D Graphics Foundation ✅ COMPLETE!
@@ -157,10 +157,9 @@ cmake --build .
 # Run the hello triangle demo
 Debug/vulkanmon.exe
 
-# Run the test suite
-cd ../tests
-pip install -r requirements.txt
-python -m pytest
+# Run the C++ unit test suite
+cd build/tests_cpp
+Debug/vulkanmon_tests.exe
 ```
 
 ## Development Philosophy
@@ -171,7 +170,7 @@ VulkanMon follows three core tenants:
 We favor clear, straightforward solutions over complex ones. Code should be easy to understand, maintain, and extend.
 
 ### 🧪 **"Test, Test, Test"**  
-Confidence comes from thorough testing at every level - from unit tests to visual validation on real hardware. We now have 14 comprehensive tests covering build, runtime, and integration!
+Confidence comes from thorough testing at every level - from unit tests to visual validation on real hardware. We have comprehensive C++ unit tests covering all core engine systems!
 
 ### 📚 **"Document Often"**
 Good documentation is as important as good code. We document the "why" not just the "what".
@@ -187,7 +186,7 @@ We welcome contributions from developers of all skill levels! Here's how you can
 - **Game Logic**: Python/Cython scripting for gameplay features
 - **Art & Assets**: 3D models, textures, animations, audio
 - **Documentation**: Tutorials, API docs, examples
-- **Testing**: Extend our comprehensive pytest framework with more test cases
+- **Testing**: Complete C++ unit test coverage for all engine systems
 
 ### Development Guidelines
 - Follow modern C++20 best practices

@@ -197,12 +197,12 @@ Test assets are located in `fixtures/test_assets/`:
 
 ## Integration with Main Project
 
-This C++ testing framework complements the existing Python pytest framework:
+This C++ testing framework provides comprehensive unit testing for VulkanMon:
 
-- **Python tests**: Integration testing, build validation, end-to-end testing
-- **C++ tests**: Unit testing, class-level validation, performance testing
+- **C++ unit tests**: Class-level validation, performance testing, system integration
+- **GitHub Actions CI/CD**: Automated build validation and test execution
 
-Both frameworks can be run independently and provide different levels of confidence in the system.
+The testing framework is integrated with GitHub Actions CI/CD for automated validation on every push to main.
 
 ## Phase 4 Testing Expansion
 

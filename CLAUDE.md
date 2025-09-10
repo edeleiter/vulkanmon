@@ -35,25 +35,18 @@ Debug/vulkanmon.exe  # Windows
 
 ### Testing
 ```bash
-# Run Python integration test suite
-cd tests
-pip install -r requirements.txt
-python -m pytest
-
-# Run specific test categories
-python -m pytest -m build        # Build system tests
-python -m pytest -m vulkan       # Vulkan runtime tests
-python -m pytest -m integration  # End-to-end tests
-
-# Run C++ unit tests (Sweet Spot approach)
+# Run C++ unit tests (Catch2 framework)
 cd build/tests_cpp
 Debug/vulkanmon_tests.exe        # All C++ unit tests
 
 # Run specific C++ test categories
-Debug/vulkanmon_tests.exe "[Logger]"   # Logger unit tests
-Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
-Debug/vulkanmon_tests.exe "[LightingSystem]"   # LightingSystem unit tests (pending implementation)
-Debug/vulkanmon_tests.exe "[MaterialSystem]"   # MaterialSystem unit tests (pending implementation)
+Debug/vulkanmon_tests.exe "[Logger]"          # Logger unit tests
+Debug/vulkanmon_tests.exe "[Camera]"          # Camera unit tests
+Debug/vulkanmon_tests.exe "[ResourceManager]" # ResourceManager unit tests
+Debug/vulkanmon_tests.exe "[AssetManager]"    # AssetManager unit tests
+Debug/vulkanmon_tests.exe "[ModelLoader]"     # ModelLoader unit tests
+Debug/vulkanmon_tests.exe "[LightingSystem]"  # LightingSystem unit tests (pending implementation)
+Debug/vulkanmon_tests.exe "[MaterialSystem]"  # MaterialSystem unit tests (pending implementation)
 ```
 
 ## Architecture
