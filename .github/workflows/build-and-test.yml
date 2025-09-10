@@ -107,7 +107,7 @@ jobs:
       with:
         name: ${{ matrix.os }}-test-results
         path: |
-          ${{ github.workspace }}/build/tests_cpp/${{ matrix.test_exe }}
+          ${{ github.workspace }}/build/tests_cpp/vulkanmon_tests*
           ${{ github.workspace }}/build/Debug/vulkanmon*
           ${{ github.workspace }}/build/*.log
         retention-days: 7
