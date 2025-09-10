@@ -13,13 +13,24 @@ env:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            preset: ci-x64-linux
+            test_exe: "./vulkanmon_tests"
+          - os: windows-latest
+            preset: ci-x64-windows
+            test_exe: "Debug/vulkanmon_tests.exe"
+    
+    runs-on: ${{ matrix.os }}
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Install system dependencies
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt update
         sudo apt install -y \
@@ -40,6 +51,7 @@ jobs:
           libglu1-mesa-dev
 
     - name: Install Vulkan development libraries
+      if: matrix.os == 'ubuntu-latest'
       run: |
         # Install Vulkan headers and loader from Ubuntu packages (more reliable for CI)
         sudo apt install -y \
@@ -63,30 +75,40 @@ jobs:
     - name: Configure and Build
       uses: lukka/run-cmake@v10
       with:
-        configurePreset: 'ci-x64-linux'
-        buildPreset: 'ci-x64-linux'
+        configurePreset: '${{ matrix.preset }}'
+        buildPreset: '${{ matrix.preset }}'
 
     - name: Run Complete Test Suite
       working-directory: ${{ github.workspace }}/build/tests_cpp
       run: |
         echo "Running VulkanMon Complete Test Suite (10 cases, 59 assertions)..."
         
-        if [ -f "vulkanmon_tests" ]; then
-          ./vulkanmon_tests --reporter=console::out=-::colour-mode=ansi
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          if [ -f "Debug/vulkanmon_tests.exe" ]; then
+            Debug/vulkanmon_tests.exe --reporter=console::out=-::colour-mode=ansi
+          else
+            echo "Error: vulkanmon_tests.exe executable not found"
+            ls -la Debug/
+            exit 1
+          fi
         else
-          echo "Error: vulkanmon_tests executable not found"
-          ls -la
-          exit 1
+          if [ -f "vulkanmon_tests" ]; then
+            ./vulkanmon_tests --reporter=console::out=-::colour-mode=ansi
+          else
+            echo "Error: vulkanmon_tests executable not found"
+            ls -la
+            exit 1
+          fi
         fi
 
     - name: Upload test artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: ubuntu-test-results
+        name: ${{ matrix.os }}-test-results
         path: |
-          ${{ github.workspace }}/build/tests_cpp/vulkanmon_tests
-          ${{ github.workspace }}/build/vulkanmon
+          ${{ github.workspace }}/build/tests_cpp/${{ matrix.test_exe }}
+          ${{ github.workspace }}/build/Debug/vulkanmon*
           ${{ github.workspace }}/build/*.log
         retention-days: 7
 
@@ -95,8 +117,8 @@ jobs:
       run: |
         echo "## VulkanMon CI Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Build Type**: ${{ env.BUILD_TYPE }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Platform**: Ubuntu Latest" >> $GITHUB_STEP_SUMMARY
-        echo "- **Generator**: Ninja" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platform**: ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Preset**: ${{ matrix.preset }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Dependencies**: vcpkg managed" >> $GITHUB_STEP_SUMMARY
         echo "- **Test Framework**: Catch2 via vcpkg" >> $GITHUB_STEP_SUMMARY
         echo "- **Expected Tests**: 10 test cases, 59 assertions" >> $GITHUB_STEP_SUMMARY
