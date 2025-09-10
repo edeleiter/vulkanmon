@@ -66,33 +66,18 @@ jobs:
         configurePreset: 'ci-x64-linux'
         buildPreset: 'ci-x64-linux'
 
-    - name: Run C++ Unit Tests
+    - name: Run Complete Test Suite
       working-directory: ${{ github.workspace }}/build/tests_cpp
       run: |
-        echo "Running VulkanMon C++ Unit Test Suite..."
-        echo "Contents of tests_cpp directory:"
-        ls -la
+        echo "Running VulkanMon Complete Test Suite (10 cases, 59 assertions)..."
         
-        # With Ninja, executable should be directly in the directory
         if [ -f "vulkanmon_tests" ]; then
           ./vulkanmon_tests --reporter=console::out=-::colour-mode=ansi
         else
           echo "Error: vulkanmon_tests executable not found"
-          echo "Full build directory structure:"
-          find ${{ github.workspace }}/build -name "*test*" -type f
+          ls -la
           exit 1
         fi
-
-    - name: Run specific test categories
-      working-directory: ${{ github.workspace }}/build/tests_cpp
-      run: |
-        echo "Testing individual core systems..."
-        
-        echo "=== Logger Tests ==="
-        ./vulkanmon_tests "[Logger]" || true
-        
-        echo "=== Camera Tests ==="
-        ./vulkanmon_tests "[Camera]" || true
 
     - name: Upload test artifacts
       uses: actions/upload-artifact@v4
