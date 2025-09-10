@@ -73,7 +73,8 @@ Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
 - ✅ **Phase 2 COMPLETE**: 3D graphics with MVP matrices, depth testing
 - ✅ **Phase 2.5 COMPLETE**: Interactive development (WASD camera, hot shader reload)
 - ✅ **Phase 3 COMPLETE**: Core engine systems (logging, assets, model loading)
-- 🚧 **Phase 4 IN PROGRESS**: Advanced graphics features
+- ✅ **Phase 3.1 COMPLETE**: C++ Unit Testing Framework (Sweet Spot approach)
+- 🚧 **Phase 4 READY**: Advanced graphics features (lighting, materials, shadows)
 
 ## Development Workflow
 
@@ -82,13 +83,15 @@ Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
 - **Vulkan Best Practices**: Proper synchronization, efficient descriptor management
 - **Error Handling**: Exceptions for unrecoverable errors, detailed error messages
 - **Memory Management**: No raw `new`/`delete`, use ResourceManager for Vulkan objects
+- **Documentation Style**: No emojis in code, documentation, or comments - focus on clear, professional text
 
 ### Testing Requirements
 Before committing code:
 1. **Build Test**: Code must compile cleanly
-2. **Console Validation**: Application runs without errors
-3. **Visual Validation**: Rendering output matches expectations
-4. **Performance Check**: Maintains 60+ FPS
+2. **Unit Tests**: C++ tests pass (Logger, Camera, future ResourceManager)
+3. **Console Validation**: Application runs without errors
+4. **Visual Validation**: Rendering output matches expectations
+5. **Performance Check**: Maintains 60+ FPS
 
 ### Hot Reloading
 - **Shader Reloading**: Press 'R' key during runtime to reload shaders from `shaders/` directory
