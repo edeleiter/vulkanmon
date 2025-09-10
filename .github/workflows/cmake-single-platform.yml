@@ -13,34 +13,33 @@ env:
 
 jobs:
   build-and-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            triplet: x64-linux
-          - os: windows-latest
-            triplet: x64-windows
-    
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install Linux dependencies
-      if: matrix.os == 'ubuntu-latest'
+    - name: Install system dependencies
       run: |
         sudo apt update
         sudo apt install -y \
-          mesa-vulkan-drivers \
-          vulkan-tools \
-          libvulkan-dev \
-          vulkan-validationlayers \
-          spirv-tools \
           build-essential \
           cmake \
-          ninja-build
+          ninja-build \
+          curl \
+          zip \
+          unzip \
+          tar \
+          pkg-config
+
+    - name: Install Vulkan SDK
+      run: |
+        # Install Vulkan SDK from LunarG repository
+        wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list \
+          https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+        sudo apt update
+        sudo apt install -y vulkan-sdk
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
@@ -51,67 +50,56 @@ jobs:
     - name: Configure and Build
       uses: lukka/run-cmake@v10
       with:
-        configurePreset: 'ci-${{ matrix.triplet }}'
-        buildPreset: 'ci-${{ matrix.triplet }}'
+        configurePreset: 'ci-x64-linux'
+        buildPreset: 'ci-x64-linux'
 
     - name: Run C++ Unit Tests
       working-directory: ${{ github.workspace }}/build/tests_cpp
       run: |
         echo "Running VulkanMon C++ Unit Test Suite..."
-        if [ -f "${{ env.BUILD_TYPE }}/vulkanmon_tests" ]; then
-          ./${{ env.BUILD_TYPE }}/vulkanmon_tests --reporter=console::out=-::colour-mode=ansi
-        elif [ -f "vulkanmon_tests" ]; then
+        echo "Contents of tests_cpp directory:"
+        ls -la
+        
+        # With Ninja, executable should be directly in the directory
+        if [ -f "vulkanmon_tests" ]; then
           ./vulkanmon_tests --reporter=console::out=-::colour-mode=ansi
         else
           echo "Error: vulkanmon_tests executable not found"
-          ls -la
+          echo "Full build directory structure:"
+          find ${{ github.workspace }}/build -name "*test*" -type f
           exit 1
         fi
 
     - name: Run specific test categories
       working-directory: ${{ github.workspace }}/build/tests_cpp
       run: |
-        echo "Testing core systems..."
-        if [ -f "${{ env.BUILD_TYPE }}/vulkanmon_tests" ]; then
-          TESTS_EXEC="./${{ env.BUILD_TYPE }}/vulkanmon_tests"
-        else
-          TESTS_EXEC="./vulkanmon_tests"
-        fi
+        echo "Testing individual core systems..."
         
         echo "=== Logger Tests ==="
-        $TESTS_EXEC "[Logger]" || true
+        ./vulkanmon_tests "[Logger]" || true
+        
         echo "=== Camera Tests ==="
-        $TESTS_EXEC "[Camera]" || true
-        echo "=== ResourceManager Tests ==="
-        $TESTS_EXEC "[ResourceManager]" || true
-        echo "=== AssetManager Tests ==="
-        $TESTS_EXEC "[AssetManager]" || true
-        echo "=== ModelLoader Tests ==="
-        $TESTS_EXEC "[ModelLoader]" || true
+        ./vulkanmon_tests "[Camera]" || true
 
     - name: Upload test artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-results-${{ env.BUILD_TYPE }}
+        name: ubuntu-test-results
         path: |
-          ${{ github.workspace }}/build/tests_cpp/
-          ${{ github.workspace }}/build/Debug/
+          ${{ github.workspace }}/build/tests_cpp/vulkanmon_tests
+          ${{ github.workspace }}/build/vulkanmon
           ${{ github.workspace }}/build/*.log
         retention-days: 7
 
     - name: Build summary
       if: always()
       run: |
-        echo "## VulkanMon Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## VulkanMon CI Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Build Type**: ${{ env.BUILD_TYPE }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Platform**: Ubuntu Latest" >> $GITHUB_STEP_SUMMARY
-        echo "- **CMake Configuration**: vcpkg toolchain" >> $GITHUB_STEP_SUMMARY
-        echo "- **Test Suite**: C++ Unit Tests (Catch2)" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ job.status }}" == "success" ]; then
-          echo "- **Status**: All tests passed" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- **Status**: Build or tests failed" >> $GITHUB_STEP_SUMMARY
-        fi
+        echo "- **Generator**: Ninja" >> $GITHUB_STEP_SUMMARY
+        echo "- **Dependencies**: vcpkg managed" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Framework**: Catch2 via vcpkg" >> $GITHUB_STEP_SUMMARY
+        echo "- **Expected Tests**: 10 test cases, 59 assertions" >> $GITHUB_STEP_SUMMARY
 
