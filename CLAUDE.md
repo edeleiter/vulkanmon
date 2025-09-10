@@ -52,6 +52,8 @@ Debug/vulkanmon_tests.exe        # All C++ unit tests
 # Run specific C++ test categories
 Debug/vulkanmon_tests.exe "[Logger]"   # Logger unit tests
 Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
+Debug/vulkanmon_tests.exe "[LightingSystem]"   # LightingSystem unit tests (pending implementation)
+Debug/vulkanmon_tests.exe "[MaterialSystem]"   # MaterialSystem unit tests (pending implementation)
 ```
 
 ## Architecture
@@ -62,6 +64,8 @@ Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
 - **AssetManager** (`src/AssetManager.h/.cpp`): Texture loading, caching, and asset discovery
 - **ModelLoader** (`src/ModelLoader.h/.cpp`): Assimp-based 3D model loading with material support
 - **Camera** (`src/Camera.h/.cpp`): Interactive WASD camera controls with mouse look
+- **LightingSystem** (`src/LightingSystem.h/.cpp`): Directional and ambient lighting with Vulkan descriptor management
+- **MaterialSystem** (`src/MaterialSystem.h/.cpp`): Material property management with Phong lighting support
 
 ### Main Application
 - **Entry Point**: `src/main.cpp` - Complete Vulkan 3D renderer
@@ -74,7 +78,47 @@ Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
 - ✅ **Phase 2.5 COMPLETE**: Interactive development (WASD camera, hot shader reload)
 - ✅ **Phase 3 COMPLETE**: Core engine systems (logging, assets, model loading)
 - ✅ **Phase 3.1 COMPLETE**: C++ Unit Testing Framework (Sweet Spot approach)
-- 🚧 **Phase 4 READY**: Advanced graphics features (lighting, materials, shadows)
+- ✅ **Phase 4.1 COMPLETE**: MaterialSystem implementation and integration
+- 🚧 **Phase 4.2 IN PROGRESS**: Lighting system refinement and material-lighting integration
+
+### Phase 4.1 Milestone: MaterialSystem Integration (COMPLETE)
+
+**Achievement**: Successfully implemented complete material property system with real-time switching capabilities.
+
+**Key Accomplishments:**
+- **MaterialSystem Architecture**: Complete material management with Vulkan descriptor handling
+- **Material Property Support**: Ambient, diffuse, specular, and shininess properties with proper GPU alignment
+- **Real-time Material Switching**: Interactive controls for cycling through material presets
+- **Automatic Shader Compilation**: CMake integration for automatic GLSL to SPIR-V compilation
+- **Material Presets**: Five realistic material types (Default, Gold, Ruby, Chrome, Emerald)
+
+**Interactive Controls:**
+- **M Key**: Cycle through material presets with immediate visual feedback
+- **5/6 Keys**: Adjust material shininess for specular highlight control
+- **R Key**: Hot reload shaders during development
+
+**Technical Foundation:**
+- MaterialData structure with vec4 alignment for Vulkan compatibility
+- Direct uniform buffer approach for reliable GPU data transfer
+- Integrated with existing descriptor set management
+- Comprehensive logging and error handling
+
+### Phase 4.2 Next Steps: Lighting System Refinement
+
+**Current Status**: Material data successfully reaches shaders, but lighting calculations need optimization.
+
+**Planned Improvements:**
+1. **Lighting-Material Integration**: Fine-tune how materials interact with lighting
+2. **Specular Lighting Refinement**: Optimize specular calculations for realistic highlights
+3. **Light Direction Calibration**: Ensure proper light direction and intensity
+4. **Camera-Lighting Synchronization**: Perfect camera position usage in specular calculations
+5. **Material Response Tuning**: Calibrate how different materials respond to lighting
+
+**Success Criteria:**
+- Materials show distinct visual characteristics under lighting
+- Specular highlights appear and move correctly with camera
+- Gold appears metallic, Ruby appears gemlike, Chrome appears reflective
+- Lighting responds appropriately to material properties
 
 ## Development Workflow
 
@@ -88,7 +132,7 @@ Debug/vulkanmon_tests.exe "[Camera]"   # Camera unit tests
 ### Testing Requirements
 Before committing code:
 1. **Build Test**: Code must compile cleanly
-2. **Unit Tests**: C++ tests pass (Logger, Camera, future ResourceManager)
+2. **Unit Tests**: C++ tests pass (Logger, Camera, LightingSystem when implemented)
 3. **Console Validation**: Application runs without errors
 4. **Visual Validation**: Rendering output matches expectations
 5. **Performance Check**: Maintains 60+ FPS
