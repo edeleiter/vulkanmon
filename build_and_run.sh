@@ -19,7 +19,6 @@ echo "Step 3: Building project..."
 cmake --build build --config Debug --parallel
 
 echo "Step 4: Running application..."
-cd build/Debug
-./vulkanmon.exe
+./build/Debug/vulkanmon.exe
 
 echo "Build and run completed!"
