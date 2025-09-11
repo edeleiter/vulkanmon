@@ -23,6 +23,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 
+#include "Window.h"
 #include "Camera.h"
 #include "Utils.h"
 #include "Logger.h"
@@ -59,54 +60,54 @@ struct UniformBufferObject {
 
 class HelloTriangleApp {
 public:
-    // Static key callback for hot shader reloading and lighting controls
-    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-        HelloTriangleApp* app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
+    // Key callback for hot shader reloading and lighting controls
+    void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+        // 'this' is captured by the lambda in initWindow(), so we can access app directly
         
         if (action == GLFW_PRESS) {
             switch (key) {
                 case GLFW_KEY_R:
                     std::cout << "\n[HOT RELOAD] R key pressed - reloading shaders..." << std::endl;
-                    app->reloadShaders();
+                    reloadShaders();
                     break;
                     
                 case GLFW_KEY_1:
                     // Adjust directional light intensity
-                    app->adjustDirectionalLightIntensity(0.1f);
+                    adjustDirectionalLightIntensity(0.1f);
                     break;
                     
                 case GLFW_KEY_2:
-                    app->adjustDirectionalLightIntensity(-0.1f);
+                    adjustDirectionalLightIntensity(-0.1f);
                     break;
                     
                 case GLFW_KEY_3:
                     // Cycle through preset lighting configurations
-                    app->cycleLightingPreset();
+                    cycleLightingPreset();
                     break;
                     
                 case GLFW_KEY_4:
                     // Toggle ambient lighting
-                    app->toggleAmbientLighting();
+                    toggleAmbientLighting();
                     break;
                     
                 case GLFW_KEY_L:
                     // Print lighting debug info
-                    app->printLightingInfo();
+                    printLightingInfo();
                     break;
                     
                 case GLFW_KEY_M:
                     // Cycle through material presets
-                    app->cycleMaterialPreset();
+                    cycleMaterialPreset();
                     break;
                     
                 case GLFW_KEY_5:
                     // Increase material shininess
-                    app->adjustMaterialShininess(10.0f);
+                    adjustMaterialShininess(10.0f);
                     break;
                     
                 case GLFW_KEY_6:
                     // Decrease material shininess
-                    app->adjustMaterialShininess(-10.0f);
+                    adjustMaterialShininess(-10.0f);
                     break;
             }
         }
@@ -120,7 +121,7 @@ public:
     }
 
 private:
-    GLFWwindow* window;
+    std::unique_ptr<Window> window_;
     VkInstance instance;
     VkSurfaceKHR surface;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -177,15 +178,17 @@ private:
     std::shared_ptr<MaterialSystem> materialSystem;
 
     void initWindow() {
-        glfwInit();
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        // Create and initialize Window
+        window_ = std::make_unique<Window>(WINDOW_WIDTH, WINDOW_HEIGHT, "VulkanMon");
+        window_->initialize();
         
-        window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "VulkanMon", nullptr, nullptr);
+        // Register callbacks - route Window events to HelloTriangleApp methods
+        window_->setKeyCallback([this](int key, int scancode, int action, int mods) {
+            keyCallback(window_->getWindow(), key, scancode, action, mods);
+        });
         
-        // Set up key callback
-        glfwSetWindowUserPointer(window, this);
-        glfwSetKeyCallback(window, keyCallback);
+        // Note: Mouse callback will be added when we extract InputHandler
+        // Note: Resize callback will be added when we extract VulkanRenderer
     }
 
     void initVulkan() {
@@ -254,9 +257,8 @@ private:
     }
 
     void createSurface() {
-        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create window surface!");
-        }
+        window_->createSurface(instance);
+        surface = window_->getSurface();
         std::cout << "Window surface created successfully!\n";
     }
 
@@ -794,8 +796,8 @@ private:
     }
 
     void mainLoop() {
-        while (!glfwWindowShouldClose(window)) {
-            glfwPollEvents();
+        while (!window_->shouldClose()) {
+            window_->pollEvents();
             drawFrame();
         }
         vkDeviceWaitIdle(device);
@@ -1294,7 +1296,7 @@ private:
     }
 
     void handleCameraInput() {
-        camera.processInput(window);
+        camera.processInput(window_->getWindow());
     }
 
     void updateUniformBuffer() {
@@ -1616,8 +1618,8 @@ private:
         vkDestroyDevice(device, nullptr);
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        // Window cleanup is handled automatically by Window destructor
+        window_.reset();
     }
 };
 

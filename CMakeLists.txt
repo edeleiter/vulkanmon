@@ -50,6 +50,7 @@ add_custom_target(shaders
 
 add_executable(vulkanmon
     src/main.cpp
+    src/Window.cpp
     src/Camera.cpp
     src/Utils.cpp
     src/ResourceManager.cpp
