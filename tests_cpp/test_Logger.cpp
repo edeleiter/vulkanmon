@@ -43,11 +43,10 @@ TEST_CASE("Logger Basic Functionality", "[Logger][Basic]") {
 
 TEST_CASE("Logger Thread Safety", "[Logger][Threading]") {
     SECTION("Concurrent logging from multiple threads") {
-        auto& logger = Logger::getInstance();
         std::atomic<int> completedThreads{0};
         
-        ThreadTestHelpers::runConcurrently([&logger, &completedThreads]() {
-            logger.info("Thread safety test message");
+        ThreadTestHelpers::runConcurrently([&completedThreads]() {
+            VKMON_INFO("Thread safety test message");
             completedThreads++;
         }, 4, 25);
         
@@ -83,12 +82,7 @@ TEST_CASE("Logger Performance Macros", "[Logger][Performance]") {
 
 TEST_CASE("Logger Vulkan Integration", "[Logger][Vulkan]") {
     SECTION("Vulkan-specific logging helpers") {
-        auto& logger = Logger::getInstance();
-        
-        logger.vulkanInfo("Test Operation", "Additional details");
-        logger.vulkanError("Test Operation", "Test error message");
-        logger.resourceInfo("Buffer", "created", "test_buffer");
-        
-        REQUIRE(true); // Will verify output format in Phase 2
+        REQUIRE_NOTHROW(VKMON_VK_INFO("Test Operation", "Additional details"));
+        REQUIRE_NOTHROW(VKMON_VK_ERROR("Test Operation", "Test error message"));
     }
 }
