@@ -27,6 +27,20 @@ add_executable(vulkanmon_tests
     test_Window.cpp
     test_InputHandler.cpp
     
+    # TODO: Application and VulkanRenderer require integration tests
+    # test_Application.cpp
+    # test_VulkanRenderer.cpp
+    
+    # Simple unit tests that work in isolation
+    test_Utils.cpp
+    test_ResourceManager.cpp
+    test_LightingSystem.cpp
+    
+    # TODO: Fix these tests to not require full Vulkan initialization
+    # test_AssetManager.cpp
+    # test_MaterialSystem.cpp
+    # test_ModelLoader.cpp
+    
     # Test utilities
     fixtures/TestHelpers.cpp
     
@@ -37,6 +51,7 @@ add_executable(vulkanmon_tests
     ../src/utils/Utils.cpp
     ../src/stb_image_impl.cpp
     ../src/rendering/ResourceManager.cpp
+    ../src/systems/LightingSystem.cpp
     ../src/utils/Logger.cpp
 )
 

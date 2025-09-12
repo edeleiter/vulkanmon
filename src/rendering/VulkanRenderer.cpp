@@ -1251,25 +1251,16 @@ bool VulkanRenderer::hasStencilComponent(VkFormat format) {
 // =============================================================================
 
 void VulkanRenderer::initializeCoreSystemsTemporary() {
-    VKMON_INFO("Initializing core systems (temporary implementation)...");
+    VKMON_INFO("Initializing core engine systems...");
     
     // This is a temporary solution until we create VulkanContext
     // These systems need Vulkan device which we don't have until after createLogicalDevice()
     
-    VKMON_INFO("Initializing ResourceManager...");
     resourceManager_ = std::make_shared<ResourceManager>(device_, physicalDevice_);
-    
-    VKMON_INFO("Initializing AssetManager...");
     assetManager_ = std::make_shared<AssetManager>(device_, physicalDevice_, commandPool_, graphicsQueue_);
-    
-    VKMON_INFO("Initializing ModelLoader...");
     modelLoader_ = std::make_shared<ModelLoader>(resourceManager_, assetManager_);
-    
-    VKMON_INFO("Initializing LightingSystem...");
     lightingSystem_ = std::make_shared<LightingSystem>(resourceManager_);
     lightingSystem_->createLightingBuffers();
-    
-    VKMON_INFO("Initializing MaterialSystem...");
     materialSystem_ = std::make_shared<MaterialSystem>(resourceManager_);
     materialSystem_->createMaterialBuffers();
     

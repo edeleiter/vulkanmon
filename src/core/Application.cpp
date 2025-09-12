@@ -90,7 +90,7 @@ void Application::initializeLogger() {
 void Application::initializeWindow() {
     window_ = std::make_unique<Window>(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, "VulkanMon");
     window_->initialize();
-    VKMON_INFO("Window system initialized");
+    // Window logs its own initialization success
 }
 
 void Application::initializeCamera() {
@@ -107,12 +107,6 @@ void Application::initializeCoreEngineSystems() {
 }
 
 void Application::initializeRenderer() {
-    VKMON_INFO("Initializing Vulkan renderer...");
-    
-    // Initialize ResourceManager first (needs device from renderer)
-    // This is a chicken-and-egg problem we'll solve by creating a VulkanContext class
-    // For now, we'll handle this in the renderer initialization
-    
     // Create placeholder systems that renderer will initialize
     resourceManager_ = nullptr;  // Will be created by renderer
     assetManager_ = nullptr;     // Will be created after resourceManager
@@ -120,7 +114,7 @@ void Application::initializeRenderer() {
     lightingSystem_ = nullptr;   // Will be created after resourceManager
     materialSystem_ = nullptr;   // Will be created after resourceManager
     
-    // Create renderer with Window and Camera (the only dependencies we have ready)
+    // Create renderer - it will log its own initialization progress
     renderer_ = std::make_shared<VulkanRenderer>(
         window_,
         camera_,
@@ -132,10 +126,7 @@ void Application::initializeRenderer() {
     );
     
     renderer_->initialize();
-    VKMON_INFO("Renderer initialized successfully");
-    
-    // Now get the core systems from renderer (this is temporary until we create VulkanContext)
-    // We'll need to refactor this when we extract VulkanContext
+    // Renderer logs its own success - no duplicate needed
 }
 
 void Application::initializeInputSystem() {
