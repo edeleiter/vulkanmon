@@ -13,7 +13,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "MaterialSystem.h"
+#include "../src/systems/MaterialSystem.h"
 #include "fixtures/TestHelpers.h"
 #include <memory>
 

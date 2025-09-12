@@ -14,7 +14,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "Window.h"
+#include "../src/core/Window.h"
 #include "fixtures/TestHelpers.h"
 #include <GLFW/glfw3.h>
 #include <memory>

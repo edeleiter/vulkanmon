@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ResourceManager.h"
-#include "Logger.h"
+#include "../rendering/ResourceManager.h"
+#include "../utils/Logger.h"
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <vector>

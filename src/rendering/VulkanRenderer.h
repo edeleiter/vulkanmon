@@ -4,14 +4,14 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 
-#include "Window.h"
-#include "Camera.h"
+#include "../core/Window.h"
+#include "../core/Camera.h"
 #include "ResourceManager.h"
-#include "AssetManager.h"
-#include "ModelLoader.h"
-#include "LightingSystem.h"
-#include "MaterialSystem.h"
-#include "Logger.h"
+#include "../io/AssetManager.h"
+#include "../io/ModelLoader.h"
+#include "../systems/LightingSystem.h"
+#include "../systems/MaterialSystem.h"
+#include "../utils/Logger.h"
 
 #include <memory>
 #include <vector>

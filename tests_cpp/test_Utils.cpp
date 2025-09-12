@@ -12,7 +12,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "Utils.h"
+#include "../src/utils/Utils.h"
 #include "fixtures/TestHelpers.h"
 
 using namespace VulkanMon::Testing;

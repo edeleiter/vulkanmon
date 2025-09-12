@@ -16,8 +16,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "InputHandler.h"
-#include "Camera.h"
+#include "../src/core/InputHandler.h"
+#include "../src/core/Camera.h"
 #include "fixtures/TestHelpers.h"
 #include <GLFW/glfw3.h>
 #include <memory>

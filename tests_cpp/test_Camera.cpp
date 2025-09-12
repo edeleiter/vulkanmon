@@ -13,8 +13,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "Camera.h"
-#include "TestHelpers.h"
+#include "../src/core/Camera.h"
+#include "fixtures/TestHelpers.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 

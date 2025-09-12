@@ -3,13 +3,13 @@
 #include "Window.h"
 #include "InputHandler.h"
 #include "Camera.h"
-#include "Logger.h"
-#include "ResourceManager.h"
-#include "AssetManager.h"
-#include "ModelLoader.h"
-#include "LightingSystem.h"
-#include "MaterialSystem.h"
-#include "VulkanRenderer.h"
+#include "../utils/Logger.h"
+#include "../rendering/ResourceManager.h"
+#include "../io/AssetManager.h"
+#include "../io/ModelLoader.h"
+#include "../systems/LightingSystem.h"
+#include "../systems/MaterialSystem.h"
+#include "../rendering/VulkanRenderer.h"
 
 #include <memory>
 #include <chrono>

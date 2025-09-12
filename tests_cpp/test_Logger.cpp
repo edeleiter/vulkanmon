@@ -12,7 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
-#include "../src/Logger.h"
+#include "../src/utils/Logger.h"
 #include "fixtures/TestHelpers.h"
 #include <thread>
 #include <fstream>

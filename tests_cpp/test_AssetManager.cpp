@@ -11,8 +11,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
-#include "../src/AssetManager.h"
-#include "../src/ResourceManager.h"
+#include "../src/io/AssetManager.h"
+#include "../src/rendering/ResourceManager.h"
 #include "fixtures/VulkanTestFixture.h"
 #include "fixtures/TestHelpers.h"
 

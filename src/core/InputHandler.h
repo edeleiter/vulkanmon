@@ -2,7 +2,7 @@
 
 #include "Camera.h"
 #include "../systems/LightingSystem.h"
-#include "MaterialSystem.h"
+#include "../systems/MaterialSystem.h"
 #include <GLFW/glfw3.h>
 #include <memory>
 #include <functional>

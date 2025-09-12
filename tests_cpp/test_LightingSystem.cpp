@@ -13,7 +13,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "LightingSystem.h"
+#include "../src/systems/LightingSystem.h"
 #include "fixtures/TestHelpers.h"
 #include <memory>
 
