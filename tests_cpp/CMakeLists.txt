@@ -36,9 +36,11 @@ add_executable(vulkanmon_tests
     test_ResourceManager.cpp
     test_LightingSystem.cpp
     
+    # MaterialSystem tests (now properly isolated)
+    test_MaterialSystem.cpp
+    
     # TODO: Fix these tests to not require full Vulkan initialization
     # test_AssetManager.cpp
-    # test_MaterialSystem.cpp
     # test_ModelLoader.cpp
     
     # Test utilities
@@ -52,6 +54,7 @@ add_executable(vulkanmon_tests
     ../src/stb_image_impl.cpp
     ../src/rendering/ResourceManager.cpp
     ../src/systems/LightingSystem.cpp
+    ../src/systems/MaterialSystem.cpp
     ../src/utils/Logger.cpp
 )
 
