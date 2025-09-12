@@ -242,6 +242,9 @@ private:
     void createRenderPass();
     void createShaderModules();
     void createGraphicsPipeline();
+    
+    // Shader helper methods
+    VkShaderModule createShaderModule(const std::vector<char>& code);
     void createFramebuffers();
     void createCommandPool();
     void createCommandBuffers();
@@ -252,6 +255,7 @@ private:
                      VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, 
                     VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     void createDescriptorSetLayout();
     void createTextureImage();
     void createTextureImageView();
@@ -270,6 +274,7 @@ private:
     
     // Helper methods
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    int findGraphicsQueueFamily();
     VkFormat findDepthFormat();
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     bool hasStencilComponent(VkFormat format);
@@ -280,6 +285,9 @@ private:
     
     // Debug and logging helpers
     void logRenderingState(const std::string& operation) const;
+    
+    // Temporary system initialization (will be moved to VulkanContext)
+    void initializeCoreSystemsTemporary();
 };
 
 } // namespace VulkanMon
