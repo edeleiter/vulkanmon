@@ -1,6 +1,7 @@
 #include "VulkanRenderer.h"
 #include "Utils.h"
 #include "ModelLoader.h"
+#include "MaterialSystem.h"
 #include <iostream>
 #include <stdexcept>
 #include <array>
@@ -165,6 +166,9 @@ void VulkanRenderer::initVulkan() {
     // Initialize core systems (after command pool creation)
     // TODO: This is temporary - will be moved to VulkanContext
     initializeCoreSystemsTemporary();
+    
+    // Load test model
+    loadTestModel();
     
     createUniformBuffer();
     createMaterialBuffer();
@@ -574,27 +578,108 @@ void VulkanRenderer::createGraphicsPipeline() {
 }
 
 void VulkanRenderer::createFramebuffers() {
-    // TODO: Extract implementation from main.cpp
-    VKMON_INFO("Creating framebuffers (placeholder)");
-    throw std::runtime_error("VulkanRenderer::createFramebuffers() not yet implemented - needs extraction from main.cpp");
+    VKMON_INFO("Creating framebuffers...");
+    
+    // First create image views for swap chain images
+    swapChainImageViews_.resize(swapChainImages_.size());
+    for (size_t i = 0; i < swapChainImages_.size(); i++) {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = swapChainImages_[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = swapChainImageFormat_;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create image view!");
+        }
+    }
+
+    // Create framebuffers with depth buffer
+    swapChainFramebuffers_.resize(swapChainImageViews_.size());
+    for (size_t i = 0; i < swapChainImageViews_.size(); i++) {
+        std::array<VkImageView, 2> attachments = {
+            swapChainImageViews_[i],
+            depthImageView_
+        };
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass_;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data();
+        framebufferInfo.width = swapChainExtent_.width;
+        framebufferInfo.height = swapChainExtent_.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create framebuffer!");
+        }
+    }
+
+    VKMON_INFO("Framebuffers created successfully");
 }
 
 void VulkanRenderer::createCommandPool() {
-    // TODO: Extract implementation from main.cpp
-    VKMON_INFO("Creating command pool (placeholder)");
-    throw std::runtime_error("VulkanRenderer::createCommandPool() not yet implemented - needs extraction from main.cpp");
+    VKMON_INFO("Creating command pool...");
+    
+    int graphicsQueueFamily = findGraphicsQueueFamily();
+
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = graphicsQueueFamily;
+
+    if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool!");
+    }
+
+    VKMON_INFO("Command pool created successfully");
 }
 
 void VulkanRenderer::createCommandBuffers() {
-    // TODO: Extract implementation from main.cpp
-    VKMON_INFO("Creating command buffers (placeholder)");
-    throw std::runtime_error("VulkanRenderer::createCommandBuffers() not yet implemented - needs extraction from main.cpp");
+    VKMON_INFO("Creating command buffers...");
+    
+    commandBuffers_.resize(swapChainFramebuffers_.size());
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool_;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = (uint32_t) commandBuffers_.size();
+
+    if (vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffers!");
+    }
+
+    VKMON_INFO("Command buffers allocated successfully");
 }
 
 void VulkanRenderer::createSyncObjects() {
-    // TODO: Extract implementation from main.cpp
-    VKMON_INFO("Creating synchronization objects (placeholder)");
-    throw std::runtime_error("VulkanRenderer::createSyncObjects() not yet implemented - needs extraction from main.cpp");
+    VKMON_INFO("Creating synchronization objects...");
+    
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &imageAvailableSemaphore_) != VK_SUCCESS ||
+        vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &renderFinishedSemaphore_) != VK_SUCCESS ||
+        vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFence_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create sync objects!");
+    }
+
+    VKMON_INFO("Sync objects created successfully");
 }
 
 // =============================================================================
@@ -603,8 +688,29 @@ void VulkanRenderer::createSyncObjects() {
 
 void VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
                                 VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createBuffer() not yet implemented");
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(device_, buffer, bufferMemory, 0);
 }
 
 void VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat format, 
@@ -694,38 +800,230 @@ void VulkanRenderer::createDescriptorSetLayout() {
 }
 
 void VulkanRenderer::createTextureImage() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createTextureImage() not yet implemented");
+    VKMON_INFO("Creating texture image...");
+    
+    // Create a simple 4x4 checkered texture programmatically
+    const int texWidth = 4;
+    const int texHeight = 4;
+    const int texChannels = 4; // RGBA
+    
+    // Create a simple checkered pattern
+    unsigned char pixels[texWidth * texHeight * texChannels];
+    for (int y = 0; y < texHeight; y++) {
+        for (int x = 0; x < texWidth; x++) {
+            int index = (y * texWidth + x) * texChannels;
+            bool isWhite = (x + y) % 2 == 0;
+            
+            if (isWhite) {
+                pixels[index + 0] = 255; // R
+                pixels[index + 1] = 255; // G  
+                pixels[index + 2] = 255; // B
+                pixels[index + 3] = 255; // A
+            } else {
+                pixels[index + 0] = 0;   // R
+                pixels[index + 1] = 0;   // G
+                pixels[index + 2] = 0;   // B
+                pixels[index + 3] = 255; // A
+            }
+        }
+    }
+    
+    VkDeviceSize imageSize = texWidth * texHeight * texChannels;
+
+    // Create staging buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                stagingBuffer, stagingBufferMemory);
+
+    // Copy pixel data to staging buffer
+    void* data;
+    vkMapMemory(device_, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device_, stagingBufferMemory);
+
+    // Create image - simplified for now, will add transitions later
+    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, 
+               VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_, textureImageMemory_);
+
+    // TODO: Add image transitions and buffer copy when we implement helper methods
+    // For now, cleanup staging buffer
+    vkDestroyBuffer(device_, stagingBuffer, nullptr);
+    vkFreeMemory(device_, stagingBufferMemory, nullptr);
+
+    VKMON_INFO("Texture image created successfully (basic version)");
 }
 
 void VulkanRenderer::createTextureImageView() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createTextureImageView() not yet implemented");
+    VKMON_INFO("Creating texture image view...");
+    textureImageView_ = createImageView(textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+    VKMON_INFO("Texture image view created successfully");
 }
 
 void VulkanRenderer::createTextureSampler() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createTextureSampler() not yet implemented");
+    VKMON_INFO("Creating texture sampler...");
+    
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_NEAREST;  // Sharp pixelated look for our checkered pattern
+    samplerInfo.minFilter = VK_FILTER_NEAREST;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(device_, &samplerInfo, nullptr, &textureSampler_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create texture sampler!");
+    }
+
+    VKMON_INFO("Texture sampler created successfully");
 }
 
 void VulkanRenderer::createDescriptorPool() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createDescriptorPool() not yet implemented");
+    VKMON_INFO("Creating descriptor pool...");
+    
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    // UBO descriptors (main UBO + lighting UBO + material UBO)
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 3;
+    // Texture sampler descriptor
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = 1;
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor pool!");
+    }
+
+    VKMON_INFO("Descriptor pool created successfully");
 }
 
 void VulkanRenderer::createDescriptorSet() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createDescriptorSet() not yet implemented");
+    VKMON_INFO("Creating descriptor set...");
+    
+    VkDescriptorSetLayout layouts[] = {descriptorSetLayout_};
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool_;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+
+    if (vkAllocateDescriptorSets(device_, &allocInfo, &descriptorSet_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate descriptor set!");
+    }
+
+    // UBO descriptor write (binding 0)
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = uniformBuffer_;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    // Texture descriptor write (binding 1)
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = textureImageView_;
+    imageInfo.sampler = textureSampler_;
+    
+    // Lighting descriptor write (binding 2)
+    VkDescriptorBufferInfo lightingBufferInfo{};
+    lightingBufferInfo.buffer = lightingSystem_->getLightingBuffer();
+    lightingBufferInfo.offset = 0;
+    lightingBufferInfo.range = VK_WHOLE_SIZE;
+    
+    // Material descriptor write (binding 3)
+    VkDescriptorBufferInfo materialBufferInfo{};
+    materialBufferInfo.buffer = materialBuffer_;
+    materialBufferInfo.offset = 0;
+    materialBufferInfo.range = sizeof(MaterialData);
+
+    std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
+
+    // UBO descriptor write
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = descriptorSet_;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+    // Texture descriptor write
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = descriptorSet_;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
+    
+    // Lighting descriptor write
+    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[2].dstSet = descriptorSet_;
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pBufferInfo = &lightingBufferInfo;
+    
+    // Material descriptor write
+    descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[3].dstSet = descriptorSet_;
+    descriptorWrites[3].dstBinding = 3;
+    descriptorWrites[3].dstArrayElement = 0;
+    descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[3].descriptorCount = 1;
+    descriptorWrites[3].pBufferInfo = &materialBufferInfo;
+
+    vkUpdateDescriptorSets(device_, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
+    VKMON_INFO("Descriptor set created successfully");
 }
 
 void VulkanRenderer::createUniformBuffer() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createUniformBuffer() not yet implemented");
+    VKMON_INFO("Creating uniform buffer...");
+    
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                uniformBuffer_, uniformBufferMemory_);
+
+    VKMON_INFO("Uniform buffer created successfully");
 }
 
 void VulkanRenderer::createMaterialBuffer() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::createMaterialBuffer() not yet implemented");
+    VKMON_INFO("Creating material buffer...");
+    
+    VkDeviceSize bufferSize = sizeof(MaterialData);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                materialBuffer_, materialBufferMemory_);
+    
+    // Initialize with default material
+    currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+    currentMaterialData_.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);   // Warm brown
+    currentMaterialData_.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
+    currentMaterialData_.shininess = 32.0f;
+    
+    updateMaterialBuffer();
+
+    VKMON_INFO("Material buffer created successfully");
 }
 
 void VulkanRenderer::createDepthResources() {
@@ -767,24 +1065,139 @@ VkImageView VulkanRenderer::createImageView(VkImage image, VkFormat format, VkIm
 // =============================================================================
 
 void VulkanRenderer::drawFrame() {
-    // TODO: Extract implementation from main.cpp
-    // For now, just do nothing so we don't crash
-    // throw std::runtime_error("VulkanRenderer::drawFrame() not yet implemented");
+    vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
+    vkResetFences(device_, 1, &inFlightFence_);
+
+    updateUniformBuffer();
+
+    uint32_t imageIndex;
+    vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers_[imageIndex];
+
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {swapChain_};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    vkQueuePresentKHR(graphicsQueue_, &presentInfo);
 }
 
 void VulkanRenderer::recordCommandBuffers() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::recordCommandBuffers() not yet implemented");
+    VKMON_INFO("Recording command buffers...");
+    
+    for (size_t i = 0; i < commandBuffers_.size(); i++) {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(commandBuffers_[i], &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to begin recording command buffer!");
+        }
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass_;
+        renderPassInfo.framebuffer = swapChainFramebuffers_[i];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = swapChainExtent_;
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+        
+        vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSet_, 0, nullptr);
+        
+        // Render loaded 3D model (if available)
+        if (currentModel_ && !currentModel_->meshes.empty()) {
+            for (const auto& mesh : currentModel_->meshes) {
+                if (mesh->vertexBuffer && mesh->indexBuffer) {
+                    VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
+                    VkDeviceSize offsets[] = {0};
+                    vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
+                    vkCmdBindIndexBuffer(commandBuffers_[i], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                    
+                    vkCmdDrawIndexed(commandBuffers_[i], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
+                }
+            }
+        }
+        vkCmdEndRenderPass(commandBuffers_[i]);
+
+        if (vkEndCommandBuffer(commandBuffers_[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to record command buffer!");
+        }
+    }
+
+    VKMON_INFO("Drawing commands recorded successfully");
 }
 
 void VulkanRenderer::updateUniformBuffer() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::updateUniformBuffer() not yet implemented");
+    static auto startTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    // Camera constants
+    constexpr float CAMERA_FOV = 45.0f;
+    constexpr float NEAR_PLANE = 0.1f;
+    constexpr float FAR_PLANE = 10.0f;
+
+    UniformBufferObject ubo{};
+    
+    // Model matrix: 3D rotation around both X and Y axes for full 3D effect
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(CAMERA_FOV), glm::vec3(1.0f, 0.0f, 0.0f));
+    ubo.model = glm::rotate(ubo.model, time * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    
+    // View matrix: use dynamic camera position from WASD input
+    ubo.view = camera_->getViewMatrix();
+    
+    // Projection matrix: perspective projection
+    ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, NEAR_PLANE, FAR_PLANE);
+    
+    // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
+    ubo.proj[1][1] *= -1;
+    
+    // Camera position for specular lighting calculations
+    ubo.cameraPos = camera_->position;
+    ubo._padding = 0.0f;
+
+    void* data;
+    vkMapMemory(device_, uniformBufferMemory_, 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device_, uniformBufferMemory_);
 }
 
 void VulkanRenderer::updateMaterialBuffer() {
-    // TODO: Extract implementation from main.cpp
-    throw std::runtime_error("VulkanRenderer::updateMaterialBuffer() not yet implemented");
+    void* data;
+    vkMapMemory(device_, materialBufferMemory_, 0, sizeof(MaterialData), 0, &data);
+    memcpy(data, &currentMaterialData_, sizeof(MaterialData));
+    vkUnmapMemory(device_, materialBufferMemory_);
 }
 
 // =============================================================================
@@ -842,10 +1255,38 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
     // This is a temporary solution until we create VulkanContext
     // These systems need Vulkan device which we don't have until after createLogicalDevice()
     
-    VKMON_INFO("Core systems initialization postponed until VulkanContext is created");
+    VKMON_INFO("Initializing ResourceManager...");
+    resourceManager_ = std::make_shared<ResourceManager>(device_, physicalDevice_);
     
-    // TODO: Create ResourceManager, AssetManager, etc. here
-    // For now, we'll leave them as nullptr and handle this in the next step
+    VKMON_INFO("Initializing AssetManager...");
+    assetManager_ = std::make_shared<AssetManager>(device_, physicalDevice_, commandPool_, graphicsQueue_);
+    
+    VKMON_INFO("Initializing ModelLoader...");
+    modelLoader_ = std::make_shared<ModelLoader>(resourceManager_, assetManager_);
+    
+    VKMON_INFO("Initializing LightingSystem...");
+    lightingSystem_ = std::make_shared<LightingSystem>(resourceManager_);
+    lightingSystem_->createLightingBuffers();
+    
+    VKMON_INFO("Initializing MaterialSystem...");
+    materialSystem_ = std::make_shared<MaterialSystem>(resourceManager_);
+    materialSystem_->createMaterialBuffers();
+    
+    VKMON_INFO("Core engine systems initialized successfully!");
+}
+
+void VulkanRenderer::loadTestModel() {
+    VKMON_INFO("Loading test model...");
+    
+    // Load the test cube
+    currentModel_ = modelLoader_->loadModel("test_cube.obj");
+    VKMON_INFO("Test cube model loaded successfully!");
+    
+    // Create a default material for the model (simplified version)
+    currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+    currentMaterialData_.diffuse = glm::vec4(0.8f, 0.8f, 0.8f, 0.0f);
+    currentMaterialData_.specular = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+    currentMaterialData_.shininess = 32.0f;
 }
 
 // =============================================================================

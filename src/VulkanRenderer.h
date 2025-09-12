@@ -16,6 +16,16 @@
 #include <memory>
 #include <vector>
 #include <chrono>
+#include <glm/glm.hpp>
+
+// Forward declarations and structures
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::vec3 cameraPos;
+    float _padding;
+};
 
 /**
  * VulkanMon Vulkan Rendering System
@@ -173,6 +183,9 @@ private:
     // Frame update callback
     FrameUpdateCallback frameUpdateCallback_;
     
+    // Material state
+    MaterialData currentMaterialData_;
+    
     // Initialization state
     bool initialized_ = false;
     
@@ -288,6 +301,9 @@ private:
     
     // Temporary system initialization (will be moved to VulkanContext)
     void initializeCoreSystemsTemporary();
+    
+    // Test model loading
+    void loadTestModel();
 };
 
 } // namespace VulkanMon
