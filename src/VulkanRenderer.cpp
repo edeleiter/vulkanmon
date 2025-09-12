@@ -1289,6 +1289,50 @@ void VulkanRenderer::loadTestModel() {
     currentMaterialData_.shininess = 32.0f;
 }
 
+void VulkanRenderer::cycleMaterialPreset() {
+    static int currentMaterialPreset = 0;
+    currentMaterialPreset = (currentMaterialPreset + 1) % 5;
+    
+    switch (currentMaterialPreset) {
+        case 0: // Default material
+            currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+            currentMaterialData_.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);
+            currentMaterialData_.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
+            currentMaterialData_.shininess = 32.0f;
+            VKMON_INFO("[MATERIAL] Preset: Default (Warm Brown)");
+            break;
+        case 1: // Metallic Gold
+            currentMaterialData_.ambient = glm::vec4(0.24725f, 0.1995f, 0.0745f, 0.0f);
+            currentMaterialData_.diffuse = glm::vec4(0.75164f, 0.60648f, 0.22648f, 0.0f);
+            currentMaterialData_.specular = glm::vec4(0.628281f, 0.555802f, 0.366065f, 0.0f);
+            currentMaterialData_.shininess = 51.2f;
+            VKMON_INFO("[MATERIAL] Preset: Metallic Gold");
+            break;
+        case 2: // Ruby Red
+            currentMaterialData_.ambient = glm::vec4(0.1745f, 0.01175f, 0.01175f, 0.0f);
+            currentMaterialData_.diffuse = glm::vec4(0.61424f, 0.04136f, 0.04136f, 0.0f);
+            currentMaterialData_.specular = glm::vec4(0.727811f, 0.626959f, 0.626959f, 0.0f);
+            currentMaterialData_.shininess = 76.8f;
+            VKMON_INFO("[MATERIAL] Preset: Ruby Red");
+            break;
+        case 3: // Chrome
+            currentMaterialData_.ambient = glm::vec4(0.25f, 0.25f, 0.25f, 0.0f);
+            currentMaterialData_.diffuse = glm::vec4(0.4f, 0.4f, 0.4f, 0.0f);
+            currentMaterialData_.specular = glm::vec4(0.774597f, 0.774597f, 0.774597f, 0.0f);
+            currentMaterialData_.shininess = 76.8f;
+            VKMON_INFO("[MATERIAL] Preset: Chrome");
+            break;
+        case 4: // Emerald Green
+            currentMaterialData_.ambient = glm::vec4(0.0215f, 0.1745f, 0.0215f, 0.0f);
+            currentMaterialData_.diffuse = glm::vec4(0.07568f, 0.61424f, 0.07568f, 0.0f);
+            currentMaterialData_.specular = glm::vec4(0.633f, 0.727811f, 0.633f, 0.0f);
+            currentMaterialData_.shininess = 76.8f;
+            VKMON_INFO("[MATERIAL] Preset: Emerald Green");
+            break;
+    }
+    updateMaterialBuffer();
+}
+
 // =============================================================================
 // Cleanup Methods
 // =============================================================================

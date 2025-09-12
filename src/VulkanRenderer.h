@@ -130,6 +130,11 @@ public:
     void setCurrentModel(std::shared_ptr<Model> model);
     
     /**
+     * Cycle through material presets (temporary - will move to game objects in Phase 6)
+     */
+    void cycleMaterialPreset();
+    
+    /**
      * Register callback for frame updates
      * Called before each frame render for external system updates
      * 

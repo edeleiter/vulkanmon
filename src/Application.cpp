@@ -337,17 +337,13 @@ void Application::adjustMaterialShininess(float delta) {
 }
 
 void Application::cycleMaterialPreset() {
+    // Call VulkanRenderer to actually cycle the materials
+    if (renderer_) {
+        renderer_->cycleMaterialPreset();
+    }
+    
+    // Keep local state in sync for any future needs
     materialState_.currentPreset = (materialState_.currentPreset + 1) % 5;
-    
-    const std::vector<std::string> presetNames = {
-        "Default (Warm Brown)",
-        "Metallic Gold", 
-        "Ruby Red",
-        "Chrome",
-        "Emerald Green"
-    };
-    
-    VKMON_INFO("[MATERIAL] Preset: " + presetNames[materialState_.currentPreset]);
 }
 
 void Application::handleCriticalError(const std::exception& error) {
