@@ -1,5 +1,6 @@
 #include "Application.h"
-#include "Utils.h"
+#include "../utils/Utils.h"
+#include "../utils/Logger.h"
 #include <iostream>
 #include <stdexcept>
 

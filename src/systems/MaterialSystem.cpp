@@ -1,7 +1,7 @@
 #include "MaterialSystem.h"
-#include "ResourceManager.h"
-#include "ModelLoader.h"
-#include "Logger.h"
+#include "../rendering/ResourceManager.h"
+#include "../io/ModelLoader.h"
+#include "../utils/Logger.h"
 #include <stdexcept>
 
 MaterialSystem::MaterialSystem(std::shared_ptr<VulkanMon::ResourceManager> resourceManager)

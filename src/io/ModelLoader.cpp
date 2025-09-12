@@ -1,5 +1,7 @@
 #include "ModelLoader.h"
 #include "AssetManager.h"
+#include "../utils/Logger.h"
+#include "../rendering/ResourceManager.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <unordered_map>

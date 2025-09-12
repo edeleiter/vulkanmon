@@ -1,6 +1,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include "Window.h"
-#include "Logger.h"
+#include "../utils/Logger.h"
 #include <stdexcept>
 
 namespace VulkanMon {

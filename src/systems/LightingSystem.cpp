@@ -1,6 +1,6 @@
 #include "LightingSystem.h"
-#include "ResourceManager.h"
-#include "Logger.h"
+#include "../rendering/ResourceManager.h"
+#include "../utils/Logger.h"
 #include <cstring>
 
 using namespace VulkanMon;

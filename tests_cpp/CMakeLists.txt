@@ -32,16 +32,30 @@ add_executable(vulkanmon_tests
     stb_image_impl.cpp
     
     # Source files under test (exact match)
-    ../src/Logger.cpp
-    ../src/Camera.cpp
-    ../src/Window.cpp
-    ../src/InputHandler.cpp
-    ../src/Utils.cpp
-    ../src/AssetManager.cpp
-    ../src/ModelLoader.cpp
-    ../src/ResourceManager.cpp
-    ../src/LightingSystem.cpp
-    ../src/MaterialSystem.cpp
+    # ../src/Logger.cpp
+    # ../src/Camera.cpp
+    # ../src/Window.cpp
+    # ../src/InputHandler.cpp
+    # ../src/Utils.cpp
+    # ../src/AssetManager.cpp
+    # ../src/ModelLoader.cpp
+    # ../src/ResourceManager.cpp
+    # ../src/LightingSystem.cpp
+    # ../src/MaterialSystem.cpp
+    ../src/main.cpp
+    ../src/core/Application.cpp
+    ../src/rendering/VulkanRenderer.cpp
+    ../src/core/Window.cpp
+    ../src/core/InputHandler.cpp
+    ../src/core/Camera.cpp
+    ../src/utils/Utils.cpp
+    ../src/stb_image_impl.cpp
+    ../src/rendering/ResourceManager.cpp
+    ../src/utils/Logger.cpp
+    ../src/io/AssetManager.cpp
+    ../src/io/ModelLoader.cpp
+    ../src/systems/LightingSystem.cpp
+    ../src/systems/MaterialSystem.cpp
 )
 
 # Link libraries

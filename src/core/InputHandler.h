@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Camera.h"
-#include "LightingSystem.h"
+#include "../systems/LightingSystem.h"
 #include "MaterialSystem.h"
 #include <GLFW/glfw3.h>
 #include <memory>

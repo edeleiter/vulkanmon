@@ -1,7 +1,8 @@
 #include "VulkanRenderer.h"
-#include "Utils.h"
-#include "ModelLoader.h"
-#include "MaterialSystem.h"
+#include "../utils/Utils.h"
+#include "../io/ModelLoader.h"
+#include "../systems/MaterialSystem.h"
+#include "../utils/Logger.h"
 #include <iostream>
 #include <stdexcept>
 #include <array>

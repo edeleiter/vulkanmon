@@ -16,8 +16,8 @@
  * - "Document Often": Self-documenting code
  */
 
-#include "Application.h"
-#include "Logger.h"
+#include "core/Application.h"
+#include "utils/Logger.h"
 
 #include <iostream>
 #include <exception>

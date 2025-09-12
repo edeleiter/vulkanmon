@@ -1,4 +1,6 @@
 #include "AssetManager.h"
+#include "../utils/Logger.h"
+#include "../rendering/ResourceManager.h"
 #include <fstream>
 #include <filesystem>
 #include <chrono>
