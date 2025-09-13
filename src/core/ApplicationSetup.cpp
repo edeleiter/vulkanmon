@@ -48,6 +48,11 @@ void Application::initializeRenderer() {
     );
 
     renderer_->initialize();
+
+    // Get initialized systems from renderer
+    lightingSystem_ = renderer_->getLightingSystem();
+    materialSystem_ = renderer_->getMaterialSystem();
+    assetManager_ = renderer_->getAssetManager();
 }
 
 void Application::initializeInputSystem() {

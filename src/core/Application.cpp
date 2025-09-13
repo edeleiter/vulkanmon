@@ -138,6 +138,25 @@ void Application::updateSystems(float deltaTime) {
 
 void Application::updateECS(float deltaTime) {
     if (world_) {
+        // Update cube rotations for animation
+        static float rotationAngle = 0.0f;
+        const auto& entities = world_->getEntityManager().getEntitiesWithComponent<Transform>();
+
+        // Rotate around Y-axis at 45 degrees per second
+        float rotationSpeed = 45.0f; // degrees per second
+        rotationAngle += rotationSpeed * deltaTime / 1000.0f;
+
+        // Keep angle in reasonable range
+        if (rotationAngle > 360.0f) {
+            rotationAngle -= 360.0f;
+        }
+
+        for (EntityID entity : entities) {
+            auto& transform = world_->getComponent<Transform>(entity);
+            // Apply rotation to all test cubes
+            transform.setRotationEuler(0.0f, rotationAngle, 0.0f);
+        }
+
         world_->update(deltaTime);
     }
 }

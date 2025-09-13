@@ -184,6 +184,29 @@ public:
      */
     float getFrameTime() const { return lastFrameTime_; }
 
+    // ===== SYSTEM ACCESS INTERFACE =====
+
+    /**
+     * Get the initialized lighting system
+     *
+     * @return Shared pointer to LightingSystem
+     */
+    std::shared_ptr<LightingSystem> getLightingSystem() const { return lightingSystem_; }
+
+    /**
+     * Get the initialized material system
+     *
+     * @return Shared pointer to MaterialSystem
+     */
+    std::shared_ptr<MaterialSystem> getMaterialSystem() const { return materialSystem_; }
+
+    /**
+     * Get the initialized asset manager
+     *
+     * @return Shared pointer to AssetManager
+     */
+    std::shared_ptr<AssetManager> getAssetManager() const { return assetManager_; }
+
     // ===== ECS INTEGRATION INTERFACE =====
     // Phase 6.2: Multi-object rendering support
 
