@@ -243,10 +243,11 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
     vkCmdPushConstants(commandBuffers_[currentImageIndex_], pipelineLayout_,
                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants);
 
-    // Render current model (for now, we'll use the currentModel_)
-    // TODO: This is temporary - will be replaced with proper mesh management per meshPath
-    if (currentModel_ && !currentModel_->meshes.empty()) {
-        for (const auto& mesh : currentModel_->meshes) {
+    // Render the specific model for this meshPath
+    auto modelIt = modelCache_.find(meshPath);
+    if (modelIt != modelCache_.end() && modelIt->second && !modelIt->second->meshes.empty()) {
+        auto model = modelIt->second;
+        for (const auto& mesh : model->meshes) {
             if (mesh->vertexBuffer && mesh->indexBuffer) {
                 VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
                 VkDeviceSize offsets[] = {0};
@@ -258,7 +259,7 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
         }
         VKMON_DEBUG("Rendered ECS object with mesh: " + meshPath);
     } else {
-        VKMON_WARNING("No model loaded for ECS object rendering");
+        VKMON_WARNING("No model cached for meshPath: " + meshPath);
     }
 }
 
@@ -322,16 +323,39 @@ void VulkanRenderer::endECSFrame() {
 }
 
 void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
-    // Check if mesh is already loaded this frame
-    if (std::find(frameLoadedMeshes_.begin(), frameLoadedMeshes_.end(), meshPath) != frameLoadedMeshes_.end()) {
-        return; // Already loaded this frame
+    // Check if model is already cached
+    if (modelCache_.find(meshPath) != modelCache_.end()) {
+        return; // Already loaded
     }
 
-    // TODO: Implement proper mesh loading and caching
-    // For now, we'll just track that we "loaded" it
-    frameLoadedMeshes_.push_back(meshPath);
+    // Load the model using ModelLoader
+    if (modelLoader_) {
+        try {
+            VKMON_DEBUG("Loading model: " + meshPath);
+            auto model = modelLoader_->loadModel(meshPath);
 
-    VKMON_DEBUG("Mesh available for rendering: " + meshPath);
+            if (model && !model->meshes.empty()) {
+                modelCache_[meshPath] = std::move(model);
+                VKMON_INFO("Model loaded and cached: " + meshPath);
+            } else {
+                VKMON_WARNING("Failed to load model or model is empty: " + meshPath);
+                // Use fallback - add current model as cache for this path
+                if (currentModel_) {
+                    modelCache_[meshPath] = currentModel_;
+                    VKMON_WARNING("Using fallback model for: " + meshPath);
+                }
+            }
+        } catch (const std::exception& e) {
+            VKMON_ERROR("Exception loading model " + meshPath + ": " + std::string(e.what()));
+            // Use fallback
+            if (currentModel_) {
+                modelCache_[meshPath] = currentModel_;
+                VKMON_WARNING("Using fallback model due to exception: " + meshPath);
+            }
+        }
+    } else {
+        VKMON_ERROR("ModelLoader not available for loading: " + meshPath);
+    }
 }
 
 // =============================================================================

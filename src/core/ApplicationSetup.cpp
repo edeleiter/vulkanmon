@@ -134,14 +134,14 @@ void Application::createTestScene() {
     world_->addComponent(cube1, transform1);
 
     Renderable renderable1;
-    renderable1.meshPath = "cube";
+    renderable1.meshPath = "test_cube.obj";  // Original cube - ModelLoader adds assets/models/ prefix
     renderable1.texturePath = "default";
     renderable1.materialId = 0;  // Default material
     renderable1.isVisible = true;
     renderable1.renderLayer = 0;
     world_->addComponent(cube1, renderable1);
 
-    // Object 2: Left cube with different material
+    // Object 2: Left sphere with different material
     EntityID cube2 = world_->createEntity();
     Transform transform2;
     transform2.position = glm::vec3(-3.0f, 0.0f, 0.0f);
@@ -150,14 +150,14 @@ void Application::createTestScene() {
     world_->addComponent(cube2, transform2);
 
     Renderable renderable2;
-    renderable2.meshPath = "cube";
+    renderable2.meshPath = "sphere.obj";  // Sphere shape
     renderable2.texturePath = "default";
     renderable2.materialId = 1;  // Gold material
     renderable2.isVisible = true;
     renderable2.renderLayer = 0;
     world_->addComponent(cube2, renderable2);
 
-    // Object 3: Right cube with different material
+    // Object 3: Right pyramid with different material
     EntityID cube3 = world_->createEntity();
     Transform transform3;
     transform3.position = glm::vec3(3.0f, 0.0f, 0.0f);
@@ -166,7 +166,7 @@ void Application::createTestScene() {
     world_->addComponent(cube3, transform3);
 
     Renderable renderable3;
-    renderable3.meshPath = "cube";
+    renderable3.meshPath = "pyramid.obj";  // Pyramid shape
     renderable3.texturePath = "default";
     renderable3.materialId = 2;  // Ruby material
     renderable3.isVisible = true;
@@ -182,7 +182,7 @@ void Application::createTestScene() {
     world_->addComponent(cube4, transform4);
 
     Renderable renderable4;
-    renderable4.meshPath = "cube";
+    renderable4.meshPath = "sphere.obj";  // Another sphere
     renderable4.texturePath = "default";
     renderable4.materialId = 3;  // Chrome material
     renderable4.isVisible = true;
@@ -198,19 +198,19 @@ void Application::createTestScene() {
     world_->addComponent(cube5, transform5);
 
     Renderable renderable5;
-    renderable5.meshPath = "cube";
+    renderable5.meshPath = "plane.obj";  // Ground plane
     renderable5.texturePath = "default";
     renderable5.materialId = 4;  // Emerald material
     renderable5.isVisible = true;
     renderable5.renderLayer = 0;
     world_->addComponent(cube5, renderable5);
 
-    VKMON_DEBUG("Created 5 ECS test entities:");
+    VKMON_DEBUG("Created 5 ECS test entities with diverse shapes:");
     VKMON_DEBUG("  Entity " + std::to_string(cube1) + ": Center cube (Default material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube2) + ": Left cube (Gold material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube3) + ": Right cube (Ruby material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube4) + ": Top cube (Chrome material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube5) + ": Back cube (Emerald material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube2) + ": Left sphere (Gold material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube3) + ": Right pyramid (Ruby material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube4) + ": Top sphere (Chrome material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube5) + ": Ground plane (Emerald material)");
 
     // Future: Create camera entity to replace legacy Camera class
     // EntityID cameraEntity = world_->createEntity();

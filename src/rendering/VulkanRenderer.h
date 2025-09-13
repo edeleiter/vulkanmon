@@ -18,6 +18,7 @@
 #include <chrono>
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 // Forward declarations and structures
@@ -245,8 +246,11 @@ private:
     std::shared_ptr<LightingSystem> lightingSystem_;
     std::shared_ptr<MaterialSystem> materialSystem_;
     
-    // Current model being rendered
+    // Current model being rendered (legacy)
     std::shared_ptr<Model> currentModel_;
+
+    // Model cache for multi-object ECS rendering
+    std::unordered_map<std::string, std::shared_ptr<Model>> modelCache_;
     
     // Callbacks
     FrameUpdateCallback frameUpdateCallback_;
