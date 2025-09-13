@@ -22,10 +22,10 @@
 
 /**
  * VulkanMon Application
- * 
+ *
  * Main application class that orchestrates all engine systems and manages the application lifecycle.
  * Extracted from main.cpp to create clean separation of concerns and testable architecture.
- * 
+ *
  * Responsibilities:
  * - Application initialization and shutdown
  * - System coordination and dependency injection
@@ -33,7 +33,7 @@
  * - High-level input event handling
  * - Error handling and recovery
  * - Configuration management
- * 
+ *
  * Design Philosophy:
  * - Single responsibility: Application orchestration only
  * - Dependency injection: All systems passed as shared_ptr
@@ -56,62 +56,62 @@ public:
     static constexpr float DEFAULT_CAMERA_FOV = 45.0f;
     static constexpr float DEFAULT_NEAR_PLANE = 0.1f;
     static constexpr float DEFAULT_FAR_PLANE = 10.0f;
-    
+
     /**
      * Create Application with default configuration
      */
     Application();
-    
+
     /**
      * Destructor - automatic cleanup of all systems
      */
     ~Application();
-    
+
     // Move-only semantics (RAII compliance)
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
     Application(Application&&) = default;
     Application& operator=(Application&&) = default;
-    
+
     /**
      * Initialize all engine systems
      * Must be called before run()
-     * 
+     *
      * @throws std::runtime_error if initialization fails
      */
     void initialize();
-    
+
     /**
      * Run the main application loop
      * Blocks until application should exit
-     * 
+     *
      * @throws std::runtime_error if critical error occurs
      */
     void run();
-    
+
     /**
      * Request application shutdown
      * Will cause run() to return cleanly
      */
     void shutdown();
-    
+
     /**
      * Check if application is running
-     * 
+     *
      * @return true if main loop is active
      */
     bool isRunning() const { return running_; }
-    
+
     /**
      * Get current application statistics
-     * 
+     *
      * @return Frame time in milliseconds
      */
     float getFrameTime() const { return frameTime_; }
-    
+
     /**
      * Get frames per second
-     * 
+     *
      * @return Current FPS
      */
     float getFPS() const { return fps_; }
@@ -120,12 +120,12 @@ private:
     // Application state
     bool initialized_ = false;
     bool running_ = false;
-    
+
     // Frame timing
     std::chrono::high_resolution_clock::time_point lastFrameTime_;
     float frameTime_ = 0.0f;
     float fps_ = 0.0f;
-    
+
     // Core engine systems (owned)
     std::shared_ptr<Window> window_;
     std::shared_ptr<::Camera> camera_;
@@ -141,22 +141,22 @@ private:
     std::unique_ptr<World> world_;
     RenderSystem* renderSystem_ = nullptr;  // Owned by World
     CameraSystem* cameraSystem_ = nullptr;  // Owned by World
-    
+
     // Current loaded model
     std::shared_ptr<Model> currentModel_;
-    
+
     // Current material settings
     struct MaterialState {
         int currentPreset = 0;
         float shininess = 32.0f;
     } materialState_;
-    
-    // Current lighting settings  
+
+    // Current lighting settings
     struct LightingState {
         int currentPreset = 0;
         bool ambientEnabled = true;
     } lightingState_;
-    
+
     // System initialization methods
     void initializeLogger();
     void initializeWindow();
@@ -167,7 +167,7 @@ private:
     void initializeECS();           // Initialize ECS World and systems
     void createTestScene();         // Create test entities for ECS
     void loadTestAssets();
-    
+
     // Main loop methods
     void processFrame();
     void updateFrameTiming();
@@ -175,7 +175,7 @@ private:
     void updateSystems(float deltaTime);
     void updateECS(float deltaTime);        // Update ECS World
     void render(float deltaTime);
-    
+
     // Input handling methods
     void handleShaderReload();
     void handleLightingControl(int key);
@@ -186,15 +186,15 @@ private:
     void printLightingInfo();
     void adjustMaterialShininess(float delta);
     void cycleMaterialPreset();
-    
+
     // System coordination methods
     void setupInputCallbacks();
     void connectSystemCallbacks();
-    
+
     // Error handling
     void handleCriticalError(const std::exception& error);
-    void logSystemState() const;
-    
+    void logSystemState();
+
     // Cleanup methods
     void cleanup();
 };
