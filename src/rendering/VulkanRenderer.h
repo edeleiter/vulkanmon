@@ -20,11 +20,14 @@
 
 // Forward declarations and structures
 struct UniformBufferObject {
-    glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
     glm::vec3 cameraPos;
     float _padding;
+};
+
+struct PushConstants {
+    glm::mat4 model;
 };
 
 /**
@@ -59,6 +62,7 @@ public:
     // Callback types for operations VulkanRenderer cannot perform directly
     using ShaderReloadCallback = std::function<void()>;
     using FrameUpdateCallback = std::function<void(float deltaTime)>;
+    using ECSRenderCallback = std::function<void(VulkanRenderer& renderer)>;
     
     /**
      * Create VulkanRenderer with required dependencies
@@ -137,10 +141,18 @@ public:
     /**
      * Register callback for frame updates
      * Called before each frame render for external system updates
-     * 
+     *
      * @param callback Function to call for frame updates
      */
     void setFrameUpdateCallback(FrameUpdateCallback callback);
+
+    /**
+     * Register callback for ECS rendering
+     * Called during frame rendering to submit ECS entity render commands
+     *
+     * @param callback Function to call for ECS rendering
+     */
+    void setECSRenderCallback(ECSRenderCallback callback);
     
     /**
      * Check if renderer is ready for rendering
@@ -167,10 +179,36 @@ public:
     
     /**
      * Get current frame statistics
-     * 
+     *
      * @return Frame time in milliseconds
      */
     float getFrameTime() const { return lastFrameTime_; }
+
+    // ===== ECS INTEGRATION INTERFACE =====
+    // Phase 6.2: Multi-object rendering support
+
+    /**
+     * Begin frame for ECS rendering
+     * Prepares frame for multiple object rendering
+     */
+    void beginECSFrame();
+
+    /**
+     * Render a single ECS entity
+     *
+     * @param modelMatrix Transform matrix for this object
+     * @param meshPath Path to mesh file (will be loaded if needed)
+     * @param materialId Material ID to use
+     */
+    void renderECSObject(const glm::mat4& modelMatrix,
+                        const std::string& meshPath,
+                        uint32_t materialId);
+
+    /**
+     * End frame for ECS rendering
+     * Submits all commands and presents frame
+     */
+    void endECSFrame();
 
 private:
     // System references (not owned)
@@ -185,8 +223,9 @@ private:
     // Current model being rendered
     std::shared_ptr<Model> currentModel_;
     
-    // Frame update callback
+    // Callbacks
     FrameUpdateCallback frameUpdateCallback_;
+    ECSRenderCallback ecsRenderCallback_;
     
     // Material state
     MaterialData currentMaterialData_;
@@ -250,6 +289,11 @@ private:
     // Frame timing
     std::chrono::high_resolution_clock::time_point lastFrameTimePoint_;
     float lastFrameTime_ = 0.0f;
+
+    // ECS Integration members
+    bool ecsFrameActive_ = false;
+    uint32_t currentImageIndex_ = 0;
+    std::vector<std::string> frameLoadedMeshes_;
     
     // Vulkan initialization methods
     void initVulkan();
@@ -289,6 +333,10 @@ private:
     void recordCommandBuffers();
     void updateUniformBuffer();
     void updateMaterialBuffer();
+
+    // ECS Integration helper methods
+    void recordECSCommandBuffer(uint32_t imageIndex);
+    void ensureMeshLoaded(const std::string& meshPath);
     
     // Helper methods
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

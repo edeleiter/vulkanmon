@@ -39,7 +39,7 @@ public:
     /**
      * Create InputHandler with camera reference
      * Other systems are controlled via callbacks
-     * 
+     *
      * @param camera Camera system for movement controls
      */
     InputHandler(std::shared_ptr<Camera> camera);

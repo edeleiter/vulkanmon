@@ -146,6 +146,194 @@ void VulkanRenderer::setFrameUpdateCallback(FrameUpdateCallback callback) {
     frameUpdateCallback_ = callback;
 }
 
+void VulkanRenderer::setECSRenderCallback(ECSRenderCallback callback) {
+    ecsRenderCallback_ = callback;
+}
+
+// =============================================================================
+// ECS Integration Interface (Phase 6.2)
+// =============================================================================
+
+void VulkanRenderer::beginECSFrame() {
+    if (ecsFrameActive_) {
+        VKMON_ERROR("ECS frame already active! Call endECSFrame() before beginning a new frame.");
+        return;
+    }
+
+    // Wait for previous frame
+    vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
+    vkResetFences(device_, 1, &inFlightFence_);
+
+    // Acquire next swapchain image
+    VkResult result = vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX,
+                                           imageAvailableSemaphore_, VK_NULL_HANDLE,
+                                           &currentImageIndex_);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        handleWindowResize();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swapchain image!");
+    }
+
+    // Update frame-level uniforms (view, projection, lighting)
+    updateUniformBuffer();
+    updateMaterialBuffer();
+
+    // Reset command buffer and begin recording
+    vkResetCommandBuffer(commandBuffers_[currentImageIndex_], 0);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffers_[currentImageIndex_], &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer!");
+    }
+
+    // Begin render pass
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass_;
+    renderPassInfo.framebuffer = swapChainFramebuffers_[currentImageIndex_];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChainExtent_;
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffers_[currentImageIndex_], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Bind graphics pipeline
+    vkCmdBindPipeline(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+    // Bind descriptor sets (UBO, lighting, etc.)
+    vkCmdBindDescriptorSets(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                           pipelineLayout_, 0, 1, &descriptorSet_, 0, nullptr);
+
+    ecsFrameActive_ = true;
+    frameLoadedMeshes_.clear();
+
+    VKMON_INFO("ECS frame begun, ready for object rendering");
+}
+
+void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
+                                    const std::string& meshPath,
+                                    uint32_t materialId) {
+    if (!ecsFrameActive_) {
+        VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
+        return;
+    }
+
+    // Ensure mesh is loaded
+    ensureMeshLoaded(meshPath);
+
+    // TODO: Implement material binding when MaterialSystem supports multiple materials
+    // For now, we use the current material set in the renderer
+
+    // Update push constants with model matrix
+    PushConstants pushConstants{};
+    pushConstants.model = modelMatrix;
+
+    vkCmdPushConstants(commandBuffers_[currentImageIndex_], pipelineLayout_,
+                      VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants);
+
+    // Render current model (for now, we'll use the currentModel_)
+    // TODO: This is temporary - will be replaced with proper mesh management per meshPath
+    if (currentModel_ && !currentModel_->meshes.empty()) {
+        for (const auto& mesh : currentModel_->meshes) {
+            if (mesh->vertexBuffer && mesh->indexBuffer) {
+                VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(commandBuffers_[currentImageIndex_], 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(commandBuffers_[currentImageIndex_], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+                vkCmdDrawIndexed(commandBuffers_[currentImageIndex_], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
+            }
+        }
+        VKMON_INFO("Rendered ECS object with mesh: " + meshPath);
+    } else {
+        VKMON_WARNING("No model loaded for ECS object rendering");
+    }
+}
+
+void VulkanRenderer::endECSFrame() {
+    if (!ecsFrameActive_) {
+        VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
+        return;
+    }
+
+    // End render pass
+    vkCmdEndRenderPass(commandBuffers_[currentImageIndex_]);
+
+    // End command buffer recording
+    if (vkEndCommandBuffer(commandBuffers_[currentImageIndex_]) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record command buffer!");
+    }
+
+    // Submit command buffer
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers_[currentImageIndex_];
+
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+
+    // Present the frame
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {swapChain_};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &currentImageIndex_;
+
+    VkResult result = vkQueuePresentKHR(graphicsQueue_, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        handleWindowResize();
+    } else if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to present swapchain image!");
+    }
+
+    ecsFrameActive_ = false;
+
+    VKMON_INFO("ECS frame completed and presented");
+}
+
+void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
+    // Check if mesh is already loaded this frame
+    if (std::find(frameLoadedMeshes_.begin(), frameLoadedMeshes_.end(), meshPath) != frameLoadedMeshes_.end()) {
+        return; // Already loaded this frame
+    }
+
+    // TODO: Implement proper mesh loading and caching
+    // For now, we'll just track that we "loaded" it
+    frameLoadedMeshes_.push_back(meshPath);
+
+    VKMON_INFO("Ensured mesh loaded: " + meshPath);
+}
+
 // =============================================================================
 // Vulkan Initialization Methods (extracted from main.cpp)
 // =============================================================================
@@ -544,12 +732,19 @@ void VulkanRenderer::createGraphicsPipeline() {
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
+    // Push constant range for model matrix
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PushConstants);
+
     // Pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
     if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout!");
@@ -1067,44 +1262,58 @@ VkImageView VulkanRenderer::createImageView(VkImage image, VkFormat format, VkIm
 // =============================================================================
 
 void VulkanRenderer::drawFrame() {
-    vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
-    vkResetFences(device_, 1, &inFlightFence_);
-
+    // Frame setup - uniform updates
     updateUniformBuffer();
 
-    uint32_t imageIndex;
-    vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
+    // Use ECS rendering pipeline if callback is registered
+    if (ecsRenderCallback_) {
+        // Begin ECS frame (handles wait, acquire, command recording start)
+        beginECSFrame();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        // Call ECS render callback to submit render commands
+        ecsRenderCallback_(*this);
 
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers_[imageIndex];
+        // End ECS frame (handles command recording end, submit, present)
+        endECSFrame();
+    } else {
+        // Legacy fallback: use static command buffers (for backward compatibility)
+        vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
+        vkResetFences(device_, 1, &inFlightFence_);
 
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
+        uint32_t imageIndex;
+        vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
 
-    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffers_[imageIndex];
+
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to submit draw command buffer!");
+        }
+
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        VkSwapchainKHR swapChains[] = {swapChain_};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex;
+
+        vkQueuePresentKHR(graphicsQueue_, &presentInfo);
     }
-
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {swapChain_};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-
-    vkQueuePresentKHR(graphicsQueue_, &presentInfo);
 }
 
 void VulkanRenderer::recordCommandBuffers() {
@@ -1171,20 +1380,16 @@ void VulkanRenderer::updateUniformBuffer() {
     constexpr float FAR_PLANE = 10.0f;
 
     UniformBufferObject ubo{};
-    
-    // Model matrix: 3D rotation around both X and Y axes for full 3D effect
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(CAMERA_FOV), glm::vec3(1.0f, 0.0f, 0.0f));
-    ubo.model = glm::rotate(ubo.model, time * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    
+
     // View matrix: use dynamic camera position from WASD input
     ubo.view = camera_->getViewMatrix();
-    
+
     // Projection matrix: perspective projection
     ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, NEAR_PLANE, FAR_PLANE);
-    
+
     // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
     ubo.proj[1][1] *= -1;
-    
+
     // Camera position for specular lighting calculations
     ubo.cameraPos = camera_->position;
     ubo._padding = 0.0f;

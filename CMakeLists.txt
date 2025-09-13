@@ -63,6 +63,8 @@ add_executable(vulkanmon
     src/io/ModelLoader.cpp
     src/systems/LightingSystem.cpp
     src/systems/MaterialSystem.cpp
+    src/systems/RenderSystem.cpp
+    src/systems/CameraSystem.cpp
 )
 
 # Make sure shaders are compiled before building the executable

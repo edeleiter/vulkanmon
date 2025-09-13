@@ -10,6 +10,11 @@
 #include "../systems/LightingSystem.h"
 #include "../systems/MaterialSystem.h"
 #include "../rendering/VulkanRenderer.h"
+#include "World.h"
+#include "../systems/RenderSystem.h"
+#include "../systems/CameraSystem.h"
+#include "../components/Transform.h"
+#include "../components/Renderable.h"
 
 #include <memory>
 #include <chrono>
@@ -123,7 +128,7 @@ private:
     
     // Core engine systems (owned)
     std::shared_ptr<Window> window_;
-    std::shared_ptr<Camera> camera_;
+    std::shared_ptr<::Camera> camera_;
     std::shared_ptr<InputHandler> inputHandler_;
     std::shared_ptr<ResourceManager> resourceManager_;
     std::shared_ptr<AssetManager> assetManager_;
@@ -131,6 +136,11 @@ private:
     std::shared_ptr<LightingSystem> lightingSystem_;
     std::shared_ptr<MaterialSystem> materialSystem_;
     std::shared_ptr<VulkanRenderer> renderer_;
+
+    // ECS World and systems
+    std::unique_ptr<World> world_;
+    RenderSystem* renderSystem_ = nullptr;  // Owned by World
+    CameraSystem* cameraSystem_ = nullptr;  // Owned by World
     
     // Current loaded model
     std::shared_ptr<Model> currentModel_;
@@ -154,6 +164,8 @@ private:
     void initializeCoreEngineSystems();
     void initializeRenderer();
     void initializeInputSystem();
+    void initializeECS();           // Initialize ECS World and systems
+    void createTestScene();         // Create test entities for ECS
     void loadTestAssets();
     
     // Main loop methods
@@ -161,6 +173,7 @@ private:
     void updateFrameTiming();
     void processInput(float deltaTime);
     void updateSystems(float deltaTime);
+    void updateECS(float deltaTime);        // Update ECS World
     void render(float deltaTime);
     
     // Input handling methods

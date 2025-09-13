@@ -33,7 +33,9 @@ void Application::initialize() {
         initializeCamera();
         initializeCoreEngineSystems();
         initializeRenderer();
+        initializeECS();            // Initialize ECS after renderer is ready
         initializeInputSystem();
+        createTestScene();          // Create test entities after ECS is set up
         loadTestAssets();
         
         initialized_ = true;
@@ -94,7 +96,7 @@ void Application::initializeWindow() {
 }
 
 void Application::initializeCamera() {
-    camera_ = std::make_shared<Camera>();
+    camera_ = std::make_shared<::Camera>();
     VKMON_INFO("Camera system initialized");
 }
 
@@ -196,7 +198,10 @@ void Application::processFrame() {
     
     // Update systems
     updateSystems(frameTime_);
-    
+
+    // Update ECS
+    updateECS(frameTime_);
+
     // Render frame
     render(frameTime_);
 }
@@ -239,6 +244,7 @@ void Application::updateSystems(float deltaTime) {
 
 void Application::render(float deltaTime) {
     if (renderer_ && renderer_->isInitialized()) {
+        // VulkanRenderer will call back to ECS during renderFrame()
         renderer_->renderFrame(deltaTime);
     }
 }
@@ -338,6 +344,144 @@ void Application::cycleMaterialPreset() {
     materialState_.currentPreset = (materialState_.currentPreset + 1) % 5;
 }
 
+void Application::initializeECS() {
+    VKMON_INFO("Initializing ECS World and systems...");
+
+    // Create ECS World
+    world_ = std::make_unique<World>();
+    world_->initialize();
+
+    // Add camera system to handle ECS camera entities
+    cameraSystem_ = world_->addSystem<CameraSystem>();
+
+    // Add render system to handle rendering ECS entities
+    renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
+
+    // Register ECS render callback with VulkanRenderer
+    if (renderer_) {
+        renderer_->setECSRenderCallback([this](VulkanRenderer& renderer) {
+            if (world_) {
+                world_->render(renderer);
+            }
+        });
+        VKMON_INFO("ECS render callback registered with VulkanRenderer");
+    } else {
+        VKMON_WARNING("Cannot register ECS callback: VulkanRenderer not available");
+    }
+
+    VKMON_INFO("ECS World initialized with CameraSystem and RenderSystem");
+}
+
+void Application::createTestScene() {
+    if (!world_) {
+        VKMON_WARNING("Cannot create test scene: ECS World not initialized");
+        return;
+    }
+
+    VKMON_INFO("Creating ECS multi-object test scene...");
+
+    // Create multiple test objects to demonstrate ECS rendering
+
+    // Object 1: Center cube (original position)
+    EntityID cube1 = world_->createEntity();
+    Transform transform1;
+    transform1.position = glm::vec3(0.0f, 0.0f, 0.0f);
+    transform1.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+    transform1.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    world_->addComponent(cube1, transform1);
+
+    Renderable renderable1;
+    renderable1.meshPath = "cube";
+    renderable1.texturePath = "default";
+    renderable1.materialId = 0;  // Default material
+    renderable1.isVisible = true;
+    renderable1.renderLayer = 0;
+    world_->addComponent(cube1, renderable1);
+
+    // Object 2: Left cube with different material
+    EntityID cube2 = world_->createEntity();
+    Transform transform2;
+    transform2.position = glm::vec3(-3.0f, 0.0f, 0.0f);
+    transform2.rotation = glm::vec3(0.0f, 45.0f, 0.0f);
+    transform2.scale = glm::vec3(0.8f, 0.8f, 0.8f);
+    world_->addComponent(cube2, transform2);
+
+    Renderable renderable2;
+    renderable2.meshPath = "cube";
+    renderable2.texturePath = "default";
+    renderable2.materialId = 1;  // Gold material
+    renderable2.isVisible = true;
+    renderable2.renderLayer = 0;
+    world_->addComponent(cube2, renderable2);
+
+    // Object 3: Right cube with different material
+    EntityID cube3 = world_->createEntity();
+    Transform transform3;
+    transform3.position = glm::vec3(3.0f, 0.0f, 0.0f);
+    transform3.rotation = glm::vec3(0.0f, -45.0f, 0.0f);
+    transform3.scale = glm::vec3(1.2f, 1.2f, 1.2f);
+    world_->addComponent(cube3, transform3);
+
+    Renderable renderable3;
+    renderable3.meshPath = "cube";
+    renderable3.texturePath = "default";
+    renderable3.materialId = 2;  // Ruby material
+    renderable3.isVisible = true;
+    renderable3.renderLayer = 0;
+    world_->addComponent(cube3, renderable3);
+
+    // Object 4: Above center cube
+    EntityID cube4 = world_->createEntity();
+    Transform transform4;
+    transform4.position = glm::vec3(0.0f, 2.5f, 0.0f);
+    transform4.rotation = glm::vec3(45.0f, 45.0f, 45.0f);
+    transform4.scale = glm::vec3(0.6f, 0.6f, 0.6f);
+    world_->addComponent(cube4, transform4);
+
+    Renderable renderable4;
+    renderable4.meshPath = "cube";
+    renderable4.texturePath = "default";
+    renderable4.materialId = 3;  // Chrome material
+    renderable4.isVisible = true;
+    renderable4.renderLayer = 0;
+    world_->addComponent(cube4, renderable4);
+
+    // Object 5: Back cube
+    EntityID cube5 = world_->createEntity();
+    Transform transform5;
+    transform5.position = glm::vec3(0.0f, 0.0f, -4.0f);
+    transform5.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+    transform5.scale = glm::vec3(1.5f, 0.5f, 1.5f);
+    world_->addComponent(cube5, transform5);
+
+    Renderable renderable5;
+    renderable5.meshPath = "cube";
+    renderable5.texturePath = "default";
+    renderable5.materialId = 4;  // Emerald material
+    renderable5.isVisible = true;
+    renderable5.renderLayer = 0;
+    world_->addComponent(cube5, renderable5);
+
+    VKMON_INFO("Created 5 ECS test entities:");
+    VKMON_INFO("  Entity " + std::to_string(cube1) + ": Center cube (Default material)");
+    VKMON_INFO("  Entity " + std::to_string(cube2) + ": Left cube (Gold material)");
+    VKMON_INFO("  Entity " + std::to_string(cube3) + ": Right cube (Ruby material)");
+    VKMON_INFO("  Entity " + std::to_string(cube4) + ": Top cube (Chrome material)");
+    VKMON_INFO("  Entity " + std::to_string(cube5) + ": Back cube (Emerald material)");
+
+    // Future: Create camera entity to replace legacy Camera class
+    // EntityID cameraEntity = world_->createEntity();
+    // ... add Camera component
+
+    VKMON_INFO("ECS multi-object test scene created successfully");
+}
+
+void Application::updateECS(float deltaTime) {
+    if (world_) {
+        world_->update(deltaTime);
+    }
+}
+
 void Application::handleCriticalError(const std::exception& error) {
     VKMON_ERROR("Critical application error: " + std::string(error.what()));
     logSystemState();
@@ -371,8 +515,16 @@ void Application::logSystemState() const {
 
 void Application::cleanup() {
     VKMON_INFO("Beginning Application cleanup...");
-    
+
     // Cleanup in reverse order of initialization
+    if (world_) {
+        VKMON_INFO("Shutting down ECS World...");
+        world_->shutdown();
+        world_.reset();
+        renderSystem_ = nullptr;  // Owned by World, already cleaned up
+        cameraSystem_ = nullptr;  // Owned by World, already cleaned up
+    }
+
     if (currentModel_) {
         VKMON_INFO("Cleaning up loaded model...");
         currentModel_.reset();
