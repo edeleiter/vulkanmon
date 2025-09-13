@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <array>
+#include <filesystem>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -1257,7 +1258,42 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
     // These systems need Vulkan device which we don't have until after createLogicalDevice()
     
     resourceManager_ = std::make_shared<ResourceManager>(device_, physicalDevice_);
-    assetManager_ = std::make_shared<AssetManager>(device_, physicalDevice_, commandPool_, graphicsQueue_);
+    // Create robust path to assets directory based on executable location
+    std::filesystem::path executablePath = std::filesystem::current_path();
+    std::filesystem::path assetsPath;
+    
+    // Try multiple possible asset locations
+    std::vector<std::filesystem::path> possiblePaths = {
+        executablePath / "assets",                    // Same directory as executable
+        executablePath / ".." / ".." / "assets",      // From build/Debug/ to project root
+        executablePath / ".." / "assets",             // From build/ to project root
+        executablePath.parent_path() / "assets",      // Parent directory
+        executablePath.parent_path().parent_path() / "assets"  // Grandparent directory
+    };
+    
+    bool foundAssets = false;
+    for (const auto& path : possiblePaths) {
+        std::filesystem::path absolutePath = std::filesystem::absolute(path);
+        VKMON_INFO("Checking assets path: " + absolutePath.string());
+        
+        if (std::filesystem::exists(absolutePath) && std::filesystem::is_directory(absolutePath)) {
+            // Verify it contains expected subdirectories
+            if (std::filesystem::exists(absolutePath / "models")) {
+                assetsPath = absolutePath;
+                foundAssets = true;
+                VKMON_INFO("Found assets directory: " + assetsPath.string());
+                break;
+            }
+        }
+    }
+    
+    if (!foundAssets) {
+        VKMON_ERROR("Could not find assets directory in any expected location");
+        VKMON_ERROR("Current executable path: " + executablePath.string());
+        throw std::runtime_error("Assets directory not found - please ensure assets/ exists relative to executable");
+    }
+    
+    assetManager_ = std::make_shared<AssetManager>(device_, physicalDevice_, commandPool_, graphicsQueue_, assetsPath.string() + "/");
     modelLoader_ = std::make_shared<ModelLoader>(resourceManager_, assetManager_);
     lightingSystem_ = std::make_shared<LightingSystem>(resourceManager_);
     lightingSystem_->createLightingBuffers();
