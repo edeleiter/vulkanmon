@@ -219,7 +219,7 @@ void VulkanRenderer::beginECSFrame() {
     ecsFrameActive_ = true;
     frameLoadedMeshes_.clear();
 
-    VKMON_INFO("ECS frame begun, ready for object rendering");
+    VKMON_DEBUG("ECS frame begun, ready for object rendering");
 }
 
 void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
@@ -256,7 +256,7 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
                 vkCmdDrawIndexed(commandBuffers_[currentImageIndex_], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
             }
         }
-        VKMON_INFO("Rendered ECS object with mesh: " + meshPath);
+        VKMON_DEBUG("Rendered ECS object with mesh: " + meshPath);
     } else {
         VKMON_WARNING("No model loaded for ECS object rendering");
     }
@@ -318,7 +318,7 @@ void VulkanRenderer::endECSFrame() {
 
     ecsFrameActive_ = false;
 
-    VKMON_INFO("ECS frame completed and presented");
+    VKMON_DEBUG("ECS frame completed and presented");
 }
 
 void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
@@ -331,7 +331,7 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
     // For now, we'll just track that we "loaded" it
     frameLoadedMeshes_.push_back(meshPath);
 
-    VKMON_INFO("Ensured mesh loaded: " + meshPath);
+    VKMON_DEBUG("Mesh available for rendering: " + meshPath);
 }
 
 // =============================================================================
@@ -339,7 +339,7 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
 // =============================================================================
 
 void VulkanRenderer::initVulkan() {
-    VKMON_INFO("Starting Vulkan initialization sequence...");
+    VKMON_DEBUG("Starting Vulkan initialization sequence...");
     
     createInstance();
     createSurface();
@@ -375,7 +375,7 @@ void VulkanRenderer::initVulkan() {
 }
 
 void VulkanRenderer::createInstance() {
-    VKMON_INFO("Creating Vulkan instance...");
+    VKMON_DEBUG("Creating Vulkan instance...");
     
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -402,16 +402,16 @@ void VulkanRenderer::createInstance() {
         throw std::runtime_error("Failed to create Vulkan instance!");
     }
 
-    VKMON_INFO("Vulkan instance created successfully");
+    VKMON_DEBUG("Vulkan instance created successfully");
 }
 
 void VulkanRenderer::createSurface() {
-    VKMON_INFO("Creating Vulkan surface...");
+    VKMON_DEBUG("Creating Vulkan surface...");
     
     window_->createSurface(instance_);
     surface_ = window_->getSurface();
     
-    VKMON_INFO("Window surface created successfully");
+    VKMON_DEBUG("Window surface created successfully");
 }
 
 void VulkanRenderer::createLogicalDevice() {
@@ -468,7 +468,7 @@ void VulkanRenderer::createLogicalDevice() {
     }
 
     vkGetDeviceQueue(device_, graphicsQueueFamily, 0, &graphicsQueue_);
-    VKMON_INFO("Logical device created successfully");
+    VKMON_DEBUG("Logical device created successfully");
 }
 
 int VulkanRenderer::findGraphicsQueueFamily() {
@@ -488,7 +488,7 @@ int VulkanRenderer::findGraphicsQueueFamily() {
 }
 
 void VulkanRenderer::createSwapChain() {
-    VKMON_INFO("Creating swapchain...");
+    VKMON_DEBUG("Creating swapchain...");
     
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice_, surface_, &capabilities);
@@ -611,11 +611,11 @@ void VulkanRenderer::createRenderPass() {
         throw std::runtime_error("Failed to create render pass!");
     }
 
-    VKMON_INFO("Render pass created successfully");
+    VKMON_DEBUG("Render pass created successfully");
 }
 
 void VulkanRenderer::createShaderModules() {
-    VKMON_INFO("Creating shader modules...");
+    VKMON_DEBUG("Creating shader modules...");
     
     auto vertShaderCode = Utils::readFile(VERTEX_SHADER_COMPILED);
     auto fragShaderCode = Utils::readFile(FRAGMENT_SHADER_COMPILED);
@@ -771,11 +771,11 @@ void VulkanRenderer::createGraphicsPipeline() {
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
 
-    VKMON_INFO("Graphics pipeline created successfully");
+    VKMON_DEBUG("Graphics pipeline created successfully");
 }
 
 void VulkanRenderer::createFramebuffers() {
-    VKMON_INFO("Creating framebuffers...");
+    VKMON_DEBUG("Creating framebuffers...");
     
     // First create image views for swap chain images
     swapChainImageViews_.resize(swapChainImages_.size());
@@ -822,11 +822,11 @@ void VulkanRenderer::createFramebuffers() {
         }
     }
 
-    VKMON_INFO("Framebuffers created successfully");
+    VKMON_DEBUG("Framebuffers created successfully");
 }
 
 void VulkanRenderer::createCommandPool() {
-    VKMON_INFO("Creating command pool...");
+    VKMON_DEBUG("Creating command pool...");
     
     int graphicsQueueFamily = findGraphicsQueueFamily();
 
@@ -997,7 +997,7 @@ void VulkanRenderer::createDescriptorSetLayout() {
 }
 
 void VulkanRenderer::createTextureImage() {
-    VKMON_INFO("Creating texture image...");
+    VKMON_DEBUG("Creating texture image...");
     
     // Create a simple 4x4 checkered texture programmatically
     const int texWidth = 4;
@@ -1050,17 +1050,17 @@ void VulkanRenderer::createTextureImage() {
     vkDestroyBuffer(device_, stagingBuffer, nullptr);
     vkFreeMemory(device_, stagingBufferMemory, nullptr);
 
-    VKMON_INFO("Texture image created successfully (basic version)");
+    VKMON_DEBUG("Texture image created successfully (basic version)");
 }
 
 void VulkanRenderer::createTextureImageView() {
-    VKMON_INFO("Creating texture image view...");
+    VKMON_DEBUG("Creating texture image view...");
     textureImageView_ = createImageView(textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
-    VKMON_INFO("Texture image view created successfully");
+    VKMON_DEBUG("Texture image view created successfully");
 }
 
 void VulkanRenderer::createTextureSampler() {
-    VKMON_INFO("Creating texture sampler...");
+    VKMON_DEBUG("Creating texture sampler...");
     
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1192,7 +1192,7 @@ void VulkanRenderer::createDescriptorSet() {
 }
 
 void VulkanRenderer::createUniformBuffer() {
-    VKMON_INFO("Creating uniform buffer...");
+    VKMON_DEBUG("Creating uniform buffer...");
     
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
@@ -1200,11 +1200,11 @@ void VulkanRenderer::createUniformBuffer() {
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 uniformBuffer_, uniformBufferMemory_);
 
-    VKMON_INFO("Uniform buffer created successfully");
+    VKMON_DEBUG("Uniform buffer created successfully");
 }
 
 void VulkanRenderer::createMaterialBuffer() {
-    VKMON_INFO("Creating material buffer...");
+    VKMON_DEBUG("Creating material buffer...");
     
     VkDeviceSize bufferSize = sizeof(MaterialData);
 
@@ -1220,7 +1220,7 @@ void VulkanRenderer::createMaterialBuffer() {
     
     updateMaterialBuffer();
 
-    VKMON_INFO("Material buffer created successfully");
+    VKMON_DEBUG("Material buffer created successfully");
 }
 
 void VulkanRenderer::createDepthResources() {
@@ -1479,7 +1479,7 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
     bool foundAssets = false;
     for (const auto& path : possiblePaths) {
         std::filesystem::path absolutePath = std::filesystem::absolute(path);
-        VKMON_INFO("Checking assets path: " + absolutePath.string());
+        VKMON_DEBUG("Checking assets path: " + absolutePath.string());
         
         if (std::filesystem::exists(absolutePath) && std::filesystem::is_directory(absolutePath)) {
             // Verify it contains expected subdirectories

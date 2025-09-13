@@ -6,7 +6,7 @@
 
 MaterialSystem::MaterialSystem(std::shared_ptr<VulkanMon::ResourceManager> resourceManager)
     : resourceManager(resourceManager), descriptorSetLayout(VK_NULL_HANDLE), descriptorPool(VK_NULL_HANDLE) {
-    VKMON_INFO("MaterialSystem: Initializing material management system");
+    VKMON_DEBUG("MaterialSystem: Initializing material management system");
 }
 
 MaterialSystem::~MaterialSystem() {
@@ -14,7 +14,7 @@ MaterialSystem::~MaterialSystem() {
 }
 
 void MaterialSystem::createMaterialBuffers() {
-    VKMON_INFO("MaterialSystem: Creating material descriptor layout and pool");
+    VKMON_DEBUG("MaterialSystem: Creating material descriptor layout and pool");
     createDescriptorSetLayout();
     createDescriptorPool();
 }
@@ -37,7 +37,7 @@ void MaterialSystem::createDescriptorSetLayout() {
         throw std::runtime_error("MaterialSystem: Failed to create descriptor set layout");
     }
     
-    VKMON_INFO("MaterialSystem: Created material descriptor set layout");
+    VKMON_DEBUG("MaterialSystem: Created material descriptor set layout");
 }
 
 void MaterialSystem::createDescriptorPool() {
@@ -76,7 +76,7 @@ void MaterialSystem::ensureDescriptorPoolCapacity(size_t requiredCapacity) {
         throw std::runtime_error("MaterialSystem: Failed to create descriptor pool");
     }
     
-    VKMON_INFO("MaterialSystem: Created descriptor pool with capacity for " + std::to_string(poolSize) + " materials");
+    VKMON_DEBUG("MaterialSystem: Created descriptor pool with capacity for " + std::to_string(poolSize) + " materials");
     
     // Reserve vector capacity to match descriptor pool
     materials.reserve(poolSize);

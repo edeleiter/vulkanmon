@@ -7,7 +7,7 @@
 using namespace VulkanMon;
 
 Application::Application() {
-    VKMON_INFO("VulkanMon Application created");
+    // Application created - ready for initialization
 }
 
 Application::~Application() {
@@ -25,7 +25,7 @@ void Application::initialize() {
     }
     
     try {
-        VKMON_INFO("VulkanMon - Initializing Application Systems");
+        VKMON_INFO("VulkanMon starting up...");
         
         // Initialize systems in dependency order
         initializeLogger();
@@ -39,7 +39,7 @@ void Application::initialize() {
         loadTestAssets();
         
         initialized_ = true;
-        VKMON_INFO("Application initialization completed successfully");
+        VKMON_INFO("VulkanMon ready!");
         
     } catch (const std::exception& e) {
         VKMON_ERROR("Application initialization failed: " + std::string(e.what()));
@@ -53,10 +53,9 @@ void Application::run() {
         throw std::runtime_error("Application not initialized. Call initialize() first.");
     }
     
-    VKMON_INFO("Starting main application loop");
     running_ = true;
     lastFrameTime_ = std::chrono::high_resolution_clock::now();
-    
+
     try {
         while (running_ && !window_->shouldClose()) {
             processFrame();
@@ -65,9 +64,8 @@ void Application::run() {
         handleCriticalError(e);
         throw;
     }
-    
+
     running_ = false;
-    VKMON_INFO("Main application loop ended");
     
     // Wait for device to be idle before cleanup
     if (renderer_ && renderer_->isInitialized()) {
@@ -101,11 +99,7 @@ void Application::initializeCamera() {
 }
 
 void Application::initializeCoreEngineSystems() {
-    VKMON_INFO("Initializing core engine systems...");
-    
-    // These systems need Vulkan device, so we'll initialize them after renderer
-    // For now, just log that we're preparing for them
-    VKMON_INFO("Core systems ready for initialization");
+    // Core systems will be initialized after renderer is ready
 }
 
 void Application::initializeRenderer() {
@@ -250,16 +244,16 @@ void Application::render(float deltaTime) {
 }
 
 void Application::handleShaderReload() {
-    VKMON_INFO("[HOT RELOAD] R key pressed - reloading shaders...");
+    VKMON_INFO("Reloading shaders...");
     
     try {
         if (renderer_) {
             renderer_->reloadShaders();
-            VKMON_INFO("[SUCCESS] Hot reload complete - new shaders active!");
+            VKMON_INFO("Hot reload complete - new shaders active!");
         }
     } catch (const std::exception& e) {
-        VKMON_ERROR("[ERROR] Hot reload failed: " + std::string(e.what()));
-        VKMON_WARNING("[WARN] Application continuing with previous shaders");
+        VKMON_ERROR("Hot reload failed: " + std::string(e.what()));
+        VKMON_WARNING("Application continuing with previous shaders");
     }
 }
 
@@ -298,8 +292,7 @@ void Application::handleMaterialControl(int key) {
 }
 
 void Application::adjustDirectionalLightIntensity(float delta) {
-    // TODO: This will be implemented once we have proper system coordination
-    // For now, just log the action
+    // Placeholder for future lighting system integration
     VKMON_INFO("[LIGHTING] Directional light intensity adjustment: " + std::to_string(delta));
 }
 
@@ -345,7 +338,7 @@ void Application::cycleMaterialPreset() {
 }
 
 void Application::initializeECS() {
-    VKMON_INFO("Initializing ECS World and systems...");
+    VKMON_DEBUG("Initializing ECS World and systems...");
 
     // Create ECS World
     world_ = std::make_unique<World>();
@@ -364,12 +357,12 @@ void Application::initializeECS() {
                 world_->render(renderer);
             }
         });
-        VKMON_INFO("ECS render callback registered with VulkanRenderer");
+        VKMON_DEBUG("ECS render callback registered with VulkanRenderer");
     } else {
         VKMON_WARNING("Cannot register ECS callback: VulkanRenderer not available");
     }
 
-    VKMON_INFO("ECS World initialized with CameraSystem and RenderSystem");
+    VKMON_INFO("ECS systems initialized successfully");
 }
 
 void Application::createTestScene() {
@@ -378,7 +371,7 @@ void Application::createTestScene() {
         return;
     }
 
-    VKMON_INFO("Creating ECS multi-object test scene...");
+    VKMON_DEBUG("Creating ECS multi-object test scene...");
 
     // Create multiple test objects to demonstrate ECS rendering
 
@@ -462,18 +455,18 @@ void Application::createTestScene() {
     renderable5.renderLayer = 0;
     world_->addComponent(cube5, renderable5);
 
-    VKMON_INFO("Created 5 ECS test entities:");
-    VKMON_INFO("  Entity " + std::to_string(cube1) + ": Center cube (Default material)");
-    VKMON_INFO("  Entity " + std::to_string(cube2) + ": Left cube (Gold material)");
-    VKMON_INFO("  Entity " + std::to_string(cube3) + ": Right cube (Ruby material)");
-    VKMON_INFO("  Entity " + std::to_string(cube4) + ": Top cube (Chrome material)");
-    VKMON_INFO("  Entity " + std::to_string(cube5) + ": Back cube (Emerald material)");
+    VKMON_DEBUG("Created 5 ECS test entities:");
+    VKMON_DEBUG("  Entity " + std::to_string(cube1) + ": Center cube (Default material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube2) + ": Left cube (Gold material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube3) + ": Right cube (Ruby material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube4) + ": Top cube (Chrome material)");
+    VKMON_DEBUG("  Entity " + std::to_string(cube5) + ": Back cube (Emerald material)");
 
     // Future: Create camera entity to replace legacy Camera class
     // EntityID cameraEntity = world_->createEntity();
     // ... add Camera component
 
-    VKMON_INFO("ECS multi-object test scene created successfully");
+    VKMON_INFO("Test scene ready - 5 objects loaded");
 }
 
 void Application::updateECS(float deltaTime) {
@@ -518,7 +511,7 @@ void Application::cleanup() {
 
     // Cleanup in reverse order of initialization
     if (world_) {
-        VKMON_INFO("Shutting down ECS World...");
+        VKMON_DEBUG("Shutting down ECS World...");
         world_->shutdown();
         world_.reset();
         renderSystem_ = nullptr;  // Owned by World, already cleaned up

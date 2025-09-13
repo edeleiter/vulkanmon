@@ -22,8 +22,8 @@ void RenderSystem::submitRenderCommand(VulkanRenderer& renderer, const RenderCom
         cmd.renderable->materialId
     );
 
-    // Log render command for debugging
-    #ifdef DEBUG
+    // Log render command for debugging (verbose)
+    #ifdef DEBUG_VERBOSE
     VKMON_DEBUG("Submitted ECS render command for entity " + std::to_string(cmd.entity) +
                " with mesh: " + cmd.renderable->meshPath +
                ", material: " + std::to_string(cmd.renderable->materialId));
