@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 #include <chrono>
+#include <functional>
+#include <string>
 #include <glm/glm.hpp>
 
 // Forward declarations and structures
@@ -90,11 +92,11 @@ public:
      */
     ~VulkanRenderer();
     
-    // Move-only semantics (RAII compliance)
+    // Non-copyable and non-movable (Vulkan handles require careful management)
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
-    VulkanRenderer(VulkanRenderer&&) = default;
-    VulkanRenderer& operator=(VulkanRenderer&&) = default;
+    VulkanRenderer(VulkanRenderer&&) = delete;
+    VulkanRenderer& operator=(VulkanRenderer&&) = delete;
     
     /**
      * Initialize Vulkan rendering system
@@ -234,7 +236,7 @@ public:
     void endECSFrame();
 
 private:
-    // System references (not owned)
+    // System references (shared ownership - systems created by renderer)
     std::shared_ptr<Window> window_;
     std::shared_ptr<Camera> camera_;
     std::shared_ptr<ResourceManager> resourceManager_;
