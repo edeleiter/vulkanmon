@@ -65,6 +65,7 @@ private:
     
     // Find graphics queue family
     int findGraphicsQueueFamily();
+    int findGraphicsQueueFamily(VkPhysicalDevice device);
 };
 
 /**

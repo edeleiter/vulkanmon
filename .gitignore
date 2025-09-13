@@ -88,3 +88,6 @@ venv/
 .pytest_cache/
 .python-version
 
+
+#models
+assets/3dmodels/
