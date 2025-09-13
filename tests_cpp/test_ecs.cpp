@@ -337,8 +337,8 @@ TEST_CASE("[ECS] Multi-Object Rendering Support", "[ECS][MultiObject]") {
 
         REQUIRE(t1.position.x != t2.position.x);
         REQUIRE(t2.position.x != t3.position.x);
-        REQUIRE(t1.getScale() != t2.getScale());
-        REQUIRE(t2.getScale() != t3.getScale());
+        REQUIRE(t1.scale != t2.scale);
+        REQUIRE(t2.scale != t3.scale);
 
         INFO("Multi-object transforms support:");
         INFO("- Independent positioning");

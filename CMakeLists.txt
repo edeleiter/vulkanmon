@@ -17,6 +17,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Create executable
 # Use CMake's Vulkan component for glslangValidator
@@ -76,6 +77,7 @@ target_link_libraries(vulkanmon PRIVATE
     glfw
     glm::glm
     assimp::assimp
+    imgui::imgui
 )
 
 # Include directories

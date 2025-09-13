@@ -56,8 +56,8 @@ void Application::initializeRenderer() {
 }
 
 void Application::initializeInputSystem() {
-    // Create InputHandler with camera reference
-    inputHandler_ = std::make_unique<InputHandler>(camera_);
+    // Create InputHandler with camera and window references
+    inputHandler_ = std::make_unique<InputHandler>(camera_, window_);
 
     // Connect input callbacks to window system
     window_->setKeyCallback([this](int key, int scancode, int action, int mods) {

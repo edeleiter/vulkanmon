@@ -4,6 +4,9 @@
 #include <iostream>
 #include <stdexcept>
 
+// ImGui includes for debug interface
+#include <imgui.h>
+
 using namespace VulkanMon;
 
 // =============================================================================
@@ -101,6 +104,7 @@ void Application::processFrame() {
     processInput(frameTime_);
     updateSystems(frameTime_);
     updateECS(frameTime_);
+    updateImGui(frameTime_);
     render(frameTime_);
 }
 
@@ -158,6 +162,29 @@ void Application::updateECS(float deltaTime) {
         }
 
         world_->update(deltaTime);
+    }
+}
+
+void Application::updateImGui(float deltaTime) {
+    if (renderer_ && renderer_->isImGuiEnabled()) {
+        renderer_->beginImGuiFrame();
+
+        // Basic "Hello ImGui" window for Phase 6.3.1 validation
+        ImGui::Begin("VulkanMon Debug");
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", frameTime_, fps_);
+        size_t entityCount = world_ ? world_->getEntityManager().getEntitiesWithComponent<Transform>().size() : 0;
+        ImGui::Text("Entity Count: %zu", entityCount);
+
+        // Phase 6.3.1: Basic ImGui functionality test
+        static bool showDemoWindow = false;
+        ImGui::Checkbox("Show ImGui Demo Window", &showDemoWindow);
+        if (showDemoWindow) {
+            ImGui::ShowDemoWindow(&showDemoWindow);
+        }
+
+        ImGui::End();
+
+        renderer_->endImGuiFrame();
     }
 }
 

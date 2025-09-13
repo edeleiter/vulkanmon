@@ -38,6 +38,7 @@ VulkanRenderer::VulkanRenderer(
 
 VulkanRenderer::~VulkanRenderer() {
     if (initialized_) {
+        cleanupImGui();
         cleanup();
     }
     VKMON_INFO("VulkanRenderer destroyed");
@@ -57,6 +58,12 @@ void VulkanRenderer::initialize() {
         
         initialized_ = true;
         VKMON_INFO("VulkanRenderer initialization completed successfully");
+
+        // Initialize ImGui after Vulkan initialization
+        if (imguiEnabled_) {
+            initializeImGui();
+            VKMON_INFO("ImGui initialization completed successfully");
+        }
         
     } catch (const std::exception& e) {
         VKMON_ERROR("VulkanRenderer initialization failed: " + std::string(e.what()));
@@ -267,6 +274,11 @@ void VulkanRenderer::endECSFrame() {
     if (!ecsFrameActive_) {
         VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
         return;
+    }
+
+    // Render ImGui if enabled
+    if (imguiEnabled_ && imguiInitialized_) {
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers_[currentImageIndex_]);
     }
 
     // End render pass
@@ -1383,6 +1395,12 @@ void VulkanRenderer::recordCommandBuffers() {
                 }
             }
         }
+
+        // Render ImGui if enabled
+        if (imguiEnabled_ && imguiInitialized_) {
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers_[i]);
+        }
+
         vkCmdEndRenderPass(commandBuffers_[i]);
 
         if (vkEndCommandBuffer(commandBuffers_[i]) != VK_SUCCESS) {
@@ -1766,4 +1784,119 @@ void VulkanRenderer::logRenderingState(const std::string& operation) const {
     } else {
         VKMON_INFO("  Current model: none");
     }
+}
+
+// =============================================================================
+// ImGui Debug Interface Integration - Phase 6.3
+// =============================================================================
+
+void VulkanRenderer::initializeImGui() {
+    if (imguiInitialized_) {
+        VKMON_WARNING("ImGui already initialized");
+        return;
+    }
+
+    VKMON_INFO("Initializing ImGui debug interface...");
+
+    // Create ImGui descriptor pool
+    VkDescriptorPoolSize poolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
+    poolInfo.poolSizeCount = static_cast<uint32_t>(IM_ARRAYSIZE(poolSizes));
+    poolInfo.pPoolSizes = poolSizes;
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &imguiDescriptorPool_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create ImGui descriptor pool");
+    }
+
+    // Setup ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup ImGui style (dark theme)
+    ImGui::StyleColorsDark();
+
+    // Get GLFW window handle from Window class
+    GLFWwindow* glfwWindow = window_->getWindow();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplGlfw_InitForVulkan(glfwWindow, true);
+
+    ImGui_ImplVulkan_InitInfo initInfo{};
+    initInfo.Instance = instance_;
+    initInfo.PhysicalDevice = physicalDevice_;
+    initInfo.Device = device_;
+    initInfo.QueueFamily = findGraphicsQueueFamily();
+    initInfo.Queue = graphicsQueue_;
+    initInfo.PipelineCache = VK_NULL_HANDLE;
+    initInfo.DescriptorPool = imguiDescriptorPool_;
+    initInfo.RenderPass = renderPass_;
+    initInfo.Subpass = 0;
+    initInfo.Allocator = nullptr;
+    initInfo.MinImageCount = static_cast<uint32_t>(swapChainImages_.size());
+    initInfo.ImageCount = static_cast<uint32_t>(swapChainImages_.size());
+    initInfo.CheckVkResultFn = nullptr;
+
+    ImGui_ImplVulkan_Init(&initInfo);
+
+    // Upload ImGui fonts (newer ImGui handles this automatically)
+    ImGui_ImplVulkan_CreateFontsTexture();
+
+    imguiInitialized_ = true;
+    VKMON_INFO("ImGui debug interface initialized successfully");
+}
+
+void VulkanRenderer::cleanupImGui() {
+    if (!imguiInitialized_) return;
+
+    VKMON_INFO("Cleaning up ImGui debug interface...");
+
+    vkDeviceWaitIdle(device_);
+
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    if (imguiDescriptorPool_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device_, imguiDescriptorPool_, nullptr);
+        imguiDescriptorPool_ = VK_NULL_HANDLE;
+    }
+
+    imguiInitialized_ = false;
+    VKMON_INFO("ImGui debug interface cleanup complete");
+}
+
+void VulkanRenderer::beginImGuiFrame() {
+    if (!imguiInitialized_ || !imguiEnabled_) return;
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void VulkanRenderer::endImGuiFrame() {
+    if (!imguiInitialized_ || !imguiEnabled_) return;
+
+    ImGui::Render();
+
+    // The ImGui draw data will be recorded to the command buffer
+    // in the existing command buffer recording (renderFrame method)
 }

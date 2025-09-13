@@ -158,6 +158,24 @@ public:
      * Reset the resize flag after handling resize
      */
     void resetResizeFlag() { resized_ = false; }
+
+    /**
+     * Enable cursor (for UI interaction mode)
+     * Shows cursor and allows it to move freely
+     */
+    void enableCursor();
+
+    /**
+     * Disable cursor (for camera control mode)
+     * Hides cursor and locks it for camera movement
+     */
+    void disableCursor();
+
+    /**
+     * Check if cursor is currently disabled
+     * @return true if cursor is disabled (camera mode)
+     */
+    bool isCursorDisabled() const;
     
 private:
     // Window state

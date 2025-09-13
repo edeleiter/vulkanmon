@@ -21,6 +21,11 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 
+// ImGui includes
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+
 // Forward declarations and structures
 struct UniformBufferObject {
     glm::mat4 view;
@@ -236,6 +241,45 @@ public:
      */
     void endECSFrame();
 
+    // ===== IMGUI DEBUG INTERFACE =====
+    // Phase 6.3: ECS Inspector integration
+
+    /**
+     * Initialize ImGui with Vulkan backend
+     * Must be called after Vulkan initialization
+     */
+    void initializeImGui();
+
+    /**
+     * Cleanup ImGui resources
+     * Called automatically in destructor
+     */
+    void cleanupImGui();
+
+    /**
+     * Begin ImGui frame
+     * Call at start of debug UI rendering
+     */
+    void beginImGuiFrame();
+
+    /**
+     * End ImGui frame and render to command buffer
+     * Call after ImGui UI definition
+     */
+    void endImGuiFrame();
+
+    /**
+     * Check if ImGui is enabled
+     * @return true if ImGui debug interface is active
+     */
+    bool isImGuiEnabled() const { return imguiEnabled_; }
+
+    /**
+     * Enable/disable ImGui debug interface
+     * @param enabled true to enable ImGui rendering
+     */
+    void setImGuiEnabled(bool enabled) { imguiEnabled_ = enabled; }
+
 private:
     // System references (shared ownership - systems created by renderer)
     std::shared_ptr<Window> window_;
@@ -323,6 +367,11 @@ private:
     bool ecsFrameActive_ = false;
     uint32_t currentImageIndex_ = 0;
     std::vector<std::string> frameLoadedMeshes_;
+
+    // ImGui Integration members
+    bool imguiEnabled_ = true;
+    VkDescriptorPool imguiDescriptorPool_ = VK_NULL_HANDLE;
+    bool imguiInitialized_ = false;
     
     // Vulkan initialization methods
     void initVulkan();

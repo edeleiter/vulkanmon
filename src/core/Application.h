@@ -174,6 +174,7 @@ private:
     void processInput(float deltaTime);
     void updateSystems(float deltaTime);
     void updateECS(float deltaTime);        // Update ECS World
+    void updateImGui(float deltaTime);      // Update ImGui interface
     void render(float deltaTime);
 
     // Input handling methods
