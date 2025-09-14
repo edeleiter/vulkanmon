@@ -17,6 +17,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Create executable
 # Use CMake's Vulkan component for glslangValidator
@@ -63,6 +64,9 @@ add_executable(vulkanmon
     src/io/ModelLoader.cpp
     src/systems/LightingSystem.cpp
     src/systems/MaterialSystem.cpp
+    src/systems/RenderSystem.cpp
+    src/systems/CameraSystem.cpp
+    src/debug/ECSInspector.cpp
 )
 
 # Make sure shaders are compiled before building the executable
@@ -74,6 +78,7 @@ target_link_libraries(vulkanmon PRIVATE
     glfw
     glm::glm
     assimp::assimp
+    imgui::imgui
 )
 
 # Include directories

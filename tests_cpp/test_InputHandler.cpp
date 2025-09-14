@@ -18,6 +18,7 @@
 #include <catch2/catch_approx.hpp>
 #include "../src/core/InputHandler.h"
 #include "../src/core/Camera.h"
+#include "../src/core/Window.h"
 #include "fixtures/TestHelpers.h"
 #include <GLFW/glfw3.h>
 #include <memory>
@@ -29,11 +30,40 @@ using Catch::Approx;
 class MockCamera : public Camera {
 public:
     MockCamera() : Camera() {}
-    
+
     mutable int processInputCallCount = 0;
-    
+
     void processInput(GLFWwindow* window) {
         processInputCallCount++;
+    }
+};
+
+// Mock Window for testing
+class MockWindow : public VulkanMon::Window {
+public:
+    MockWindow() : VulkanMon::Window(800, 600, "MockWindow") {}
+
+    mutable bool cursorDisabled = true;  // Start with cursor disabled (camera mode)
+    mutable int enableCursorCallCount = 0;
+    mutable int disableCursorCallCount = 0;
+
+    void enableCursor() override {
+        cursorDisabled = false;
+        enableCursorCallCount++;
+    }
+
+    void disableCursor() override {
+        cursorDisabled = true;
+        disableCursorCallCount++;
+    }
+
+    bool isCursorDisabled() const override {
+        return cursorDisabled;
+    }
+
+    // Override initialize to do nothing for tests (no actual GLFW)
+    void initialize() override {
+        // Do nothing for tests
     }
 };
 
@@ -45,19 +75,41 @@ public:
             throw std::runtime_error("Failed to initialize GLFW for testing");
         }
     }
-    
+
     ~InputTestFixture() {
         glfwTerminate();
+    }
+
+    // Helper methods to create mock objects
+    std::shared_ptr<MockCamera> createMockCamera() {
+        return std::make_shared<MockCamera>();
+    }
+
+    std::shared_ptr<MockWindow> createMockWindow() {
+        return std::make_shared<MockWindow>();
+    }
+
+    // Helper to create InputHandler with both mocks
+    std::unique_ptr<VulkanMon::InputHandler> createInputHandler() {
+        auto camera = createMockCamera();
+        auto window = createMockWindow();
+        return std::make_unique<VulkanMon::InputHandler>(camera, window);
+    }
+
+    // Helper for tests that need specific camera/window
+    std::unique_ptr<VulkanMon::InputHandler> createInputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<VulkanMon::Window> window) {
+        return std::make_unique<VulkanMon::InputHandler>(camera, window);
     }
 };
 
 TEST_CASE("InputHandler Basic Construction", "[InputHandler][Basic]") {
     InputTestFixture fixture;
     
-    SECTION("Construction with valid camera") {
+    SECTION("Construction with valid camera and window") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
-        
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
+
         // Should construct successfully
         REQUIRE(true); // Constructor didn't throw
     }
@@ -66,13 +118,15 @@ TEST_CASE("InputHandler Basic Construction", "[InputHandler][Basic]") {
         std::shared_ptr<Camera> nullCamera = nullptr;
         
         // Should not crash with null camera
-        VulkanMon::InputHandler inputHandler(nullCamera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(nullCamera, window);
         REQUIRE(true); // Constructor didn't throw
     }
     
     SECTION("Default configuration values") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Mouse should be locked by default
         REQUIRE(inputHandler.isMouseLocked());
@@ -84,7 +138,8 @@ TEST_CASE("InputHandler Configuration", "[InputHandler][Configuration]") {
     
     SECTION("Mouse sensitivity configuration") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         REQUIRE_NOTHROW(inputHandler.setMouseSensitivity(0.5f));
         REQUIRE_NOTHROW(inputHandler.setMouseSensitivity(2.0f));
@@ -93,7 +148,8 @@ TEST_CASE("InputHandler Configuration", "[InputHandler][Configuration]") {
     
     SECTION("Camera speed configuration") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         REQUIRE_NOTHROW(inputHandler.setCameraSpeed(1.0f));
         REQUIRE_NOTHROW(inputHandler.setCameraSpeed(10.0f));
@@ -102,7 +158,8 @@ TEST_CASE("InputHandler Configuration", "[InputHandler][Configuration]") {
     
     SECTION("Mouse lock state") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         REQUIRE(inputHandler.isMouseLocked());
         
@@ -115,7 +172,8 @@ TEST_CASE("InputHandler Configuration", "[InputHandler][Configuration]") {
     
     SECTION("Mouse position reset") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         REQUIRE_NOTHROW(inputHandler.resetMousePosition());
     }
@@ -126,7 +184,8 @@ TEST_CASE("InputHandler Key Input Processing", "[InputHandler][KeyInput]") {
     
     SECTION("System control keys") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         bool shaderReloadCalled = false;
         inputHandler.setShaderReloadCallback([&]() {
@@ -150,7 +209,8 @@ TEST_CASE("InputHandler Key Input Processing", "[InputHandler][KeyInput]") {
     
     SECTION("Lighting control keys") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         int receivedKey = -1;
         int callCount = 0;
@@ -174,7 +234,8 @@ TEST_CASE("InputHandler Key Input Processing", "[InputHandler][KeyInput]") {
     
     SECTION("Material control keys") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         int receivedKey = -1;
         int callCount = 0;
@@ -198,7 +259,8 @@ TEST_CASE("InputHandler Key Input Processing", "[InputHandler][KeyInput]") {
     
     SECTION("Help key") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Help key should not crash
         REQUIRE_NOTHROW(inputHandler.processKeyInput(GLFW_KEY_H, 0, GLFW_PRESS, 0));
@@ -206,7 +268,8 @@ TEST_CASE("InputHandler Key Input Processing", "[InputHandler][KeyInput]") {
     
     SECTION("Unhandled keys") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Unhandled keys should not crash
         REQUIRE_NOTHROW(inputHandler.processKeyInput(GLFW_KEY_Z, 0, GLFW_PRESS, 0));
@@ -220,7 +283,8 @@ TEST_CASE("InputHandler Mouse Input Processing", "[InputHandler][MouseInput]") {
     
     SECTION("Mouse input with locked mouse") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         inputHandler.setMouseLocked(true);
         
@@ -234,7 +298,8 @@ TEST_CASE("InputHandler Mouse Input Processing", "[InputHandler][MouseInput]") {
     
     SECTION("Mouse input with unlocked mouse") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         inputHandler.setMouseLocked(false);
         
@@ -244,7 +309,8 @@ TEST_CASE("InputHandler Mouse Input Processing", "[InputHandler][MouseInput]") {
     
     SECTION("Mouse input with null camera") {
         std::shared_ptr<Camera> nullCamera = nullptr;
-        VulkanMon::InputHandler inputHandler(nullCamera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(nullCamera, window);
         
         // Should handle gracefully with null camera
         REQUIRE_NOTHROW(inputHandler.processMouseInput(400.0, 300.0));
@@ -252,7 +318,8 @@ TEST_CASE("InputHandler Mouse Input Processing", "[InputHandler][MouseInput]") {
     
     SECTION("Mouse input edge cases") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Test with extreme values
         REQUIRE_NOTHROW(inputHandler.processMouseInput(0.0, 0.0));
@@ -266,27 +333,29 @@ TEST_CASE("InputHandler Continuous Input Processing", "[InputHandler][Continuous
     
     SECTION("Continuous input with valid camera") {
         auto mockCamera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(mockCamera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(mockCamera, window);
         
         // Create a mock GLFW window for testing
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // Don't show window during test
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        REQUIRE(window != nullptr);
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        REQUIRE(glfwWindow != nullptr);
         
         // Process continuous input
-        inputHandler.processContinuousInput(window, 0.016f); // 60 FPS delta time
+        inputHandler.processContinuousInput(glfwWindow, 0.016f); // 60 FPS delta time
         
         // Camera's processInput should have been called through InputHandler
         // Note: processInputCallCount may not increment if InputHandler doesn't call it directly
         // For now, just verify the operation completed without crashing
         REQUIRE(true); // Placeholder - would need deeper integration testing
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
     
     SECTION("Continuous input with null window") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Should handle gracefully with null window
         REQUIRE_NOTHROW(inputHandler.processContinuousInput(nullptr, 0.016f));
@@ -294,33 +363,35 @@ TEST_CASE("InputHandler Continuous Input Processing", "[InputHandler][Continuous
     
     SECTION("Continuous input with null camera") {
         std::shared_ptr<Camera> nullCamera = nullptr;
-        VulkanMon::InputHandler inputHandler(nullCamera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(nullCamera, window);
         
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        REQUIRE(window != nullptr);
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        REQUIRE(glfwWindow != nullptr);
         
         // Should handle gracefully with null camera
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.016f));
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.016f));
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
     
     SECTION("Continuous input with various delta times") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        REQUIRE(window != nullptr);
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        REQUIRE(glfwWindow != nullptr);
         
         // Test with different delta times
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.0f));     // Zero delta
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.016f));   // 60 FPS
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.033f));   // 30 FPS
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 1.0f));     // 1 second
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.0f));     // Zero delta
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.016f));   // 60 FPS
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.033f));   // 30 FPS
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 1.0f));     // 1 second
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
 }
 
@@ -329,7 +400,8 @@ TEST_CASE("InputHandler Callback Management", "[InputHandler][Callbacks]") {
     
     SECTION("Setting callbacks before use") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Set callbacks
         bool shaderReloadCalled = false;
@@ -352,7 +424,8 @@ TEST_CASE("InputHandler Callback Management", "[InputHandler][Callbacks]") {
     
     SECTION("Using input without callbacks registered") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Should not crash when callbacks are not set
         REQUIRE_NOTHROW(inputHandler.processKeyInput(GLFW_KEY_R, 0, GLFW_PRESS, 0));
@@ -362,7 +435,8 @@ TEST_CASE("InputHandler Callback Management", "[InputHandler][Callbacks]") {
     
     SECTION("Replacing callbacks") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         int callCount1 = 0;
         int callCount2 = 0;
@@ -386,7 +460,8 @@ TEST_CASE("InputHandler Error Handling", "[InputHandler][ErrorHandling]") {
     
     SECTION("Invalid key codes") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Should handle invalid key codes gracefully
         REQUIRE_NOTHROW(inputHandler.processKeyInput(-1, 0, GLFW_PRESS, 0));
@@ -395,7 +470,8 @@ TEST_CASE("InputHandler Error Handling", "[InputHandler][ErrorHandling]") {
     
     SECTION("Invalid action codes") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Should handle invalid action codes gracefully
         REQUIRE_NOTHROW(inputHandler.processKeyInput(GLFW_KEY_A, 0, -1, 0));
@@ -404,7 +480,8 @@ TEST_CASE("InputHandler Error Handling", "[InputHandler][ErrorHandling]") {
     
     SECTION("Extreme mouse coordinates") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Should handle extreme values gracefully
         REQUIRE_NOTHROW(inputHandler.processMouseInput(std::numeric_limits<double>::max(), 
@@ -421,7 +498,8 @@ TEST_CASE("InputHandler Performance", "[InputHandler][Performance]") {
     
     SECTION("Key input processing performance") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         inputHandler.setShaderReloadCallback([]() {});
         inputHandler.setLightingControlCallback([](int) {});
@@ -437,7 +515,8 @@ TEST_CASE("InputHandler Performance", "[InputHandler][Performance]") {
     
     SECTION("Mouse input processing performance") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         double avgTime = PerformanceTestHelpers::benchmarkFunction([&inputHandler]() {
             static double x = 400.0, y = 300.0;
@@ -455,7 +534,8 @@ TEST_CASE("InputHandler Integration", "[InputHandler][Integration]") {
     
     SECTION("Complete input workflow") {
         auto camera = std::make_shared<MockCamera>();
-        VulkanMon::InputHandler inputHandler(camera);
+        auto window = std::make_shared<MockWindow>();
+        VulkanMon::InputHandler inputHandler(camera, window);
         
         // Set up all callbacks
         bool systemCallbackTriggered = false;
@@ -480,8 +560,8 @@ TEST_CASE("InputHandler Integration", "[InputHandler][Integration]") {
         
         // Create window for continuous input test
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        inputHandler.processContinuousInput(window, 0.016f);            // Continuous
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        inputHandler.processContinuousInput(glfwWindow, 0.016f);            // Continuous
         
         // Verify all systems were triggered
         REQUIRE(systemCallbackTriggered);
@@ -491,6 +571,6 @@ TEST_CASE("InputHandler Integration", "[InputHandler][Integration]") {
         // This would require more sophisticated integration testing
         REQUIRE(true); // Placeholder for integration test
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
 }

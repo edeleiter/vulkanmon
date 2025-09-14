@@ -146,4 +146,27 @@ void Window::glfwResizeCallback(GLFWwindow* window, int width, int height) {
     }
 }
 
+// =============================================================================
+// Cursor Control Methods
+// =============================================================================
+
+void Window::enableCursor() {
+    if (window_) {
+        glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+}
+
+void Window::disableCursor() {
+    if (window_) {
+        glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+}
+
+bool Window::isCursorDisabled() const {
+    if (window_) {
+        return glfwGetInputMode(window_, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+    }
+    return false;
+}
+
 } // namespace VulkanMon

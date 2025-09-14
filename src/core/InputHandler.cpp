@@ -5,11 +5,12 @@
 
 namespace VulkanMon {
 
-InputHandler::InputHandler(std::shared_ptr<Camera> camera)
-    : camera_(camera) {
-    
+InputHandler::InputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<Window> window)
+    : camera_(camera), window_(window) {
+
     VKMON_DEBUG("InputHandler initialized");
     VKMON_DEBUG(camera_ ? "  Camera: connected" : "  Camera: null");
+    VKMON_DEBUG(window_ ? "  Window: connected" : "  Window: null");
 }
 
 void InputHandler::processKeyInput(int key, int scancode, int action, int mods) {
@@ -45,7 +46,19 @@ void InputHandler::processKeyInput(int key, int scancode, int action, int mods) 
         case GLFW_KEY_H:
             printControlsHelp();
             break;
-            
+
+        // Tab key - Toggle between camera mode and UI mode
+        case GLFW_KEY_TAB:
+            toggleInputMode();
+            break;
+
+        // Inspector toggle
+        case GLFW_KEY_I:
+            if (inspectorToggleCallback_) {
+                inspectorToggleCallback_();
+            }
+            break;
+
         default:
             // Unhandled key - could log for debugging
             VKMON_DEBUG("Unhandled key press: " + std::to_string(key));
@@ -103,6 +116,11 @@ void InputHandler::setLightingControlCallback(LightingControlCallback callback) 
 void InputHandler::setMaterialControlCallback(MaterialControlCallback callback) {
     materialControlCallback_ = callback;
     VKMON_DEBUG("Material control callback registered");
+}
+
+void InputHandler::setInspectorToggleCallback(InspectorToggleCallback callback) {
+    inspectorToggleCallback_ = callback;
+    VKMON_DEBUG("Inspector toggle callback registered");
 }
 
 void InputHandler::resetMousePosition() {
@@ -188,7 +206,28 @@ void InputHandler::printControlsHelp() const {
     std::cout << "System Controls:" << std::endl;
     std::cout << "  R   - Hot reload shaders" << std::endl;
     std::cout << "  H   - Show this help" << std::endl;
+    std::cout << "  TAB - Toggle camera/UI mode" << std::endl;
     std::cout << "==========================" << std::endl;
+}
+
+void InputHandler::toggleInputMode() {
+    if (!window_) {
+        VKMON_ERROR("Cannot toggle input mode - no window reference");
+        return;
+    }
+
+    // Check current cursor state and toggle
+    if (window_->isCursorDisabled()) {
+        // Currently in camera mode, switch to UI mode
+        window_->enableCursor();
+        setMouseLocked(false);
+        VKMON_INFO("Switched to UI mode - cursor enabled for ImGui interaction");
+    } else {
+        // Currently in UI mode, switch to camera mode
+        window_->disableCursor();
+        setMouseLocked(true);
+        VKMON_INFO("Switched to camera mode - cursor disabled for camera control");
+    }
 }
 
 } // namespace VulkanMon

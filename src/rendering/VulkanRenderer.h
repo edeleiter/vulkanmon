@@ -16,15 +16,26 @@
 #include <memory>
 #include <vector>
 #include <chrono>
+#include <functional>
+#include <string>
+#include <unordered_map>
 #include <glm/glm.hpp>
+
+// ImGui includes
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 
 // Forward declarations and structures
 struct UniformBufferObject {
-    glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
     glm::vec3 cameraPos;
     float _padding;
+};
+
+struct PushConstants {
+    glm::mat4 model;
 };
 
 /**
@@ -59,6 +70,7 @@ public:
     // Callback types for operations VulkanRenderer cannot perform directly
     using ShaderReloadCallback = std::function<void()>;
     using FrameUpdateCallback = std::function<void(float deltaTime)>;
+    using ECSRenderCallback = std::function<void(VulkanRenderer& renderer)>;
     
     /**
      * Create VulkanRenderer with required dependencies
@@ -86,11 +98,11 @@ public:
      */
     ~VulkanRenderer();
     
-    // Move-only semantics (RAII compliance)
+    // Non-copyable and non-movable (Vulkan handles require careful management)
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
-    VulkanRenderer(VulkanRenderer&&) = default;
-    VulkanRenderer& operator=(VulkanRenderer&&) = default;
+    VulkanRenderer(VulkanRenderer&&) = delete;
+    VulkanRenderer& operator=(VulkanRenderer&&) = delete;
     
     /**
      * Initialize Vulkan rendering system
@@ -112,7 +124,6 @@ public:
      * Handle window resize events
      * Recreates swapchain and dependent resources
      */
-    void handleWindowResize();
     
     /**
      * Reload shaders from disk
@@ -137,17 +148,34 @@ public:
     /**
      * Register callback for frame updates
      * Called before each frame render for external system updates
-     * 
+     *
      * @param callback Function to call for frame updates
      */
     void setFrameUpdateCallback(FrameUpdateCallback callback);
+
+    /**
+     * Register callback for ECS rendering
+     * Called during frame rendering to submit ECS entity render commands
+     *
+     * @param callback Function to call for ECS rendering
+     */
+    void setECSRenderCallback(ECSRenderCallback callback);
     
     /**
      * Check if renderer is ready for rendering
-     * 
+     *
      * @return true if initialization completed successfully
      */
     bool isInitialized() const { return initialized_; }
+
+    /**
+     * Handle window resize event
+     * Recreates swapchain and updates viewport
+     *
+     * @param width New window width
+     * @param height New window height
+     */
+    void handleWindowResize(int width, int height);
     
     /**
      * Get Vulkan device handle
@@ -167,13 +195,102 @@ public:
     
     /**
      * Get current frame statistics
-     * 
+     *
      * @return Frame time in milliseconds
      */
     float getFrameTime() const { return lastFrameTime_; }
 
+
+    // ===== SYSTEM ACCESS INTERFACE =====
+
+    /**
+     * Get the initialized lighting system
+     *
+     * @return Shared pointer to LightingSystem
+     */
+    std::shared_ptr<LightingSystem> getLightingSystem() const { return lightingSystem_; }
+
+    /**
+     * Get the initialized material system
+     *
+     * @return Shared pointer to MaterialSystem
+     */
+    std::shared_ptr<MaterialSystem> getMaterialSystem() const { return materialSystem_; }
+
+    /**
+     * Get the initialized asset manager
+     *
+     * @return Shared pointer to AssetManager
+     */
+    std::shared_ptr<AssetManager> getAssetManager() const { return assetManager_; }
+
+    // ===== ECS INTEGRATION INTERFACE =====
+    // Phase 6.2: Multi-object rendering support
+
+    /**
+     * Begin frame for ECS rendering
+     * Prepares frame for multiple object rendering
+     */
+    void beginECSFrame();
+
+    /**
+     * Render a single ECS entity
+     *
+     * @param modelMatrix Transform matrix for this object
+     * @param meshPath Path to mesh file (will be loaded if needed)
+     * @param materialId Material ID to use
+     */
+    void renderECSObject(const glm::mat4& modelMatrix,
+                        const std::string& meshPath,
+                        uint32_t materialId);
+
+    /**
+     * End frame for ECS rendering
+     * Submits all commands and presents frame
+     */
+    void endECSFrame();
+
+    // ===== IMGUI DEBUG INTERFACE =====
+    // Phase 6.3: ECS Inspector integration
+
+    /**
+     * Initialize ImGui with Vulkan backend
+     * Must be called after Vulkan initialization
+     */
+    void initializeImGui();
+
+    /**
+     * Cleanup ImGui resources
+     * Called automatically in destructor
+     */
+    void cleanupImGui();
+
+    /**
+     * Begin ImGui frame
+     * Call at start of debug UI rendering
+     */
+    void beginImGuiFrame();
+
+    /**
+     * End ImGui frame and render to command buffer
+     * Call after ImGui UI definition
+     */
+    void endImGuiFrame();
+
+    /**
+     * Check if ImGui is enabled
+     * @return true if ImGui debug interface is active
+     */
+    bool isImGuiEnabled() const { return imguiEnabled_; }
+
+    /**
+     * Enable/disable ImGui debug interface
+     * @param enabled true to enable ImGui rendering
+     */
+    void setImGuiEnabled(bool enabled) { imguiEnabled_ = enabled; }
+
 private:
-    // System references (not owned)
+    // System references (shared ownership - systems created by renderer)
     std::shared_ptr<Window> window_;
     std::shared_ptr<Camera> camera_;
     std::shared_ptr<ResourceManager> resourceManager_;
@@ -182,11 +299,15 @@ private:
     std::shared_ptr<LightingSystem> lightingSystem_;
     std::shared_ptr<MaterialSystem> materialSystem_;
     
-    // Current model being rendered
+    // Current model being rendered (legacy)
     std::shared_ptr<Model> currentModel_;
+
+    // Model cache for multi-object ECS rendering
+    std::unordered_map<std::string, std::shared_ptr<Model>> modelCache_;
     
-    // Frame update callback
+    // Callbacks
     FrameUpdateCallback frameUpdateCallback_;
+    ECSRenderCallback ecsRenderCallback_;
     
     // Material state
     MaterialData currentMaterialData_;
@@ -232,6 +353,15 @@ private:
     VkSampler textureSampler_ = VK_NULL_HANDLE;
     
     // Descriptor resources
+    // Global descriptor set layout (UBO, texture, lighting)
+    VkDescriptorSetLayout globalDescriptorSetLayout_ = VK_NULL_HANDLE;
+    VkDescriptorPool globalDescriptorPool_ = VK_NULL_HANDLE;
+    VkDescriptorSet globalDescriptorSet_ = VK_NULL_HANDLE;
+
+    // Material descriptor set layout (per-material data)
+    VkDescriptorSetLayout materialDescriptorSetLayout_ = VK_NULL_HANDLE;
+
+    // Legacy descriptor resources (to be removed after refactor)
     VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
     VkDescriptorSet descriptorSet_ = VK_NULL_HANDLE;
@@ -250,6 +380,19 @@ private:
     // Frame timing
     std::chrono::high_resolution_clock::time_point lastFrameTimePoint_;
     float lastFrameTime_ = 0.0f;
+
+    // Material cycling state
+    uint32_t currentMaterialPreset_ = 0;
+
+    // ECS Integration members
+    bool ecsFrameActive_ = false;
+    uint32_t currentImageIndex_ = 0;
+    std::vector<std::string> frameLoadedMeshes_;
+
+    // ImGui Integration members
+    bool imguiEnabled_ = true;
+    VkDescriptorPool imguiDescriptorPool_ = VK_NULL_HANDLE;
+    bool imguiInitialized_ = false;
     
     // Vulkan initialization methods
     void initVulkan();
@@ -257,6 +400,7 @@ private:
     void createSurface();
     void createLogicalDevice();
     void createSwapChain();
+    void recreateSwapChain();
     void createRenderPass();
     void createShaderModules();
     void createGraphicsPipeline();
@@ -275,11 +419,16 @@ private:
                     VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     void createDescriptorSetLayout();
+    void createGlobalDescriptorSetLayout();
+    void createMaterialDescriptorSetLayout();
+    void ensureStandardMaterialsExist();
     void createTextureImage();
     void createTextureImageView();
     void createTextureSampler();
     void createDescriptorPool();
+    void createGlobalDescriptorPool();
     void createDescriptorSet();
+    void createGlobalDescriptorSet();
     void createUniformBuffer();
     void createMaterialBuffer();
     void createDepthResources();
@@ -289,6 +438,10 @@ private:
     void recordCommandBuffers();
     void updateUniformBuffer();
     void updateMaterialBuffer();
+
+    // ECS Integration helper methods
+    void recordECSCommandBuffer(uint32_t imageIndex);
+    void ensureMeshLoaded(const std::string& meshPath);
     
     // Helper methods
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Camera.h"
+#include "Window.h"
 #include "../systems/LightingSystem.h"
 #include "../systems/MaterialSystem.h"
 #include <GLFW/glfw3.h>
@@ -35,14 +36,16 @@ public:
     using ShaderReloadCallback = std::function<void()>;
     using LightingControlCallback = std::function<void(int key)>;
     using MaterialControlCallback = std::function<void(int key)>;
+    using InspectorToggleCallback = std::function<void()>;
 
     /**
-     * Create InputHandler with camera reference
+     * Create InputHandler with camera and window references
      * Other systems are controlled via callbacks
-     * 
+     *
      * @param camera Camera system for movement controls
+     * @param window Window system for cursor mode control
      */
-    InputHandler(std::shared_ptr<Camera> camera);
+    InputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<Window> window);
     
     /**
      * Destructor - no special cleanup needed
@@ -101,10 +104,17 @@ public:
     
     /**
      * Register material control callback
-     * 
+     *
      * @param callback Function to call with material control key
      */
     void setMaterialControlCallback(MaterialControlCallback callback);
+
+    /**
+     * Register inspector toggle callback
+     *
+     * @param callback Function to call when inspector toggle is requested (I key)
+     */
+    void setInspectorToggleCallback(InspectorToggleCallback callback);
     
     /**
      * Reset mouse position tracking
@@ -135,14 +145,22 @@ public:
     
     /**
      * Enable/disable mouse lock for camera controls
-     * 
+     *
      * @param locked true to lock mouse for camera look
      */
     void setMouseLocked(bool locked) { mouseLocked_ = locked; }
 
+    /**
+     * Toggle between camera mode and UI interaction mode
+     * Camera mode: cursor disabled, mouse controls camera
+     * UI mode: cursor enabled, can interact with ImGui
+     */
+    void toggleInputMode();
+
 private:
     // System references (not owned)
     std::shared_ptr<Camera> camera_;
+    std::shared_ptr<Window> window_;
     
     // Mouse input state
     bool firstMouse_ = true;
@@ -158,6 +176,7 @@ private:
     ShaderReloadCallback shaderReloadCallback_;
     LightingControlCallback lightingControlCallback_;
     MaterialControlCallback materialControlCallback_;
+    InspectorToggleCallback inspectorToggleCallback_;
     
     // Input processing helpers
     void handleCameraMovement(GLFWwindow* window, float deltaTime);

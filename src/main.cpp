@@ -30,21 +30,14 @@ int main() {
     Logger::getInstance().enableConsoleOutput(true);
     Logger::getInstance().setLogLevel(LogLevel::INFO_LEVEL);
     
-    VKMON_INFO("=== VulkanMon Engine Starting ===");
-    VKMON_INFO("Phase 5.2: Refactored Architecture");
-    VKMON_INFO("Modern C++20 Vulkan Graphics Engine");
-    
     try {
         // Create and initialize application
         Application app;
-        VKMON_INFO("Application created successfully");
-        
+
         // Initialize all engine systems
         app.initialize();
-        VKMON_INFO("Application initialized successfully");
-        
+
         // Run main application loop
-        VKMON_INFO("Starting main application loop...");
         app.run();
         
         // Clean shutdown

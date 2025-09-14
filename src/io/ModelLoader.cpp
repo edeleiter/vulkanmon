@@ -93,10 +93,9 @@ std::unique_ptr<Model> ModelLoader::loadModelFromFile(const std::string& fullPat
     auto endTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double, std::milli>(endTime - startTime);
     
-    VKMON_INFO("Model loaded successfully: " + fullPath);
-    VKMON_INFO("  Meshes: " + std::to_string(model->meshCount()));
-    VKMON_INFO("  Vertices: " + std::to_string(model->totalVertices())); 
-    VKMON_INFO("  Triangles: " + std::to_string(model->totalTriangles()));
+    VKMON_INFO("Model loaded: " + fullPath.substr(fullPath.find_last_of('/') + 1) +
+               " (" + std::to_string(model->meshCount()) + " meshes, " +
+               std::to_string(model->totalVertices()) + " vertices)");
     VKMON_PERF("Model loading", duration.count());
     
     totalModelsLoaded_++;

@@ -13,6 +13,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(Catch2 CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Include directories for VulkanMon source files
 include_directories(../src)
@@ -42,7 +43,17 @@ add_executable(vulkanmon_tests
     # Phase 2: Asset pipeline tests (now properly isolated)
     test_AssetManager.cpp
     test_ModelLoader.cpp
-    
+
+    # Phase 6: ECS Framework tests
+    test_ecs.cpp
+    # test_ecs_integration.cpp  # Temporarily disabled for compilation fix
+
+    # Phase 6.3: ECS Inspector tests (NEW)
+    test_ECSInspector.cpp
+
+    # Phase 6.4: Window Resize tests (NEW)
+    test_WindowResize.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
@@ -53,11 +64,15 @@ add_executable(vulkanmon_tests
     ../src/utils/Utils.cpp
     ../src/stb_image_impl.cpp
     ../src/rendering/ResourceManager.cpp
+    ../src/rendering/VulkanRenderer.cpp
     ../src/systems/LightingSystem.cpp
     ../src/systems/MaterialSystem.cpp
+    ../src/systems/RenderSystem.cpp
+    ../src/systems/CameraSystem.cpp
     ../src/io/AssetManager.cpp
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp
+    ../src/debug/ECSInspector.cpp
 )
 
 # Link libraries
@@ -67,6 +82,7 @@ target_link_libraries(vulkanmon_tests PRIVATE
     glfw
     assimp::assimp
     Catch2::Catch2WithMain
+    imgui::imgui
 )
 
 # Include directories

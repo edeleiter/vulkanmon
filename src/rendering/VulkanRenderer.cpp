@@ -38,6 +38,7 @@ VulkanRenderer::VulkanRenderer(
 
 VulkanRenderer::~VulkanRenderer() {
     if (initialized_) {
+        cleanupImGui();
         cleanup();
     }
     VKMON_INFO("VulkanRenderer destroyed");
@@ -57,6 +58,12 @@ void VulkanRenderer::initialize() {
         
         initialized_ = true;
         VKMON_INFO("VulkanRenderer initialization completed successfully");
+
+        // Initialize ImGui after Vulkan initialization
+        if (imguiEnabled_) {
+            initializeImGui();
+            VKMON_INFO("ImGui initialization completed successfully");
+        }
         
     } catch (const std::exception& e) {
         VKMON_ERROR("VulkanRenderer initialization failed: " + std::string(e.what()));
@@ -87,9 +94,29 @@ void VulkanRenderer::renderFrame(float deltaTime) {
     drawFrame();
 }
 
-void VulkanRenderer::handleWindowResize() {
-    // TODO: Implement swapchain recreation
-    VKMON_INFO("Window resize handling not yet implemented");
+void VulkanRenderer::handleWindowResize(int width, int height) {
+    VKMON_INFO("Handling window resize to " + std::to_string(width) + "x" + std::to_string(height));
+
+    // Don't resize if minimized (width/height = 0)
+    if (width == 0 || height == 0) {
+        VKMON_INFO("Window minimized, skipping swapchain recreation");
+        return;
+    }
+
+    // Wait for device to be idle before recreating swapchain
+    vkDeviceWaitIdle(device_);
+
+    // Recreate swapchain with new dimensions
+    recreateSwapChain();
+
+    // Update ImGui display size
+    if (imguiInitialized_) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
+        VKMON_INFO("Updated ImGui display size");
+    }
+
+    VKMON_INFO("Window resize handling completed successfully");
 }
 
 void VulkanRenderer::reloadShaders() {
@@ -146,12 +173,252 @@ void VulkanRenderer::setFrameUpdateCallback(FrameUpdateCallback callback) {
     frameUpdateCallback_ = callback;
 }
 
+void VulkanRenderer::setECSRenderCallback(ECSRenderCallback callback) {
+    ecsRenderCallback_ = callback;
+}
+
+// =============================================================================
+// ECS Integration Interface (Phase 6.2)
+// =============================================================================
+
+void VulkanRenderer::beginECSFrame() {
+    if (ecsFrameActive_) {
+        VKMON_ERROR("ECS frame already active! Call endECSFrame() before beginning a new frame.");
+        return;
+    }
+
+    // Wait for previous frame
+    vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
+    vkResetFences(device_, 1, &inFlightFence_);
+
+    // Acquire next swapchain image
+    VkResult result = vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX,
+                                           imageAvailableSemaphore_, VK_NULL_HANDLE,
+                                           &currentImageIndex_);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        handleWindowResize(window_->getWidth(), window_->getHeight());
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swapchain image!");
+    }
+
+    // Update frame-level uniforms (view, projection, lighting)
+    updateUniformBuffer();
+    updateMaterialBuffer();
+
+    // Reset command buffer and begin recording
+    vkResetCommandBuffer(commandBuffers_[currentImageIndex_], 0);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffers_[currentImageIndex_], &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer!");
+    }
+
+    // Begin render pass
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass_;
+    renderPassInfo.framebuffer = swapChainFramebuffers_[currentImageIndex_];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChainExtent_;
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffers_[currentImageIndex_], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Bind graphics pipeline
+    vkCmdBindPipeline(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+    // Set viewport dynamically (essential for proper resize handling)
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapChainExtent_.width);
+    viewport.height = static_cast<float>(swapChainExtent_.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffers_[currentImageIndex_], 0, 1, &viewport);
+
+    // Set scissor rectangle
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapChainExtent_;
+    vkCmdSetScissor(commandBuffers_[currentImageIndex_], 0, 1, &scissor);
+
+    // Bind global descriptor set (set 0: UBO, texture, lighting)
+    vkCmdBindDescriptorSets(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                           pipelineLayout_, 0, 1, &globalDescriptorSet_, 0, nullptr);
+
+    ecsFrameActive_ = true;
+    frameLoadedMeshes_.clear();
+
+    VKMON_DEBUG("ECS frame begun, ready for object rendering");
+}
+
+void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
+                                    const std::string& meshPath,
+                                    uint32_t materialId) {
+    if (!ecsFrameActive_) {
+        VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
+        return;
+    }
+
+    // Ensure mesh is loaded
+    ensureMeshLoaded(meshPath);
+
+    // Bind material-specific descriptor set (set 1)
+    if (materialSystem_ && materialId < materialSystem_->getMaterialCount()) {
+        VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(materialId);
+        if (materialDescriptorSet != VK_NULL_HANDLE) {
+            // Bind the material descriptor set to set 1
+            vkCmdBindDescriptorSets(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                   pipelineLayout_, 1, 1, &materialDescriptorSet, 0, nullptr);
+        }
+    }
+
+    // Update push constants with model matrix
+    PushConstants pushConstants{};
+    pushConstants.model = modelMatrix;
+
+    vkCmdPushConstants(commandBuffers_[currentImageIndex_], pipelineLayout_,
+                      VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants);
+
+    // Render the specific model for this meshPath
+    auto modelIt = modelCache_.find(meshPath);
+    if (modelIt != modelCache_.end() && modelIt->second && !modelIt->second->meshes.empty()) {
+        auto model = modelIt->second;
+        for (const auto& mesh : model->meshes) {
+            if (mesh->vertexBuffer && mesh->indexBuffer) {
+                VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(commandBuffers_[currentImageIndex_], 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(commandBuffers_[currentImageIndex_], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+                vkCmdDrawIndexed(commandBuffers_[currentImageIndex_], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
+            }
+        }
+        VKMON_DEBUG("Rendered ECS object with mesh: " + meshPath);
+    } else {
+        VKMON_WARNING("No model cached for meshPath: " + meshPath);
+    }
+}
+
+void VulkanRenderer::endECSFrame() {
+    if (!ecsFrameActive_) {
+        VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
+        return;
+    }
+
+    // Render ImGui if enabled
+    if (imguiEnabled_ && imguiInitialized_) {
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers_[currentImageIndex_]);
+    }
+
+    // End render pass
+    vkCmdEndRenderPass(commandBuffers_[currentImageIndex_]);
+
+    // End command buffer recording
+    if (vkEndCommandBuffer(commandBuffers_[currentImageIndex_]) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record command buffer!");
+    }
+
+    // Submit command buffer
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers_[currentImageIndex_];
+
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+
+    // Present the frame
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {swapChain_};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &currentImageIndex_;
+
+    VkResult result = vkQueuePresentKHR(graphicsQueue_, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        handleWindowResize(window_->getWidth(), window_->getHeight());
+    } else if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to present swapchain image!");
+    }
+
+    ecsFrameActive_ = false;
+
+    VKMON_DEBUG("ECS frame completed and presented");
+}
+
+void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
+    // Check if model is already cached
+    if (modelCache_.find(meshPath) != modelCache_.end()) {
+        return; // Already loaded
+    }
+
+    // Load the model using ModelLoader
+    if (modelLoader_) {
+        try {
+            VKMON_DEBUG("Loading model: " + meshPath);
+            auto model = modelLoader_->loadModel(meshPath);
+
+            if (model && !model->meshes.empty()) {
+                modelCache_[meshPath] = std::move(model);
+                VKMON_INFO("Model loaded and cached: " + meshPath);
+            } else {
+                VKMON_WARNING("Failed to load model or model is empty: " + meshPath);
+                // Use fallback - add current model as cache for this path
+                if (currentModel_) {
+                    modelCache_[meshPath] = currentModel_;
+                    VKMON_WARNING("Using fallback model for: " + meshPath);
+                }
+            }
+        } catch (const std::exception& e) {
+            VKMON_ERROR("Exception loading model " + meshPath + ": " + std::string(e.what()));
+            // Use fallback
+            if (currentModel_) {
+                modelCache_[meshPath] = currentModel_;
+                VKMON_WARNING("Using fallback model due to exception: " + meshPath);
+            }
+        }
+    } else {
+        VKMON_ERROR("ModelLoader not available for loading: " + meshPath);
+    }
+}
+
 // =============================================================================
 // Vulkan Initialization Methods (extracted from main.cpp)
 // =============================================================================
 
 void VulkanRenderer::initVulkan() {
-    VKMON_INFO("Starting Vulkan initialization sequence...");
+    VKMON_DEBUG("Starting Vulkan initialization sequence...");
     
     createInstance();
     createSurface();
@@ -179,6 +446,8 @@ void VulkanRenderer::initVulkan() {
     createTextureSampler();
     createDescriptorPool();
     createDescriptorSet();
+    createGlobalDescriptorPool();
+    createGlobalDescriptorSet();
     createCommandBuffers();
     recordCommandBuffers();
     createSyncObjects();
@@ -187,7 +456,7 @@ void VulkanRenderer::initVulkan() {
 }
 
 void VulkanRenderer::createInstance() {
-    VKMON_INFO("Creating Vulkan instance...");
+    VKMON_DEBUG("Creating Vulkan instance...");
     
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -214,16 +483,16 @@ void VulkanRenderer::createInstance() {
         throw std::runtime_error("Failed to create Vulkan instance!");
     }
 
-    VKMON_INFO("Vulkan instance created successfully");
+    VKMON_DEBUG("Vulkan instance created successfully");
 }
 
 void VulkanRenderer::createSurface() {
-    VKMON_INFO("Creating Vulkan surface...");
+    VKMON_DEBUG("Creating Vulkan surface...");
     
     window_->createSurface(instance_);
     surface_ = window_->getSurface();
     
-    VKMON_INFO("Window surface created successfully");
+    VKMON_DEBUG("Window surface created successfully");
 }
 
 void VulkanRenderer::createLogicalDevice() {
@@ -280,7 +549,7 @@ void VulkanRenderer::createLogicalDevice() {
     }
 
     vkGetDeviceQueue(device_, graphicsQueueFamily, 0, &graphicsQueue_);
-    VKMON_INFO("Logical device created successfully");
+    VKMON_DEBUG("Logical device created successfully");
 }
 
 int VulkanRenderer::findGraphicsQueueFamily() {
@@ -300,7 +569,7 @@ int VulkanRenderer::findGraphicsQueueFamily() {
 }
 
 void VulkanRenderer::createSwapChain() {
-    VKMON_INFO("Creating swapchain...");
+    VKMON_DEBUG("Creating swapchain...");
     
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice_, surface_, &capabilities);
@@ -359,6 +628,53 @@ void VulkanRenderer::createSwapChain() {
 
     swapChainImageFormat_ = surfaceFormat.format;
     VKMON_INFO("Swap chain created successfully with " + std::to_string(imageCount) + " images");
+}
+
+void VulkanRenderer::recreateSwapChain() {
+    VKMON_INFO("Recreating swap chain for resize...");
+
+    // Wait for any in-flight operations to complete
+    vkDeviceWaitIdle(device_);
+
+    // Clean up old swapchain-dependent resources
+    // Cleanup framebuffers
+    for (size_t i = 0; i < swapChainFramebuffers_.size(); i++) {
+        vkDestroyFramebuffer(device_, swapChainFramebuffers_[i], nullptr);
+    }
+
+    // Cleanup image views
+    for (size_t i = 0; i < swapChainImageViews_.size(); i++) {
+        vkDestroyImageView(device_, swapChainImageViews_[i], nullptr);
+    }
+
+    // Cleanup depth resources
+    vkDestroyImageView(device_, depthImageView_, nullptr);
+    vkDestroyImage(device_, depthImage_, nullptr);
+    vkFreeMemory(device_, depthImageMemory_, nullptr);
+
+    // Cleanup old swapchain
+    vkDestroySwapchainKHR(device_, swapChain_, nullptr);
+
+    // Recreate swapchain with new window size
+    createSwapChain();
+
+    // Recreate swapchain image views
+    swapChainImageViews_.resize(swapChainImages_.size());
+    for (size_t i = 0; i < swapChainImages_.size(); i++) {
+        swapChainImageViews_[i] = createImageView(swapChainImages_[i], swapChainImageFormat_, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+
+    // Recreate depth buffer
+    VkFormat depthFormat = findDepthFormat();
+    createImage(swapChainExtent_.width, swapChainExtent_.height, depthFormat, VK_IMAGE_TILING_OPTIMAL,
+               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+               depthImage_, depthImageMemory_);
+    depthImageView_ = createImageView(depthImage_, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    // Recreate framebuffers
+    createFramebuffers();
+
+    VKMON_INFO("Swap chain recreation completed successfully");
 }
 
 void VulkanRenderer::createRenderPass() {
@@ -423,11 +739,11 @@ void VulkanRenderer::createRenderPass() {
         throw std::runtime_error("Failed to create render pass!");
     }
 
-    VKMON_INFO("Render pass created successfully");
+    VKMON_DEBUG("Render pass created successfully");
 }
 
 void VulkanRenderer::createShaderModules() {
-    VKMON_INFO("Creating shader modules...");
+    VKMON_DEBUG("Creating shader modules...");
     
     auto vertShaderCode = Utils::readFile(VERTEX_SHADER_COMPILED);
     auto fragShaderCode = Utils::readFile(FRAGMENT_SHADER_COMPILED);
@@ -544,12 +860,20 @@ void VulkanRenderer::createGraphicsPipeline() {
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    // Pipeline layout
+    // Push constant range for model matrix
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PushConstants);
+
+    // Pipeline layout with multiple descriptor sets
+    VkDescriptorSetLayout descriptorSetLayouts[] = {globalDescriptorSetLayout_, materialDescriptorSetLayout_};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.setLayoutCount = 2; // Global (set 0) + Material (set 1)
+    pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
     if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout!");
@@ -576,11 +900,11 @@ void VulkanRenderer::createGraphicsPipeline() {
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
 
-    VKMON_INFO("Graphics pipeline created successfully");
+    VKMON_DEBUG("Graphics pipeline created successfully");
 }
 
 void VulkanRenderer::createFramebuffers() {
-    VKMON_INFO("Creating framebuffers...");
+    VKMON_DEBUG("Creating framebuffers...");
     
     // First create image views for swap chain images
     swapChainImageViews_.resize(swapChainImages_.size());
@@ -627,11 +951,11 @@ void VulkanRenderer::createFramebuffers() {
         }
     }
 
-    VKMON_INFO("Framebuffers created successfully");
+    VKMON_DEBUG("Framebuffers created successfully");
 }
 
 void VulkanRenderer::createCommandPool() {
-    VKMON_INFO("Creating command pool...");
+    VKMON_DEBUG("Creating command pool...");
     
     int graphicsQueueFamily = findGraphicsQueueFamily();
 
@@ -753,8 +1077,14 @@ void VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat forma
 }
 
 void VulkanRenderer::createDescriptorSetLayout() {
-    VKMON_INFO("Creating descriptor set layout...");
-    
+    // Legacy method - will be removed after refactor
+    // For now, maintain both old and new approaches during transition
+    createGlobalDescriptorSetLayout();
+    createMaterialDescriptorSetLayout();
+
+    // Keep old single descriptor set layout for backward compatibility during transition
+    VKMON_INFO("Creating legacy descriptor set layout...");
+
     // UBO binding (binding 0)
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
@@ -770,7 +1100,7 @@ void VulkanRenderer::createDescriptorSetLayout() {
     samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    
+
     // Lighting uniform binding (binding 2)
     VkDescriptorSetLayoutBinding lightingLayoutBinding{};
     lightingLayoutBinding.binding = 2;
@@ -778,7 +1108,7 @@ void VulkanRenderer::createDescriptorSetLayout() {
     lightingLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     lightingLayoutBinding.pImmutableSamplers = nullptr;
     lightingLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    
+
     // Material uniform binding (binding 3)
     VkDescriptorSetLayoutBinding materialLayoutBinding{};
     materialLayoutBinding.binding = 3;
@@ -795,14 +1125,80 @@ void VulkanRenderer::createDescriptorSetLayout() {
     layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout!");
+        throw std::runtime_error("Failed to create legacy descriptor set layout!");
     }
 
-    VKMON_INFO("Descriptor set layout created successfully");
+    VKMON_INFO("Legacy descriptor set layout created successfully");
+}
+
+void VulkanRenderer::createGlobalDescriptorSetLayout() {
+    VKMON_INFO("Creating global descriptor set layout (UBO, texture, lighting)...");
+
+    // UBO binding (binding 0)
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    // Texture sampler binding (binding 1)
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // Lighting uniform binding (binding 2)
+    VkDescriptorSetLayoutBinding lightingLayoutBinding{};
+    lightingLayoutBinding.binding = 2;
+    lightingLayoutBinding.descriptorCount = 1;
+    lightingLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingLayoutBinding.pImmutableSamplers = nullptr;
+    lightingLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, samplerLayoutBinding, lightingLayoutBinding};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &globalDescriptorSetLayout_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create global descriptor set layout!");
+    }
+
+    VKMON_INFO("Global descriptor set layout created successfully");
+}
+
+void VulkanRenderer::createMaterialDescriptorSetLayout() {
+    VKMON_INFO("Creating material descriptor set layout (per-material data)...");
+
+    // Material uniform binding (binding 0 - rebased from binding 3)
+    VkDescriptorSetLayoutBinding materialLayoutBinding{};
+    materialLayoutBinding.binding = 0;
+    materialLayoutBinding.descriptorCount = 1;
+    materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    materialLayoutBinding.pImmutableSamplers = nullptr;
+    materialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 1> bindings = {materialLayoutBinding};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &materialDescriptorSetLayout_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create material descriptor set layout!");
+    }
+
+    VKMON_INFO("Material descriptor set layout created successfully");
 }
 
 void VulkanRenderer::createTextureImage() {
-    VKMON_INFO("Creating texture image...");
+    VKMON_DEBUG("Creating texture image...");
     
     // Create a simple 4x4 checkered texture programmatically
     const int texWidth = 4;
@@ -855,17 +1251,17 @@ void VulkanRenderer::createTextureImage() {
     vkDestroyBuffer(device_, stagingBuffer, nullptr);
     vkFreeMemory(device_, stagingBufferMemory, nullptr);
 
-    VKMON_INFO("Texture image created successfully (basic version)");
+    VKMON_DEBUG("Texture image created successfully (basic version)");
 }
 
 void VulkanRenderer::createTextureImageView() {
-    VKMON_INFO("Creating texture image view...");
+    VKMON_DEBUG("Creating texture image view...");
     textureImageView_ = createImageView(textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
-    VKMON_INFO("Texture image view created successfully");
+    VKMON_DEBUG("Texture image view created successfully");
 }
 
 void VulkanRenderer::createTextureSampler() {
-    VKMON_INFO("Creating texture sampler...");
+    VKMON_DEBUG("Creating texture sampler...");
     
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -996,8 +1392,98 @@ void VulkanRenderer::createDescriptorSet() {
     VKMON_INFO("Descriptor set created successfully");
 }
 
+void VulkanRenderer::createGlobalDescriptorPool() {
+    VKMON_INFO("Creating global descriptor pool (UBO, texture, lighting)...");
+
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    // UBO and lighting uniform buffer descriptors
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 2; // UBO + lighting
+    // Texture sampler descriptor
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = 1; // Only need one global descriptor set
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &globalDescriptorPool_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create global descriptor pool!");
+    }
+
+    VKMON_INFO("Global descriptor pool created successfully");
+}
+
+void VulkanRenderer::createGlobalDescriptorSet() {
+    VKMON_INFO("Creating global descriptor set (UBO, texture, lighting)...");
+
+    VkDescriptorSetLayout layouts[] = {globalDescriptorSetLayout_};
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = globalDescriptorPool_;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+
+    if (vkAllocateDescriptorSets(device_, &allocInfo, &globalDescriptorSet_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate global descriptor set!");
+    }
+
+    // UBO descriptor write (binding 0)
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = uniformBuffer_;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    // Texture descriptor write (binding 1)
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = textureImageView_;
+    imageInfo.sampler = textureSampler_;
+
+    // Lighting descriptor write (binding 2)
+    VkDescriptorBufferInfo lightingBufferInfo{};
+    lightingBufferInfo.buffer = lightingSystem_->getLightingBuffer();
+    lightingBufferInfo.offset = 0;
+    lightingBufferInfo.range = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+
+    // UBO descriptor write
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = globalDescriptorSet_;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+    // Texture descriptor write
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = globalDescriptorSet_;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
+
+    // Lighting descriptor write
+    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[2].dstSet = globalDescriptorSet_;
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pBufferInfo = &lightingBufferInfo;
+
+    vkUpdateDescriptorSets(device_, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
+    VKMON_INFO("Global descriptor set created successfully");
+}
+
 void VulkanRenderer::createUniformBuffer() {
-    VKMON_INFO("Creating uniform buffer...");
+    VKMON_DEBUG("Creating uniform buffer...");
     
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
@@ -1005,11 +1491,11 @@ void VulkanRenderer::createUniformBuffer() {
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 uniformBuffer_, uniformBufferMemory_);
 
-    VKMON_INFO("Uniform buffer created successfully");
+    VKMON_DEBUG("Uniform buffer created successfully");
 }
 
 void VulkanRenderer::createMaterialBuffer() {
-    VKMON_INFO("Creating material buffer...");
+    VKMON_DEBUG("Creating material buffer...");
     
     VkDeviceSize bufferSize = sizeof(MaterialData);
 
@@ -1025,7 +1511,7 @@ void VulkanRenderer::createMaterialBuffer() {
     
     updateMaterialBuffer();
 
-    VKMON_INFO("Material buffer created successfully");
+    VKMON_DEBUG("Material buffer created successfully");
 }
 
 void VulkanRenderer::createDepthResources() {
@@ -1067,44 +1553,58 @@ VkImageView VulkanRenderer::createImageView(VkImage image, VkFormat format, VkIm
 // =============================================================================
 
 void VulkanRenderer::drawFrame() {
-    vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
-    vkResetFences(device_, 1, &inFlightFence_);
-
+    // Frame setup - uniform updates
     updateUniformBuffer();
 
-    uint32_t imageIndex;
-    vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
+    // Use ECS rendering pipeline if callback is registered
+    if (ecsRenderCallback_) {
+        // Begin ECS frame (handles wait, acquire, command recording start)
+        beginECSFrame();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        // Call ECS render callback to submit render commands
+        ecsRenderCallback_(*this);
 
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers_[imageIndex];
+        // End ECS frame (handles command recording end, submit, present)
+        endECSFrame();
+    } else {
+        // Legacy fallback: use static command buffers (for backward compatibility)
+        vkWaitForFences(device_, 1, &inFlightFence_, VK_TRUE, UINT64_MAX);
+        vkResetFences(device_, 1, &inFlightFence_);
 
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
+        uint32_t imageIndex;
+        vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
 
-    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore_};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffers_[imageIndex];
+
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore_};
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to submit draw command buffer!");
+        }
+
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        VkSwapchainKHR swapChains[] = {swapChain_};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex;
+
+        vkQueuePresentKHR(graphicsQueue_, &presentInfo);
     }
-
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {swapChain_};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-
-    vkQueuePresentKHR(graphicsQueue_, &presentInfo);
 }
 
 void VulkanRenderer::recordCommandBuffers() {
@@ -1135,7 +1635,16 @@ void VulkanRenderer::recordCommandBuffers() {
         vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
         
-        vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSet_, 0, nullptr);
+        // Legacy rendering path - bind global descriptor set (set 0)
+        vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &globalDescriptorSet_, 0, nullptr);
+
+        // Legacy rendering path - bind default material descriptor set (set 1)
+        if (materialSystem_ && materialSystem_->getMaterialCount() > 0) {
+            VkDescriptorSet defaultMaterialDescriptorSet = materialSystem_->getDescriptorSet(0); // Use first material as default
+            if (defaultMaterialDescriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1, &defaultMaterialDescriptorSet, 0, nullptr);
+            }
+        }
         
         // Render loaded 3D model (if available)
         if (currentModel_ && !currentModel_->meshes.empty()) {
@@ -1150,6 +1659,12 @@ void VulkanRenderer::recordCommandBuffers() {
                 }
             }
         }
+
+        // Render ImGui if enabled
+        if (imguiEnabled_ && imguiInitialized_) {
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers_[i]);
+        }
+
         vkCmdEndRenderPass(commandBuffers_[i]);
 
         if (vkEndCommandBuffer(commandBuffers_[i]) != VK_SUCCESS) {
@@ -1171,20 +1686,16 @@ void VulkanRenderer::updateUniformBuffer() {
     constexpr float FAR_PLANE = 10.0f;
 
     UniformBufferObject ubo{};
-    
-    // Model matrix: 3D rotation around both X and Y axes for full 3D effect
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(CAMERA_FOV), glm::vec3(1.0f, 0.0f, 0.0f));
-    ubo.model = glm::rotate(ubo.model, time * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    
+
     // View matrix: use dynamic camera position from WASD input
     ubo.view = camera_->getViewMatrix();
-    
+
     // Projection matrix: perspective projection
     ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, NEAR_PLANE, FAR_PLANE);
-    
+
     // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
     ubo.proj[1][1] *= -1;
-    
+
     // Camera position for specular lighting calculations
     ubo.cameraPos = camera_->position;
     ubo._padding = 0.0f;
@@ -1274,7 +1785,7 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
     bool foundAssets = false;
     for (const auto& path : possiblePaths) {
         std::filesystem::path absolutePath = std::filesystem::absolute(path);
-        VKMON_INFO("Checking assets path: " + absolutePath.string());
+        VKMON_DEBUG("Checking assets path: " + absolutePath.string());
         
         if (std::filesystem::exists(absolutePath) && std::filesystem::is_directory(absolutePath)) {
             // Verify it contains expected subdirectories
@@ -1298,8 +1809,13 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
     lightingSystem_ = std::make_shared<LightingSystem>(resourceManager_);
     lightingSystem_->createLightingBuffers();
     materialSystem_ = std::make_shared<MaterialSystem>(resourceManager_);
+    materialSystem_->setDescriptorSetLayout(materialDescriptorSetLayout_);
     materialSystem_->createMaterialBuffers();
-    
+
+    // Create a default material for legacy rendering compatibility
+    MaterialData defaultMaterial;
+    materialSystem_->createMaterial(defaultMaterial);
+
     VKMON_INFO("Core engine systems initialized successfully!");
 }
 
@@ -1318,47 +1834,52 @@ void VulkanRenderer::loadTestModel() {
 }
 
 void VulkanRenderer::cycleMaterialPreset() {
-    static int currentMaterialPreset = 0;
-    currentMaterialPreset = (currentMaterialPreset + 1) % 5;
-    
-    switch (currentMaterialPreset) {
-        case 0: // Default material
-            currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
-            currentMaterialData_.shininess = 32.0f;
-            VKMON_INFO("[MATERIAL] Preset: Default (Warm Brown)");
-            break;
-        case 1: // Metallic Gold
-            currentMaterialData_.ambient = glm::vec4(0.24725f, 0.1995f, 0.0745f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.75164f, 0.60648f, 0.22648f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.628281f, 0.555802f, 0.366065f, 0.0f);
-            currentMaterialData_.shininess = 51.2f;
-            VKMON_INFO("[MATERIAL] Preset: Metallic Gold");
-            break;
-        case 2: // Ruby Red
-            currentMaterialData_.ambient = glm::vec4(0.1745f, 0.01175f, 0.01175f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.61424f, 0.04136f, 0.04136f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.727811f, 0.626959f, 0.626959f, 0.0f);
-            currentMaterialData_.shininess = 76.8f;
-            VKMON_INFO("[MATERIAL] Preset: Ruby Red");
-            break;
-        case 3: // Chrome
-            currentMaterialData_.ambient = glm::vec4(0.25f, 0.25f, 0.25f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.4f, 0.4f, 0.4f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.774597f, 0.774597f, 0.774597f, 0.0f);
-            currentMaterialData_.shininess = 76.8f;
-            VKMON_INFO("[MATERIAL] Preset: Chrome");
-            break;
-        case 4: // Emerald Green
-            currentMaterialData_.ambient = glm::vec4(0.0215f, 0.1745f, 0.0215f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.07568f, 0.61424f, 0.07568f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.633f, 0.727811f, 0.633f, 0.0f);
-            currentMaterialData_.shininess = 76.8f;
-            VKMON_INFO("[MATERIAL] Preset: Emerald Green");
-            break;
+    if (!materialSystem_) {
+        VKMON_WARNING("Cannot cycle materials - MaterialSystem not available");
+        return;
     }
-    updateMaterialBuffer();
+
+    // Ensure we have the standard material presets in MaterialSystem
+    ensureStandardMaterialsExist();
+
+    // Cycle to next material preset
+    currentMaterialPreset_ = (currentMaterialPreset_ + 1) % materialSystem_->getMaterialCount();
+
+    const char* materialNames[] = {"Default", "Gold", "Ruby", "Chrome", "Emerald"};
+    const char* materialName = (currentMaterialPreset_ < 5) ? materialNames[currentMaterialPreset_] : "Unknown";
+
+    VKMON_INFO("[MATERIAL] Cycled to preset: " + std::string(materialName) +
+               " (" + std::to_string(currentMaterialPreset_ + 1) + "/" +
+               std::to_string(materialSystem_->getMaterialCount()) + ")");
+
+    // For now, this provides user feedback that material cycling is working
+    // In the future, this could update specific entities in the ECS system
+}
+
+void VulkanRenderer::ensureStandardMaterialsExist() {
+    // Ensure we have at least 5 standard material presets
+    if (materialSystem_->getMaterialCount() < 5) {
+        // Define standard material presets
+        std::vector<MaterialData> standardMaterials = {
+            // 0: Default (already created in initializeCoreEngineSystems)
+            MaterialData(glm::vec3(0.1f, 0.1f, 0.1f), glm::vec3(0.8f, 0.8f, 0.8f), glm::vec3(1.0f, 1.0f, 1.0f), 32.0f),
+            // 1: Gold
+            MaterialData(glm::vec3(0.24725f, 0.1995f, 0.0745f), glm::vec3(0.75164f, 0.60648f, 0.22648f), glm::vec3(0.628281f, 0.555802f, 0.366065f), 51.2f),
+            // 2: Ruby
+            MaterialData(glm::vec3(0.1745f, 0.01175f, 0.01175f), glm::vec3(0.61424f, 0.04136f, 0.04136f), glm::vec3(0.727811f, 0.626959f, 0.626959f), 76.8f),
+            // 3: Chrome
+            MaterialData(glm::vec3(0.25f, 0.25f, 0.25f), glm::vec3(0.4f, 0.4f, 0.4f), glm::vec3(0.774597f, 0.774597f, 0.774597f), 76.8f),
+            // 4: Emerald
+            MaterialData(glm::vec3(0.0215f, 0.1745f, 0.0215f), glm::vec3(0.07568f, 0.61424f, 0.07568f), glm::vec3(0.633f, 0.727811f, 0.633f), 76.8f)
+        };
+
+        // Create materials starting from index 1 (0 is already created)
+        for (size_t i = materialSystem_->getMaterialCount(); i < standardMaterials.size(); ++i) {
+            materialSystem_->createMaterial(standardMaterials[i]);
+        }
+
+        VKMON_INFO("Created " + std::to_string(standardMaterials.size()) + " standard material presets");
+    }
 }
 
 // =============================================================================
@@ -1402,6 +1923,20 @@ void VulkanRenderer::cleanup() {
     if (descriptorSetLayout_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device_, descriptorSetLayout_, nullptr);
         descriptorSetLayout_ = VK_NULL_HANDLE;
+    }
+
+    // Cleanup global descriptor resources
+    if (globalDescriptorPool_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device_, globalDescriptorPool_, nullptr);
+        globalDescriptorPool_ = VK_NULL_HANDLE;
+    }
+    if (globalDescriptorSetLayout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device_, globalDescriptorSetLayout_, nullptr);
+        globalDescriptorSetLayout_ = VK_NULL_HANDLE;
+    }
+    if (materialDescriptorSetLayout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device_, materialDescriptorSetLayout_, nullptr);
+        materialDescriptorSetLayout_ = VK_NULL_HANDLE;
     }
     
     // Cleanup texture resources
@@ -1538,3 +2073,119 @@ void VulkanRenderer::logRenderingState(const std::string& operation) const {
         VKMON_INFO("  Current model: none");
     }
 }
+
+// =============================================================================
+// ImGui Debug Interface Integration - Phase 6.3
+// =============================================================================
+
+void VulkanRenderer::initializeImGui() {
+    if (imguiInitialized_) {
+        VKMON_WARNING("ImGui already initialized");
+        return;
+    }
+
+    VKMON_INFO("Initializing ImGui debug interface...");
+
+    // Create ImGui descriptor pool
+    VkDescriptorPoolSize poolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
+    poolInfo.poolSizeCount = static_cast<uint32_t>(IM_ARRAYSIZE(poolSizes));
+    poolInfo.pPoolSizes = poolSizes;
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &imguiDescriptorPool_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create ImGui descriptor pool");
+    }
+
+    // Setup ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup ImGui style (dark theme)
+    ImGui::StyleColorsDark();
+
+    // Get GLFW window handle from Window class
+    GLFWwindow* glfwWindow = window_->getWindow();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplGlfw_InitForVulkan(glfwWindow, true);
+
+    ImGui_ImplVulkan_InitInfo initInfo{};
+    initInfo.Instance = instance_;
+    initInfo.PhysicalDevice = physicalDevice_;
+    initInfo.Device = device_;
+    initInfo.QueueFamily = findGraphicsQueueFamily();
+    initInfo.Queue = graphicsQueue_;
+    initInfo.PipelineCache = VK_NULL_HANDLE;
+    initInfo.DescriptorPool = imguiDescriptorPool_;
+    initInfo.RenderPass = renderPass_;
+    initInfo.Subpass = 0;
+    initInfo.Allocator = nullptr;
+    initInfo.MinImageCount = static_cast<uint32_t>(swapChainImages_.size());
+    initInfo.ImageCount = static_cast<uint32_t>(swapChainImages_.size());
+    initInfo.CheckVkResultFn = nullptr;
+
+    ImGui_ImplVulkan_Init(&initInfo);
+
+    // Upload ImGui fonts (newer ImGui handles this automatically)
+    ImGui_ImplVulkan_CreateFontsTexture();
+
+    imguiInitialized_ = true;
+    VKMON_INFO("ImGui debug interface initialized successfully");
+}
+
+void VulkanRenderer::cleanupImGui() {
+    if (!imguiInitialized_) return;
+
+    VKMON_INFO("Cleaning up ImGui debug interface...");
+
+    vkDeviceWaitIdle(device_);
+
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    if (imguiDescriptorPool_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device_, imguiDescriptorPool_, nullptr);
+        imguiDescriptorPool_ = VK_NULL_HANDLE;
+    }
+
+    imguiInitialized_ = false;
+    VKMON_INFO("ImGui debug interface cleanup complete");
+}
+
+void VulkanRenderer::beginImGuiFrame() {
+    if (!imguiInitialized_ || !imguiEnabled_) return;
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void VulkanRenderer::endImGuiFrame() {
+    if (!imguiInitialized_ || !imguiEnabled_) return;
+
+    ImGui::Render();
+
+    // The ImGui draw data will be recorded to the command buffer
+    // in the existing command buffer recording (renderFrame method)
+}
+

@@ -1,14 +1,19 @@
 #version 450
 
-layout(binding = 0) uniform UniformBufferObject {
+// Push constants for per-object data (fast, small data)
+layout(push_constant) uniform PushConstants {
     mat4 model;
+} push;
+
+// Uniform buffer for per-frame data (view, projection, camera)
+layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 cameraPos;
     float _padding;
 } ubo;
 
-layout(binding = 2) uniform LightingData {
+layout(set = 0, binding = 2) uniform LightingData {
     vec3 directionalLightDir;
     float directionalLightIntensity;
     vec3 directionalLightColor;
@@ -29,15 +34,15 @@ layout(location = 3) out vec3 worldPos;
 layout(location = 4) out vec3 cameraPos;
 
 void main() {
-    // Calculate world position for lighting calculations
-    vec4 worldPosition = ubo.model * vec4(inPosition, 1.0);
+    // Calculate world position for lighting calculations using push constant model matrix
+    vec4 worldPosition = push.model * vec4(inPosition, 1.0);
     worldPos = worldPosition.xyz;
-    
+
     // Complete MVP transformation: Projection * View * Model
     gl_Position = ubo.proj * ubo.view * worldPosition;
-    
-    // Transform normal to world space (using normal matrix)
-    fragNormal = mat3(transpose(inverse(ubo.model))) * inNormal;
+
+    // Transform normal to world space (using normal matrix from push constants)
+    fragNormal = mat3(transpose(inverse(push.model))) * inNormal;
     
     fragColor = inColor;
     fragTexCoord = inTexCoord;
