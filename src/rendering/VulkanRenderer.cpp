@@ -94,9 +94,29 @@ void VulkanRenderer::renderFrame(float deltaTime) {
     drawFrame();
 }
 
-void VulkanRenderer::handleWindowResize() {
-    // TODO: Implement swapchain recreation
-    VKMON_INFO("Window resize handling not yet implemented");
+void VulkanRenderer::handleWindowResize(int width, int height) {
+    VKMON_INFO("Handling window resize to " + std::to_string(width) + "x" + std::to_string(height));
+
+    // Don't resize if minimized (width/height = 0)
+    if (width == 0 || height == 0) {
+        VKMON_INFO("Window minimized, skipping swapchain recreation");
+        return;
+    }
+
+    // Wait for device to be idle before recreating swapchain
+    vkDeviceWaitIdle(device_);
+
+    // Recreate swapchain with new dimensions
+    recreateSwapChain();
+
+    // Update ImGui display size
+    if (imguiInitialized_) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
+        VKMON_INFO("Updated ImGui display size");
+    }
+
+    VKMON_INFO("Window resize handling completed successfully");
 }
 
 void VulkanRenderer::reloadShaders() {
@@ -177,7 +197,7 @@ void VulkanRenderer::beginECSFrame() {
                                            &currentImageIndex_);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        handleWindowResize();
+        handleWindowResize(window_->getWidth(), window_->getHeight());
         return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swapchain image!");
@@ -218,6 +238,22 @@ void VulkanRenderer::beginECSFrame() {
 
     // Bind graphics pipeline
     vkCmdBindPipeline(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+    // Set viewport dynamically (essential for proper resize handling)
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapChainExtent_.width);
+    viewport.height = static_cast<float>(swapChainExtent_.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffers_[currentImageIndex_], 0, 1, &viewport);
+
+    // Set scissor rectangle
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapChainExtent_;
+    vkCmdSetScissor(commandBuffers_[currentImageIndex_], 0, 1, &scissor);
 
     // Bind descriptor sets (UBO, lighting, etc.)
     vkCmdBindDescriptorSets(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -324,7 +360,7 @@ void VulkanRenderer::endECSFrame() {
     VkResult result = vkQueuePresentKHR(graphicsQueue_, &presentInfo);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        handleWindowResize();
+        handleWindowResize(window_->getWidth(), window_->getHeight());
     } else if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to present swapchain image!");
     }
@@ -583,6 +619,53 @@ void VulkanRenderer::createSwapChain() {
 
     swapChainImageFormat_ = surfaceFormat.format;
     VKMON_INFO("Swap chain created successfully with " + std::to_string(imageCount) + " images");
+}
+
+void VulkanRenderer::recreateSwapChain() {
+    VKMON_INFO("Recreating swap chain for resize...");
+
+    // Wait for any in-flight operations to complete
+    vkDeviceWaitIdle(device_);
+
+    // Clean up old swapchain-dependent resources
+    // Cleanup framebuffers
+    for (size_t i = 0; i < swapChainFramebuffers_.size(); i++) {
+        vkDestroyFramebuffer(device_, swapChainFramebuffers_[i], nullptr);
+    }
+
+    // Cleanup image views
+    for (size_t i = 0; i < swapChainImageViews_.size(); i++) {
+        vkDestroyImageView(device_, swapChainImageViews_[i], nullptr);
+    }
+
+    // Cleanup depth resources
+    vkDestroyImageView(device_, depthImageView_, nullptr);
+    vkDestroyImage(device_, depthImage_, nullptr);
+    vkFreeMemory(device_, depthImageMemory_, nullptr);
+
+    // Cleanup old swapchain
+    vkDestroySwapchainKHR(device_, swapChain_, nullptr);
+
+    // Recreate swapchain with new window size
+    createSwapChain();
+
+    // Recreate swapchain image views
+    swapChainImageViews_.resize(swapChainImages_.size());
+    for (size_t i = 0; i < swapChainImages_.size(); i++) {
+        swapChainImageViews_[i] = createImageView(swapChainImages_[i], swapChainImageFormat_, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+
+    // Recreate depth buffer
+    VkFormat depthFormat = findDepthFormat();
+    createImage(swapChainExtent_.width, swapChainExtent_.height, depthFormat, VK_IMAGE_TILING_OPTIMAL,
+               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+               depthImage_, depthImageMemory_);
+    depthImageView_ = createImageView(depthImage_, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    // Recreate framebuffers
+    createFramebuffers();
+
+    VKMON_INFO("Swap chain recreation completed successfully");
 }
 
 void VulkanRenderer::createRenderPass() {

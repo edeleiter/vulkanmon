@@ -185,6 +185,14 @@ void Application::toggleInspector() {
     VKMON_INFO(std::string("ECS Inspector ") + (inspectorEnabled_ ? "enabled" : "disabled"));
 }
 
+void Application::handleWindowResize(int width, int height) {
+    VKMON_INFO("Window resize event: " + std::to_string(width) + "x" + std::to_string(height));
+
+    if (renderer_) {
+        renderer_->handleWindowResize(width, height);
+    }
+}
+
 void Application::render(float deltaTime) {
     if (renderer_ && renderer_->isInitialized()) {
         // VulkanRenderer will call back to ECS during renderFrame()

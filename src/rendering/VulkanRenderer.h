@@ -124,7 +124,6 @@ public:
      * Handle window resize events
      * Recreates swapchain and dependent resources
      */
-    void handleWindowResize();
     
     /**
      * Reload shaders from disk
@@ -164,10 +163,19 @@ public:
     
     /**
      * Check if renderer is ready for rendering
-     * 
+     *
      * @return true if initialization completed successfully
      */
     bool isInitialized() const { return initialized_; }
+
+    /**
+     * Handle window resize event
+     * Recreates swapchain and updates viewport
+     *
+     * @param width New window width
+     * @param height New window height
+     */
+    void handleWindowResize(int width, int height);
     
     /**
      * Get Vulkan device handle
@@ -379,6 +387,7 @@ private:
     void createSurface();
     void createLogicalDevice();
     void createSwapChain();
+    void recreateSwapChain();
     void createRenderPass();
     void createShaderModules();
     void createGraphicsPipeline();

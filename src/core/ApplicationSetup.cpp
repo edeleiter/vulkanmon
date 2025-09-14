@@ -87,6 +87,11 @@ void Application::initializeInputSystem() {
         toggleInspector();
     });
 
+    // Connect window resize callback
+    window_->setResizeCallback([this](int width, int height) {
+        handleWindowResize(width, height);
+    });
+
     VKMON_INFO("System callbacks connected");
     VKMON_INFO("Input system initialized");
 }

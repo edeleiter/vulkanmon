@@ -122,6 +122,15 @@ public:
      */
     void toggleInspector();
 
+    /**
+     * Handle window resize event
+     * Called by Window resize callback
+     *
+     * @param width New window width
+     * @param height New window height
+     */
+    void handleWindowResize(int width, int height);
+
 private:
     // Application state
     bool initialized_ = false;
