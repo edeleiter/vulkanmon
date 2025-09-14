@@ -13,6 +13,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(Catch2 CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Include directories for VulkanMon source files
 include_directories(../src)
@@ -74,6 +75,7 @@ target_link_libraries(vulkanmon_tests PRIVATE
     glfw
     assimp::assimp
     Catch2::Catch2WithMain
+    imgui::imgui
 )
 
 # Include directories

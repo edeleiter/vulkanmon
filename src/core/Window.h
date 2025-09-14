@@ -59,7 +59,7 @@ public:
      * 
      * @throws std::runtime_error if GLFW initialization or window creation fails
      */
-    void initialize();
+    virtual void initialize();
     
     /**
      * Create Vulkan surface for this window
@@ -163,19 +163,19 @@ public:
      * Enable cursor (for UI interaction mode)
      * Shows cursor and allows it to move freely
      */
-    void enableCursor();
+    virtual void enableCursor();
 
     /**
      * Disable cursor (for camera control mode)
      * Hides cursor and locks it for camera movement
      */
-    void disableCursor();
+    virtual void disableCursor();
 
     /**
      * Check if cursor is currently disabled
      * @return true if cursor is disabled (camera mode)
      */
-    bool isCursorDisabled() const;
+    virtual bool isCursorDisabled() const;
     
 private:
     // Window state

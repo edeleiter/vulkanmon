@@ -39,9 +39,9 @@ public:
 };
 
 // Mock Window for testing
-class MockWindow : public Window {
+class MockWindow : public VulkanMon::Window {
 public:
-    MockWindow() : Window(800, 600, "MockWindow") {}
+    MockWindow() : VulkanMon::Window(800, 600, "MockWindow") {}
 
     mutable bool cursorDisabled = true;  // Start with cursor disabled (camera mode)
     mutable int enableCursorCallCount = 0;
@@ -97,7 +97,7 @@ public:
     }
 
     // Helper for tests that need specific camera/window
-    std::unique_ptr<VulkanMon::InputHandler> createInputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<Window> window) {
+    std::unique_ptr<VulkanMon::InputHandler> createInputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<VulkanMon::Window> window) {
         return std::make_unique<VulkanMon::InputHandler>(camera, window);
     }
 };
@@ -338,18 +338,18 @@ TEST_CASE("InputHandler Continuous Input Processing", "[InputHandler][Continuous
         
         // Create a mock GLFW window for testing
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // Don't show window during test
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        REQUIRE(window != nullptr);
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        REQUIRE(glfwWindow != nullptr);
         
         // Process continuous input
-        inputHandler.processContinuousInput(window, 0.016f); // 60 FPS delta time
+        inputHandler.processContinuousInput(glfwWindow, 0.016f); // 60 FPS delta time
         
         // Camera's processInput should have been called through InputHandler
         // Note: processInputCallCount may not increment if InputHandler doesn't call it directly
         // For now, just verify the operation completed without crashing
         REQUIRE(true); // Placeholder - would need deeper integration testing
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
     
     SECTION("Continuous input with null window") {
@@ -367,13 +367,13 @@ TEST_CASE("InputHandler Continuous Input Processing", "[InputHandler][Continuous
         VulkanMon::InputHandler inputHandler(nullCamera, window);
         
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        REQUIRE(window != nullptr);
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        REQUIRE(glfwWindow != nullptr);
         
         // Should handle gracefully with null camera
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.016f));
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.016f));
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
     
     SECTION("Continuous input with various delta times") {
@@ -382,16 +382,16 @@ TEST_CASE("InputHandler Continuous Input Processing", "[InputHandler][Continuous
         VulkanMon::InputHandler inputHandler(camera, window);
         
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        REQUIRE(window != nullptr);
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        REQUIRE(glfwWindow != nullptr);
         
         // Test with different delta times
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.0f));     // Zero delta
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.016f));   // 60 FPS
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 0.033f));   // 30 FPS
-        REQUIRE_NOTHROW(inputHandler.processContinuousInput(window, 1.0f));     // 1 second
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.0f));     // Zero delta
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.016f));   // 60 FPS
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 0.033f));   // 30 FPS
+        REQUIRE_NOTHROW(inputHandler.processContinuousInput(glfwWindow, 1.0f));     // 1 second
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
 }
 
@@ -560,8 +560,8 @@ TEST_CASE("InputHandler Integration", "[InputHandler][Integration]") {
         
         // Create window for continuous input test
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
-        inputHandler.processContinuousInput(window, 0.016f);            // Continuous
+        GLFWwindow* glfwWindow = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+        inputHandler.processContinuousInput(glfwWindow, 0.016f);            // Continuous
         
         // Verify all systems were triggered
         REQUIRE(systemCallbackTriggered);
@@ -571,6 +571,6 @@ TEST_CASE("InputHandler Integration", "[InputHandler][Integration]") {
         // This would require more sophisticated integration testing
         REQUIRE(true); // Placeholder for integration test
         
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(glfwWindow);
     }
 }
