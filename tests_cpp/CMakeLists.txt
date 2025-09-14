@@ -48,6 +48,12 @@ add_executable(vulkanmon_tests
     test_ecs.cpp
     # test_ecs_integration.cpp  # Temporarily disabled for compilation fix
 
+    # Phase 6.3: ECS Inspector tests (NEW)
+    test_ECSInspector.cpp
+
+    # Phase 6.4: Window Resize tests (NEW)
+    test_WindowResize.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
@@ -66,6 +72,7 @@ add_executable(vulkanmon_tests
     ../src/io/AssetManager.cpp
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp
+    ../src/debug/ECSInspector.cpp
 )
 
 # Link libraries
