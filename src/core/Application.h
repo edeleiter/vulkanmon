@@ -15,6 +15,7 @@
 #include "../systems/CameraSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
+#include "../debug/ECSInspector.h"
 
 #include <memory>
 #include <chrono>
@@ -116,10 +117,16 @@ public:
      */
     float getFPS() const { return fps_; }
 
+    /**
+     * Toggle ECS Inspector visibility
+     */
+    void toggleInspector();
+
 private:
     // Application state
     bool initialized_ = false;
     bool running_ = false;
+    bool inspectorEnabled_ = false; // Start with inspector hidden for clean startup
 
     // Frame timing
     std::chrono::high_resolution_clock::time_point lastFrameTime_;
@@ -141,6 +148,9 @@ private:
     std::unique_ptr<World> world_;
     RenderSystem* renderSystem_ = nullptr;  // Owned by World
     CameraSystem* cameraSystem_ = nullptr;  // Owned by World
+
+    // Debug tools
+    std::unique_ptr<Debug::ECSInspector> ecsInspector_;
 
     // Current loaded model
     std::shared_ptr<Model> currentModel_;

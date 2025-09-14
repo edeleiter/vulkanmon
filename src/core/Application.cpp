@@ -169,23 +169,20 @@ void Application::updateImGui(float deltaTime) {
     if (renderer_ && renderer_->isImGuiEnabled()) {
         renderer_->beginImGuiFrame();
 
-        // Basic "Hello ImGui" window for Phase 6.3.1 validation
-        ImGui::Begin("VulkanMon Debug");
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", frameTime_, fps_);
-        size_t entityCount = world_ ? world_->getEntityManager().getEntitiesWithComponent<Transform>().size() : 0;
-        ImGui::Text("Entity Count: %zu", entityCount);
+        // Phase 6.3 Complete: Clean ImGui interface - only ECS Inspector when toggled
 
-        // Phase 6.3.1: Basic ImGui functionality test
-        static bool showDemoWindow = false;
-        ImGui::Checkbox("Show ImGui Demo Window", &showDemoWindow);
-        if (showDemoWindow) {
-            ImGui::ShowDemoWindow(&showDemoWindow);
+        // Render ECS Inspector (only if enabled)
+        if (ecsInspector_ && inspectorEnabled_) {
+            ecsInspector_->render(frameTime_);
         }
-
-        ImGui::End();
 
         renderer_->endImGuiFrame();
     }
+}
+
+void Application::toggleInspector() {
+    inspectorEnabled_ = !inspectorEnabled_;
+    VKMON_INFO(std::string("ECS Inspector ") + (inspectorEnabled_ ? "enabled" : "disabled"));
 }
 
 void Application::render(float deltaTime) {
@@ -203,6 +200,11 @@ void Application::cleanup() {
     VKMON_INFO("Beginning Application cleanup...");
 
     // Cleanup in reverse order of initialization
+    if (ecsInspector_) {
+        VKMON_DEBUG("Cleaning up ECS Inspector...");
+        ecsInspector_.reset();
+    }
+
     if (world_) {
         VKMON_DEBUG("Shutting down ECS World...");
         world_->shutdown();

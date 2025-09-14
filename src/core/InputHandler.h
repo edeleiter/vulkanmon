@@ -36,6 +36,7 @@ public:
     using ShaderReloadCallback = std::function<void()>;
     using LightingControlCallback = std::function<void(int key)>;
     using MaterialControlCallback = std::function<void(int key)>;
+    using InspectorToggleCallback = std::function<void()>;
 
     /**
      * Create InputHandler with camera and window references
@@ -103,10 +104,17 @@ public:
     
     /**
      * Register material control callback
-     * 
+     *
      * @param callback Function to call with material control key
      */
     void setMaterialControlCallback(MaterialControlCallback callback);
+
+    /**
+     * Register inspector toggle callback
+     *
+     * @param callback Function to call when inspector toggle is requested (I key)
+     */
+    void setInspectorToggleCallback(InspectorToggleCallback callback);
     
     /**
      * Reset mouse position tracking
@@ -168,6 +176,7 @@ private:
     ShaderReloadCallback shaderReloadCallback_;
     LightingControlCallback lightingControlCallback_;
     MaterialControlCallback materialControlCallback_;
+    InspectorToggleCallback inspectorToggleCallback_;
     
     // Input processing helpers
     void handleCameraMovement(GLFWwindow* window, float deltaTime);

@@ -83,6 +83,10 @@ void Application::initializeInputSystem() {
         handleMaterialControl(key);
     });
 
+    inputHandler_->setInspectorToggleCallback([this]() {
+        toggleInspector();
+    });
+
     VKMON_INFO("System callbacks connected");
     VKMON_INFO("Input system initialized");
 }
@@ -111,6 +115,10 @@ void Application::initializeECS() {
     } else {
         VKMON_WARNING("Cannot register ECS callback: VulkanRenderer not available");
     }
+
+    // Initialize ECS Inspector
+    ecsInspector_ = std::make_unique<Debug::ECSInspector>(world_.get());
+    VKMON_DEBUG("ECS Inspector initialized successfully");
 
     VKMON_INFO("ECS systems initialized successfully");
 }

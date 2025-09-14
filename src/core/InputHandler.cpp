@@ -52,6 +52,13 @@ void InputHandler::processKeyInput(int key, int scancode, int action, int mods) 
             toggleInputMode();
             break;
 
+        // Inspector toggle
+        case GLFW_KEY_I:
+            if (inspectorToggleCallback_) {
+                inspectorToggleCallback_();
+            }
+            break;
+
         default:
             // Unhandled key - could log for debugging
             VKMON_DEBUG("Unhandled key press: " + std::to_string(key));
@@ -109,6 +116,11 @@ void InputHandler::setLightingControlCallback(LightingControlCallback callback) 
 void InputHandler::setMaterialControlCallback(MaterialControlCallback callback) {
     materialControlCallback_ = callback;
     VKMON_DEBUG("Material control callback registered");
+}
+
+void InputHandler::setInspectorToggleCallback(InspectorToggleCallback callback) {
+    inspectorToggleCallback_ = callback;
+    VKMON_DEBUG("Inspector toggle callback registered");
 }
 
 void InputHandler::resetMousePosition() {
