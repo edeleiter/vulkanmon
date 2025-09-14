@@ -255,9 +255,9 @@ void VulkanRenderer::beginECSFrame() {
     scissor.extent = swapChainExtent_;
     vkCmdSetScissor(commandBuffers_[currentImageIndex_], 0, 1, &scissor);
 
-    // Bind descriptor sets (UBO, lighting, etc.)
+    // Bind global descriptor set (set 0: UBO, texture, lighting)
     vkCmdBindDescriptorSets(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                           pipelineLayout_, 0, 1, &descriptorSet_, 0, nullptr);
+                           pipelineLayout_, 0, 1, &globalDescriptorSet_, 0, nullptr);
 
     ecsFrameActive_ = true;
     frameLoadedMeshes_.clear();
@@ -276,8 +276,15 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
     // Ensure mesh is loaded
     ensureMeshLoaded(meshPath);
 
-    // TODO: Implement material binding when MaterialSystem supports multiple materials
-    // For now, we use the current material set in the renderer
+    // Bind material-specific descriptor set (set 1)
+    if (materialSystem_ && materialId < materialSystem_->getMaterialCount()) {
+        VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(materialId);
+        if (materialDescriptorSet != VK_NULL_HANDLE) {
+            // Bind the material descriptor set to set 1
+            vkCmdBindDescriptorSets(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                   pipelineLayout_, 1, 1, &materialDescriptorSet, 0, nullptr);
+        }
+    }
 
     // Update push constants with model matrix
     PushConstants pushConstants{};
@@ -439,6 +446,8 @@ void VulkanRenderer::initVulkan() {
     createTextureSampler();
     createDescriptorPool();
     createDescriptorSet();
+    createGlobalDescriptorPool();
+    createGlobalDescriptorSet();
     createCommandBuffers();
     recordCommandBuffers();
     createSyncObjects();
@@ -857,11 +866,12 @@ void VulkanRenderer::createGraphicsPipeline() {
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(PushConstants);
 
-    // Pipeline layout
+    // Pipeline layout with multiple descriptor sets
+    VkDescriptorSetLayout descriptorSetLayouts[] = {globalDescriptorSetLayout_, materialDescriptorSetLayout_};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
+    pipelineLayoutInfo.setLayoutCount = 2; // Global (set 0) + Material (set 1)
+    pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
@@ -1067,8 +1077,14 @@ void VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat forma
 }
 
 void VulkanRenderer::createDescriptorSetLayout() {
-    VKMON_INFO("Creating descriptor set layout...");
-    
+    // Legacy method - will be removed after refactor
+    // For now, maintain both old and new approaches during transition
+    createGlobalDescriptorSetLayout();
+    createMaterialDescriptorSetLayout();
+
+    // Keep old single descriptor set layout for backward compatibility during transition
+    VKMON_INFO("Creating legacy descriptor set layout...");
+
     // UBO binding (binding 0)
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
@@ -1084,7 +1100,7 @@ void VulkanRenderer::createDescriptorSetLayout() {
     samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    
+
     // Lighting uniform binding (binding 2)
     VkDescriptorSetLayoutBinding lightingLayoutBinding{};
     lightingLayoutBinding.binding = 2;
@@ -1092,7 +1108,7 @@ void VulkanRenderer::createDescriptorSetLayout() {
     lightingLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     lightingLayoutBinding.pImmutableSamplers = nullptr;
     lightingLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    
+
     // Material uniform binding (binding 3)
     VkDescriptorSetLayoutBinding materialLayoutBinding{};
     materialLayoutBinding.binding = 3;
@@ -1109,10 +1125,76 @@ void VulkanRenderer::createDescriptorSetLayout() {
     layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout!");
+        throw std::runtime_error("Failed to create legacy descriptor set layout!");
     }
 
-    VKMON_INFO("Descriptor set layout created successfully");
+    VKMON_INFO("Legacy descriptor set layout created successfully");
+}
+
+void VulkanRenderer::createGlobalDescriptorSetLayout() {
+    VKMON_INFO("Creating global descriptor set layout (UBO, texture, lighting)...");
+
+    // UBO binding (binding 0)
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    // Texture sampler binding (binding 1)
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // Lighting uniform binding (binding 2)
+    VkDescriptorSetLayoutBinding lightingLayoutBinding{};
+    lightingLayoutBinding.binding = 2;
+    lightingLayoutBinding.descriptorCount = 1;
+    lightingLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingLayoutBinding.pImmutableSamplers = nullptr;
+    lightingLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, samplerLayoutBinding, lightingLayoutBinding};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &globalDescriptorSetLayout_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create global descriptor set layout!");
+    }
+
+    VKMON_INFO("Global descriptor set layout created successfully");
+}
+
+void VulkanRenderer::createMaterialDescriptorSetLayout() {
+    VKMON_INFO("Creating material descriptor set layout (per-material data)...");
+
+    // Material uniform binding (binding 0 - rebased from binding 3)
+    VkDescriptorSetLayoutBinding materialLayoutBinding{};
+    materialLayoutBinding.binding = 0;
+    materialLayoutBinding.descriptorCount = 1;
+    materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    materialLayoutBinding.pImmutableSamplers = nullptr;
+    materialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 1> bindings = {materialLayoutBinding};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &materialDescriptorSetLayout_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create material descriptor set layout!");
+    }
+
+    VKMON_INFO("Material descriptor set layout created successfully");
 }
 
 void VulkanRenderer::createTextureImage() {
@@ -1310,6 +1392,96 @@ void VulkanRenderer::createDescriptorSet() {
     VKMON_INFO("Descriptor set created successfully");
 }
 
+void VulkanRenderer::createGlobalDescriptorPool() {
+    VKMON_INFO("Creating global descriptor pool (UBO, texture, lighting)...");
+
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    // UBO and lighting uniform buffer descriptors
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 2; // UBO + lighting
+    // Texture sampler descriptor
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = 1; // Only need one global descriptor set
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &globalDescriptorPool_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create global descriptor pool!");
+    }
+
+    VKMON_INFO("Global descriptor pool created successfully");
+}
+
+void VulkanRenderer::createGlobalDescriptorSet() {
+    VKMON_INFO("Creating global descriptor set (UBO, texture, lighting)...");
+
+    VkDescriptorSetLayout layouts[] = {globalDescriptorSetLayout_};
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = globalDescriptorPool_;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+
+    if (vkAllocateDescriptorSets(device_, &allocInfo, &globalDescriptorSet_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate global descriptor set!");
+    }
+
+    // UBO descriptor write (binding 0)
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = uniformBuffer_;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    // Texture descriptor write (binding 1)
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = textureImageView_;
+    imageInfo.sampler = textureSampler_;
+
+    // Lighting descriptor write (binding 2)
+    VkDescriptorBufferInfo lightingBufferInfo{};
+    lightingBufferInfo.buffer = lightingSystem_->getLightingBuffer();
+    lightingBufferInfo.offset = 0;
+    lightingBufferInfo.range = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+
+    // UBO descriptor write
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = globalDescriptorSet_;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+    // Texture descriptor write
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = globalDescriptorSet_;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
+
+    // Lighting descriptor write
+    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[2].dstSet = globalDescriptorSet_;
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pBufferInfo = &lightingBufferInfo;
+
+    vkUpdateDescriptorSets(device_, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
+    VKMON_INFO("Global descriptor set created successfully");
+}
+
 void VulkanRenderer::createUniformBuffer() {
     VKMON_DEBUG("Creating uniform buffer...");
     
@@ -1463,7 +1635,16 @@ void VulkanRenderer::recordCommandBuffers() {
         vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
         
-        vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSet_, 0, nullptr);
+        // Legacy rendering path - bind global descriptor set (set 0)
+        vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &globalDescriptorSet_, 0, nullptr);
+
+        // Legacy rendering path - bind default material descriptor set (set 1)
+        if (materialSystem_ && materialSystem_->getMaterialCount() > 0) {
+            VkDescriptorSet defaultMaterialDescriptorSet = materialSystem_->getDescriptorSet(0); // Use first material as default
+            if (defaultMaterialDescriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1, &defaultMaterialDescriptorSet, 0, nullptr);
+            }
+        }
         
         // Render loaded 3D model (if available)
         if (currentModel_ && !currentModel_->meshes.empty()) {
@@ -1628,8 +1809,13 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
     lightingSystem_ = std::make_shared<LightingSystem>(resourceManager_);
     lightingSystem_->createLightingBuffers();
     materialSystem_ = std::make_shared<MaterialSystem>(resourceManager_);
+    materialSystem_->setDescriptorSetLayout(materialDescriptorSetLayout_);
     materialSystem_->createMaterialBuffers();
-    
+
+    // Create a default material for legacy rendering compatibility
+    MaterialData defaultMaterial;
+    materialSystem_->createMaterial(defaultMaterial);
+
     VKMON_INFO("Core engine systems initialized successfully!");
 }
 
@@ -1648,47 +1834,52 @@ void VulkanRenderer::loadTestModel() {
 }
 
 void VulkanRenderer::cycleMaterialPreset() {
-    static int currentMaterialPreset = 0;
-    currentMaterialPreset = (currentMaterialPreset + 1) % 5;
-    
-    switch (currentMaterialPreset) {
-        case 0: // Default material
-            currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.8f, 0.6f, 0.4f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.3f, 0.3f, 0.3f, 0.0f);
-            currentMaterialData_.shininess = 32.0f;
-            VKMON_INFO("[MATERIAL] Preset: Default (Warm Brown)");
-            break;
-        case 1: // Metallic Gold
-            currentMaterialData_.ambient = glm::vec4(0.24725f, 0.1995f, 0.0745f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.75164f, 0.60648f, 0.22648f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.628281f, 0.555802f, 0.366065f, 0.0f);
-            currentMaterialData_.shininess = 51.2f;
-            VKMON_INFO("[MATERIAL] Preset: Metallic Gold");
-            break;
-        case 2: // Ruby Red
-            currentMaterialData_.ambient = glm::vec4(0.1745f, 0.01175f, 0.01175f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.61424f, 0.04136f, 0.04136f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.727811f, 0.626959f, 0.626959f, 0.0f);
-            currentMaterialData_.shininess = 76.8f;
-            VKMON_INFO("[MATERIAL] Preset: Ruby Red");
-            break;
-        case 3: // Chrome
-            currentMaterialData_.ambient = glm::vec4(0.25f, 0.25f, 0.25f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.4f, 0.4f, 0.4f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.774597f, 0.774597f, 0.774597f, 0.0f);
-            currentMaterialData_.shininess = 76.8f;
-            VKMON_INFO("[MATERIAL] Preset: Chrome");
-            break;
-        case 4: // Emerald Green
-            currentMaterialData_.ambient = glm::vec4(0.0215f, 0.1745f, 0.0215f, 0.0f);
-            currentMaterialData_.diffuse = glm::vec4(0.07568f, 0.61424f, 0.07568f, 0.0f);
-            currentMaterialData_.specular = glm::vec4(0.633f, 0.727811f, 0.633f, 0.0f);
-            currentMaterialData_.shininess = 76.8f;
-            VKMON_INFO("[MATERIAL] Preset: Emerald Green");
-            break;
+    if (!materialSystem_) {
+        VKMON_WARNING("Cannot cycle materials - MaterialSystem not available");
+        return;
     }
-    updateMaterialBuffer();
+
+    // Ensure we have the standard material presets in MaterialSystem
+    ensureStandardMaterialsExist();
+
+    // Cycle to next material preset
+    currentMaterialPreset_ = (currentMaterialPreset_ + 1) % materialSystem_->getMaterialCount();
+
+    const char* materialNames[] = {"Default", "Gold", "Ruby", "Chrome", "Emerald"};
+    const char* materialName = (currentMaterialPreset_ < 5) ? materialNames[currentMaterialPreset_] : "Unknown";
+
+    VKMON_INFO("[MATERIAL] Cycled to preset: " + std::string(materialName) +
+               " (" + std::to_string(currentMaterialPreset_ + 1) + "/" +
+               std::to_string(materialSystem_->getMaterialCount()) + ")");
+
+    // For now, this provides user feedback that material cycling is working
+    // In the future, this could update specific entities in the ECS system
+}
+
+void VulkanRenderer::ensureStandardMaterialsExist() {
+    // Ensure we have at least 5 standard material presets
+    if (materialSystem_->getMaterialCount() < 5) {
+        // Define standard material presets
+        std::vector<MaterialData> standardMaterials = {
+            // 0: Default (already created in initializeCoreEngineSystems)
+            MaterialData(glm::vec3(0.1f, 0.1f, 0.1f), glm::vec3(0.8f, 0.8f, 0.8f), glm::vec3(1.0f, 1.0f, 1.0f), 32.0f),
+            // 1: Gold
+            MaterialData(glm::vec3(0.24725f, 0.1995f, 0.0745f), glm::vec3(0.75164f, 0.60648f, 0.22648f), glm::vec3(0.628281f, 0.555802f, 0.366065f), 51.2f),
+            // 2: Ruby
+            MaterialData(glm::vec3(0.1745f, 0.01175f, 0.01175f), glm::vec3(0.61424f, 0.04136f, 0.04136f), glm::vec3(0.727811f, 0.626959f, 0.626959f), 76.8f),
+            // 3: Chrome
+            MaterialData(glm::vec3(0.25f, 0.25f, 0.25f), glm::vec3(0.4f, 0.4f, 0.4f), glm::vec3(0.774597f, 0.774597f, 0.774597f), 76.8f),
+            // 4: Emerald
+            MaterialData(glm::vec3(0.0215f, 0.1745f, 0.0215f), glm::vec3(0.07568f, 0.61424f, 0.07568f), glm::vec3(0.633f, 0.727811f, 0.633f), 76.8f)
+        };
+
+        // Create materials starting from index 1 (0 is already created)
+        for (size_t i = materialSystem_->getMaterialCount(); i < standardMaterials.size(); ++i) {
+            materialSystem_->createMaterial(standardMaterials[i]);
+        }
+
+        VKMON_INFO("Created " + std::to_string(standardMaterials.size()) + " standard material presets");
+    }
 }
 
 // =============================================================================
@@ -1732,6 +1923,20 @@ void VulkanRenderer::cleanup() {
     if (descriptorSetLayout_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device_, descriptorSetLayout_, nullptr);
         descriptorSetLayout_ = VK_NULL_HANDLE;
+    }
+
+    // Cleanup global descriptor resources
+    if (globalDescriptorPool_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device_, globalDescriptorPool_, nullptr);
+        globalDescriptorPool_ = VK_NULL_HANDLE;
+    }
+    if (globalDescriptorSetLayout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device_, globalDescriptorSetLayout_, nullptr);
+        globalDescriptorSetLayout_ = VK_NULL_HANDLE;
+    }
+    if (materialDescriptorSetLayout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device_, materialDescriptorSetLayout_, nullptr);
+        materialDescriptorSetLayout_ = VK_NULL_HANDLE;
     }
     
     // Cleanup texture resources
@@ -1983,3 +2188,4 @@ void VulkanRenderer::endImGuiFrame() {
     // The ImGui draw data will be recorded to the command buffer
     // in the existing command buffer recording (renderFrame method)
 }
+

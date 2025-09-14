@@ -6,14 +6,14 @@ layout(push_constant) uniform PushConstants {
 } push;
 
 // Uniform buffer for per-frame data (view, projection, camera)
-layout(binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 cameraPos;
     float _padding;
 } ubo;
 
-layout(binding = 2) uniform LightingData {
+layout(set = 0, binding = 2) uniform LightingData {
     vec3 directionalLightDir;
     float directionalLightIntensity;
     vec3 directionalLightColor;

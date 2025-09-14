@@ -183,6 +183,13 @@ private:
     void deleteSelectedEntity();
 
     /**
+     * Duplicate entity with all its components
+     * @param sourceEntity Entity to duplicate
+     * @return Created entity ID
+     */
+    EntityID duplicateEntity(EntityID sourceEntity);
+
+    /**
      * Render component addition interface for selected entity
      */
     void renderComponentAddition();

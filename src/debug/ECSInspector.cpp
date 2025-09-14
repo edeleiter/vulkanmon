@@ -138,8 +138,13 @@ void ECSInspector::renderEntityList() {
                     selectedEntity_ = entityId;
                 }
                 if (ImGui::MenuItem("Duplicate")) {
-                    // TODO: Implement entity duplication
-                    VKMON_INFO("Entity duplication not yet implemented");
+                    EntityID duplicatedEntity = duplicateEntity(entityId);
+                    if (duplicatedEntity != INVALID_ENTITY) {
+                        selectedEntity_ = duplicatedEntity;
+                        VKMON_INFO("Duplicated entity " + std::to_string(entityId) + " to entity " + std::to_string(duplicatedEntity));
+                    } else {
+                        VKMON_WARNING("Failed to duplicate entity " + std::to_string(entityId));
+                    }
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Delete", "Del")) {
@@ -442,6 +447,43 @@ void ECSInspector::deleteSelectedEntity() {
     selectedEntity_ = INVALID_ENTITY;
 }
 
+EntityID ECSInspector::duplicateEntity(EntityID sourceEntity) {
+    if (sourceEntity == INVALID_ENTITY) {
+        VKMON_WARNING("Cannot duplicate invalid entity");
+        return INVALID_ENTITY;
+    }
+
+    auto& entityManager = world_->getEntityManager();
+
+    // Create new entity
+    EntityID newEntity = world_->createEntity();
+
+    // Duplicate Transform component if it exists
+    if (entityManager.hasComponent<Transform>(sourceEntity)) {
+        Transform sourceTransform = entityManager.getComponent<Transform>(sourceEntity);
+        // Offset position slightly to avoid exact overlap
+        sourceTransform.setPosition(sourceTransform.position + glm::vec3(1.0f, 0.0f, 0.0f));
+        world_->addComponent<Transform>(newEntity, sourceTransform);
+    }
+
+    // Duplicate Renderable component if it exists
+    if (entityManager.hasComponent<Renderable>(sourceEntity)) {
+        Renderable sourceRenderable = entityManager.getComponent<Renderable>(sourceEntity);
+        world_->addComponent<Renderable>(newEntity, sourceRenderable);
+    }
+
+    // Duplicate Camera component if it exists
+    if (entityManager.hasComponent<Camera>(sourceEntity)) {
+        Camera sourceCamera = entityManager.getComponent<Camera>(sourceEntity);
+        // Set duplicated camera as inactive to avoid conflicts
+        sourceCamera.isActive = false;
+        sourceCamera.priority = sourceCamera.priority - 1; // Lower priority
+        world_->addComponent<Camera>(newEntity, sourceCamera);
+    }
+
+    return newEntity;
+}
+
 void ECSInspector::renderComponentAddition() {
     ImGui::Text("Add Component:");
 
@@ -488,21 +530,38 @@ void ECSInspector::renderPerformanceProfiler() {
         ImGui::Separator();
 
         // System performance
-        if (ImGui::BeginTable("Systems", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable)) {
+        if (ImGui::BeginTable("Systems", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable)) {
             ImGui::TableSetupColumn("System");
-            ImGui::TableSetupColumn("Time (ms)");
-            ImGui::TableSetupColumn("Entities");
+            ImGui::TableSetupColumn("Update (ms)");
+            ImGui::TableSetupColumn("Render (ms)");
+            ImGui::TableSetupColumn("Total (ms)");
             ImGui::TableHeadersRow();
 
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn(); ImGui::Text("RenderSystem");
-            ImGui::TableNextColumn(); ImGui::Text("%.3f", performanceData_.renderSystemTime);
-            ImGui::TableNextColumn(); ImGui::Text("%zu", performanceData_.visibleEntities);
+            // Display all systems dynamically
+            auto& systemManager = world_->getSystemManager();
+            const auto& perfData = systemManager.getPerformanceData();
 
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn(); ImGui::Text("CameraSystem");
-            ImGui::TableNextColumn(); ImGui::Text("%.3f", performanceData_.cameraSystemTime);
-            ImGui::TableNextColumn(); ImGui::Text("1"); // Usually one active camera
+            for (const auto& [typeIndex, systemPerfData] : perfData) {
+                std::string systemName = systemPerfData.name;
+
+                // Clean up the system name (remove namespace and class decorations)
+                size_t classPos = systemName.find("class ");
+                if (classPos != std::string::npos) {
+                    systemName = systemName.substr(classPos + 6);
+                }
+                size_t namespacePos = systemName.find("VulkanMon::");
+                if (namespacePos != std::string::npos) {
+                    systemName = systemName.substr(namespacePos + 11);
+                }
+
+                float totalTime = systemPerfData.updateTime + systemPerfData.renderTime;
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn(); ImGui::Text("%s", systemName.c_str());
+                ImGui::TableNextColumn(); ImGui::Text("%.3f", systemPerfData.updateTime);
+                ImGui::TableNextColumn(); ImGui::Text("%.3f", systemPerfData.renderTime);
+                ImGui::TableNextColumn(); ImGui::Text("%.3f", totalTime);
+            }
 
             ImGui::EndTable();
         }
@@ -666,9 +725,25 @@ void ECSInspector::updatePerformanceData(float deltaTime) {
 
     performanceData_.culledEntities = renderableEntities.size() - performanceData_.visibleEntities;
 
-    // TODO: Get actual system timing data
-    performanceData_.renderSystemTime = 0.1f; // Placeholder
-    performanceData_.cameraSystemTime = 0.05f; // Placeholder
+    // Get actual system timing data
+    auto& systemManager = world_->getSystemManager();
+    const auto& perfData = systemManager.getPerformanceData();
+
+    performanceData_.renderSystemTime = 0.0f;
+    performanceData_.cameraSystemTime = 0.0f;
+
+    // Aggregate timing data from all systems
+    for (const auto& [typeIndex, systemPerfData] : perfData) {
+        std::string systemName = systemPerfData.name;
+        float totalTime = systemPerfData.updateTime + systemPerfData.renderTime;
+
+        // Classify systems by name (crude but functional)
+        if (systemName.find("Render") != std::string::npos || systemName.find("render") != std::string::npos) {
+            performanceData_.renderSystemTime += totalTime;
+        } else if (systemName.find("Camera") != std::string::npos || systemName.find("camera") != std::string::npos) {
+            performanceData_.cameraSystemTime += totalTime;
+        }
+    }
 }
 
 void ECSInspector::renderHelpTooltip(const char* text) const {

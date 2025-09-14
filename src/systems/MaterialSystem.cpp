@@ -14,31 +14,19 @@ MaterialSystem::~MaterialSystem() {
 }
 
 void MaterialSystem::createMaterialBuffers() {
-    VKMON_DEBUG("MaterialSystem: Creating material descriptor layout and pool");
-    createDescriptorSetLayout();
+    VKMON_DEBUG("MaterialSystem: Creating material descriptor pool");
+    if (descriptorSetLayout == VK_NULL_HANDLE) {
+        throw std::runtime_error("MaterialSystem: Descriptor set layout must be set before creating material buffers");
+    }
     createDescriptorPool();
 }
 
-void MaterialSystem::createDescriptorSetLayout() {
-    VkDescriptorSetLayoutBinding materialBinding{};
-    materialBinding.binding = 3; // Binding 3 for material data (after MVP=0, texture=1, lighting=2)
-    materialBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    materialBinding.descriptorCount = 1;
-    materialBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    materialBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &materialBinding;
-
-    VkDevice device = resourceManager->getDevice();
-    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("MaterialSystem: Failed to create descriptor set layout");
-    }
-    
-    VKMON_DEBUG("MaterialSystem: Created material descriptor set layout");
+void MaterialSystem::setDescriptorSetLayout(VkDescriptorSetLayout layout) {
+    descriptorSetLayout = layout;
+    VKMON_DEBUG("MaterialSystem: Set external descriptor set layout");
 }
+
+// createDescriptorSetLayout() method removed - descriptor set layout is now provided by VulkanRenderer
 
 void MaterialSystem::createDescriptorPool() {
     // Start with capacity for 16 materials, will expand as needed
@@ -168,7 +156,7 @@ void MaterialSystem::updateDescriptorSet(uint32_t materialId) {
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = materials[materialId].descriptorSet;
-    descriptorWrite.dstBinding = 3;
+    descriptorWrite.dstBinding = 0; // Material data is now at binding 0 in set 1
     descriptorWrite.dstArrayElement = 0;
     descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrite.descriptorCount = 1;

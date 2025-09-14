@@ -1,8 +1,8 @@
 #version 450
 
-layout(binding = 1) uniform sampler2D texSampler;
+layout(set = 0, binding = 1) uniform sampler2D texSampler;
 
-layout(binding = 2) uniform LightingData {
+layout(set = 0, binding = 2) uniform LightingData {
     vec3 directionalLightDir;
     float directionalLightIntensity;
     vec3 directionalLightColor;
@@ -11,7 +11,7 @@ layout(binding = 2) uniform LightingData {
     float ambientIntensity;
 } lighting;
 
-layout(binding = 3) uniform MaterialData {
+layout(set = 1, binding = 0) uniform MaterialData {
     vec4 ambient;
     vec4 diffuse;
     vec4 specular;

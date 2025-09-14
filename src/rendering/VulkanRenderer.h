@@ -200,6 +200,7 @@ public:
      */
     float getFrameTime() const { return lastFrameTime_; }
 
+
     // ===== SYSTEM ACCESS INTERFACE =====
 
     /**
@@ -352,6 +353,15 @@ private:
     VkSampler textureSampler_ = VK_NULL_HANDLE;
     
     // Descriptor resources
+    // Global descriptor set layout (UBO, texture, lighting)
+    VkDescriptorSetLayout globalDescriptorSetLayout_ = VK_NULL_HANDLE;
+    VkDescriptorPool globalDescriptorPool_ = VK_NULL_HANDLE;
+    VkDescriptorSet globalDescriptorSet_ = VK_NULL_HANDLE;
+
+    // Material descriptor set layout (per-material data)
+    VkDescriptorSetLayout materialDescriptorSetLayout_ = VK_NULL_HANDLE;
+
+    // Legacy descriptor resources (to be removed after refactor)
     VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
     VkDescriptorSet descriptorSet_ = VK_NULL_HANDLE;
@@ -370,6 +380,9 @@ private:
     // Frame timing
     std::chrono::high_resolution_clock::time_point lastFrameTimePoint_;
     float lastFrameTime_ = 0.0f;
+
+    // Material cycling state
+    uint32_t currentMaterialPreset_ = 0;
 
     // ECS Integration members
     bool ecsFrameActive_ = false;
@@ -406,11 +419,16 @@ private:
                     VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     void createDescriptorSetLayout();
+    void createGlobalDescriptorSetLayout();
+    void createMaterialDescriptorSetLayout();
+    void ensureStandardMaterialsExist();
     void createTextureImage();
     void createTextureImageView();
     void createTextureSampler();
     void createDescriptorPool();
+    void createGlobalDescriptorPool();
     void createDescriptorSet();
+    void createGlobalDescriptorSet();
     void createUniformBuffer();
     void createMaterialBuffer();
     void createDepthResources();

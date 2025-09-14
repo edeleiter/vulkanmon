@@ -35,6 +35,7 @@ public:
     ~MaterialSystem();
     
     void createMaterialBuffers();
+    void setDescriptorSetLayout(VkDescriptorSetLayout layout);
     void updateMaterial(uint32_t materialId, const MaterialData& materialData);
     void updateMaterialFromModelMaterial(uint32_t materialId, const VulkanMon::Material& material);
     
@@ -67,7 +68,6 @@ private:
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
     
-    void createDescriptorSetLayout();
     void createDescriptorPool();
     void createDescriptorSet(uint32_t materialId);
     void updateDescriptorSet(uint32_t materialId);
