@@ -54,6 +54,9 @@ add_executable(vulkanmon_tests
     # Phase 6.4: Window Resize tests (NEW)
     test_WindowResize.cpp
 
+    # Spatial System tests (NEW)
+    test_WorldConfig.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
@@ -70,6 +73,7 @@ add_executable(vulkanmon_tests
     ../src/systems/RenderSystem.cpp
     ../src/systems/CameraSystem.cpp
     ../src/spatial/SpatialManager.cpp
+    ../src/spatial/WorldConfig.cpp
     ../src/io/AssetManager.cpp
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp

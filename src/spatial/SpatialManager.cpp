@@ -104,10 +104,8 @@ void OctreeNode::insert(EntityID entity, const glm::vec3& position) {
     if (is_leaf_) {
         entities_.push_back(entity);
 
-        // Check if we should subdivide
-        if (shouldSubdivide()) {
-            subdivide();
-        }
+        // Note: Subdivision now requires position lookup from SpatialManager
+        // This will be handled by SpatialManager::insert() when needed
     } else {
         // Insert into appropriate child
         int childIndex = getChildIndex(position);
@@ -251,7 +249,7 @@ void OctreeNode::getStatistics(int& nodeCount, int& maxDepth, int& totalEntities
     }
 }
 
-void OctreeNode::subdivide() {
+void OctreeNode::subdivide(const std::function<glm::vec3(EntityID)>& getPosition) {
     if (depth_ >= MAX_DEPTH) {
         return; // Max depth reached
     }
@@ -264,12 +262,17 @@ void OctreeNode::subdivide() {
         children_[i] = std::make_unique<OctreeNode>(childBounds, depth_ + 1);
     }
 
-    // Redistribute entities to children
+    // Redistribute entities to children using position lookup
     std::vector<EntityID> entitiesToRedistribute = std::move(entities_);
     entities_.clear();
 
-    // Note: We need positions to redistribute, but we don't have them here
-    // This will be handled by the SpatialManager which tracks positions
+    for (EntityID entity : entitiesToRedistribute) {
+        glm::vec3 position = getPosition(entity);
+        int childIndex = getChildIndex(position);
+        if (children_[childIndex]) {
+            children_[childIndex]->insert(entity, position);
+        }
+    }
 }
 
 int OctreeNode::getChildIndex(const glm::vec3& position) const {

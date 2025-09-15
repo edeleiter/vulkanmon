@@ -7,6 +7,7 @@
 #include "../utils/Logger.h"
 #include <memory>
 #include <chrono>
+#include <limits>
 
 namespace VulkanMon {
 
@@ -104,7 +105,7 @@ public:
         return spatialManager_->findVisibleCreatures(cameraFrustum);
     }
 
-    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = FLT_MAX) const {
+    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = std::numeric_limits<float>::max()) const {
         return spatialManager_->findNearestEntity(position, maxDistance);
     }
 

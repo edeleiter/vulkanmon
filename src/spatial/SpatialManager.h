@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <memory>
 #include <functional>
+#include <limits>
 
 namespace VulkanMon {
 
@@ -14,7 +15,7 @@ struct BoundingBox {
     glm::vec3 min;
     glm::vec3 max;
 
-    BoundingBox() : min(FLT_MAX), max(-FLT_MAX) {}
+    BoundingBox() : min(std::numeric_limits<float>::max()), max(-std::numeric_limits<float>::max()) {}
     BoundingBox(const glm::vec3& center, float radius)
         : min(center - radius), max(center + radius) {}
     BoundingBox(const glm::vec3& minPoint, const glm::vec3& maxPoint)
@@ -69,6 +70,9 @@ public:
     void remove(EntityID entity, const glm::vec3& position);
     void update(EntityID entity, const glm::vec3& oldPos, const glm::vec3& newPos);
 
+    // Subdivision with position lookup
+    void subdivide(const std::function<glm::vec3(EntityID)>& getPosition);
+
     // Spatial queries
     void query(const BoundingBox& region, std::vector<EntityID>& results) const;
     void query(const Frustum& frustum, std::vector<EntityID>& results) const;
@@ -81,7 +85,6 @@ public:
     void getStatistics(int& nodeCount, int& maxDepth, int& totalEntities) const;
 
 private:
-    void subdivide();
     int getChildIndex(const glm::vec3& position) const;
     BoundingBox getChildBounds(int childIndex) const;
     bool shouldSubdivide() const;
@@ -126,8 +129,8 @@ public:
     std::vector<EntityID> findVisibleCreatures(const Frustum& cameraFrustum) const;
 
     // Nearest neighbor queries (for creature AI)
-    std::vector<EntityID> findNearestEntities(const glm::vec3& position, int count, float maxDistance = FLT_MAX) const;
-    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = FLT_MAX) const;
+    std::vector<EntityID> findNearestEntities(const glm::vec3& position, int count, float maxDistance = std::numeric_limits<float>::max()) const;
+    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = std::numeric_limits<float>::max()) const;
 
     // Performance and debugging
     void getStatistics(int& nodeCount, int& maxDepth, int& totalEntities) const;

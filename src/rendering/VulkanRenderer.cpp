@@ -1823,7 +1823,7 @@ void VulkanRenderer::loadTestModel() {
     VKMON_INFO("Loading test model...");
     
     // Load the test cube
-    currentModel_ = modelLoader_->loadModel("test_cube.obj");
+    currentModel_ = modelLoader_->loadModel("cube.obj");
     VKMON_INFO("Test cube model loaded successfully!");
     
     // Create a default material for the model (simplified version)

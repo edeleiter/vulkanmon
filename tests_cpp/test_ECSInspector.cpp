@@ -209,7 +209,7 @@ TEST_CASE("ECS Inspector Component Modification", "[ECSInspector][Modification]"
         EntityID entity = world.createEntity();
         Transform transform;
         Renderable renderable;
-        renderable.meshPath = "test_cube.obj";
+        renderable.meshPath = "cube.obj";
         world.addComponent(entity, transform);
         world.addComponent(entity, renderable);
 
@@ -240,7 +240,7 @@ TEST_CASE("ECS Inspector Entity Management", "[ECSInspector][Management]") {
         EntityID cubeEntity = world.createEntity();
         Transform transform1;
         Renderable renderable1;
-        renderable1.meshPath = "test_cube.obj";
+        renderable1.meshPath = "cube.obj";
         renderable1.materialId = 0;
         world.addComponent(cubeEntity, transform1);
         world.addComponent(cubeEntity, renderable1);

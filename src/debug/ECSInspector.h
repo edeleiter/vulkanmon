@@ -4,6 +4,7 @@
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
 #include "../components/Camera.h"
+#include "../components/SpatialComponent.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
@@ -96,6 +97,7 @@ private:
     bool transformExpanded_ = true;
     bool renderableExpanded_ = true;
     bool cameraExpanded_ = true;
+    bool spatialExpanded_ = true;
 
     // Performance tracking
     struct PerformanceData {
@@ -109,7 +111,7 @@ private:
 
     // Material and mesh asset lists
     std::vector<std::string> availableMeshes_ = {
-        "test_cube.obj", "sphere.obj", "pyramid.obj", "plane.obj"
+        "cube.obj", "sphere.obj", "pyramid.obj", "plane.obj"
     };
 
     const char* materialNames_[5] = {
@@ -164,6 +166,13 @@ private:
      * @return true if component was modified
      */
     bool renderCameraEditor(Camera& camera);
+
+    /**
+     * Render SpatialComponent editor with spatial properties
+     * @param spatial SpatialComponent to edit
+     * @return true if component was modified
+     */
+    bool renderSpatialEditor(SpatialComponent& spatial);
 
     // =================================================================
     // Entity operations and templates

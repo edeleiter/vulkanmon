@@ -43,7 +43,7 @@ public:
         return entity;
     }
 
-    EntityID createTestEntityWithRenderable(const std::string& meshPath = "test_cube.obj", int materialId = 0) {
+    EntityID createTestEntityWithRenderable(const std::string& meshPath = "cube.obj", int materialId = 0) {
         EntityID entity = entityManager_->createEntity();
         Transform transform;
         Renderable renderable;

@@ -412,10 +412,10 @@ std::unique_ptr<Model> ModelLoader::createTestCube() {
         20, 21, 22, 22, 23, 20
     };
     
-    Material material("test_cube");
+    Material material("cube");
     material.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     
-    auto model = std::make_unique<Model>("test_cube.obj");
+    auto model = std::make_unique<Model>("cube.obj");
     model->meshes.push_back(createMesh(vertices, indices, material));
     
     return model;

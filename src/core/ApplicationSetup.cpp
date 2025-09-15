@@ -2,6 +2,7 @@
 #include "../utils/Logger.h"
 #include "../systems/SpatialSystem.h"
 #include "../components/SpatialComponent.h"
+#include "../spatial/WorldConfig.h"
 #include <stdexcept>
 
 using namespace VulkanMon;
@@ -110,10 +111,17 @@ void Application::initializeECS() {
 
     // Add render system to handle rendering ECS entities
     renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
+
     // Add spatial system for Pokemon-style spatial queries and management
-    // World bounds: (-10, -5, -10) to (10, 10, 10) - allows for expansion beyond current test objects
-    BoundingBox worldBounds(glm::vec3(-10.0f, -5.0f, -10.0f), glm::vec3(10.0f, 10.0f, 10.0f));
-    spatialSystem_ = world_->addSystem<SpatialSystem>(worldBounds);
+    WorldConfig worldConfig = WorldConfig::createTestWorld();
+    VKMON_INFO("Using world config: " + worldConfig.name +
+               " bounds (" + std::to_string(worldConfig.minBounds.x) + "," +
+                           std::to_string(worldConfig.minBounds.y) + "," +
+                           std::to_string(worldConfig.minBounds.z) + ") to (" +
+                           std::to_string(worldConfig.maxBounds.x) + "," +
+                           std::to_string(worldConfig.maxBounds.y) + "," +
+                           std::to_string(worldConfig.maxBounds.z) + ")");
+    spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
 
     // Connect RenderSystem with SpatialSystem for spatial frustum culling
     if (renderSystem_ && spatialSystem_) {
@@ -159,7 +167,7 @@ void Application::createTestScene() {
     world_->addComponent(cube1, transform1);
 
     Renderable renderable1;
-    renderable1.meshPath = "test_cube.obj";  // Original cube - ModelLoader adds assets/models/ prefix
+    renderable1.meshPath = "cube.obj";  // Original cube - ModelLoader adds assets/models/ prefix
     renderable1.texturePath = "default";
     renderable1.materialId = 0;  // Default material
     renderable1.isVisible = true;

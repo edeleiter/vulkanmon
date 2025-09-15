@@ -76,7 +76,7 @@ TEST_CASE("VulkanRenderer Model Caching System", "[VulkanRenderer][ModelCache]")
 
     SECTION("Model path validation design") {
         // Test expected behavior of model path handling
-        std::string testPath1 = "test_cube.obj";
+        std::string testPath1 = "cube.obj";
         std::string testPath2 = "sphere.obj";
         std::string testPath3 = "pyramid.obj";
         std::string testPath4 = "plane.obj";
@@ -94,7 +94,7 @@ TEST_CASE("VulkanRenderer Model Caching System", "[VulkanRenderer][ModelCache]")
         REQUIRE(testPath4.ends_with(".obj"));
 
         INFO("Model caching system supports diverse mesh paths:");
-        INFO("- test_cube.obj (24 vertices)");
+        INFO("- cube.obj (24 vertices)");
         INFO("- sphere.obj (58 vertices)");
         INFO("- pyramid.obj (5 vertices)");
         INFO("- plane.obj (25 vertices)");
@@ -106,7 +106,7 @@ TEST_CASE("VulkanRenderer Model Caching System", "[VulkanRenderer][ModelCache]")
 
         int expectedObjectCount = 5;
         std::vector<std::string> expectedMeshes = {
-            "test_cube.obj",
+            "cube.obj",
             "sphere.obj",
             "pyramid.obj",
             "sphere.obj",    // Second sphere instance

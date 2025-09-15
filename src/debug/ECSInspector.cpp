@@ -1,5 +1,6 @@
 #include "ECSInspector.h"
 #include "../utils/Logger.h"
+#include "../systems/SpatialSystem.h"
 #include <glm/gtc/type_ptr.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/euler_angles.hpp>
@@ -211,6 +212,17 @@ void ECSInspector::renderComponentInspector() {
         }
     }
 
+    // SpatialComponent - spatial properties and optimization
+    if (entityManager.hasComponent<SpatialComponent>(selectedEntity_)) {
+        if (ImGui::CollapsingHeader("Spatial Component", spatialExpanded_ ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+            auto& spatial = entityManager.getComponent<SpatialComponent>(selectedEntity_);
+            if (renderSpatialEditor(spatial)) {
+                // Spatial component was modified - mark for spatial system update
+                spatial.markDirty();
+            }
+        }
+    }
+
     ImGui::Separator();
     renderComponentAddition();
 }
@@ -381,6 +393,90 @@ bool ECSInspector::renderCameraEditor(Camera& camera) {
     return modified;
 }
 
+bool ECSInspector::renderSpatialEditor(SpatialComponent& spatial) {
+    bool modified = false;
+
+    // Bounding radius with live preview
+    float boundingRadius = spatial.boundingRadius;
+    if (ImGui::SliderFloat("Bounding Radius", &boundingRadius, 0.1f, 50.0f)) {
+        spatial.setBoundingRadius(boundingRadius);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Radius for collision detection and spatial queries. Larger = more inclusive spatial queries.");
+    }
+
+    // Detection radius for Pokemon encounters
+    float detectionRadius = spatial.detectionRadius;
+    if (ImGui::SliderFloat("Detection Radius", &detectionRadius, 1.0f, 100.0f)) {
+        spatial.detectionRadius = detectionRadius;
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("How far this entity can detect other entities. Used for entity interaction and AI systems.");
+    }
+
+    // Territory radius for entity behavior
+    float territoryRadius = spatial.territoryRadius;
+    if (ImGui::SliderFloat("Territory Radius", &territoryRadius, 5.0f, 200.0f)) {
+        spatial.territoryRadius = territoryRadius;
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Territory size for entities with area-based behavior. Defines movement bounds and interaction area.");
+    }
+
+    // Spatial behavior selection
+    const char* behaviors[] = { "Static", "Dynamic", "Occasional" };
+    int currentBehavior = static_cast<int>(spatial.behavior);
+    if (ImGui::Combo("Behavior", &currentBehavior, behaviors, 3)) {
+        spatial.behavior = static_cast<SpatialBehavior>(currentBehavior);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Static: Never moves (buildings, trees). Dynamic: Moves frequently (creatures). Occasional: Moves rarely (NPCs).");
+    }
+
+    // Home position editor
+    glm::vec3 homePosition = spatial.homePosition;
+    if (ImGui::DragFloat3("Home Position", &homePosition.x, 0.1f)) {
+        spatial.setHomePosition(homePosition);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Original spawn position. Used for territorial behavior and returning home.");
+    }
+
+    // Performance info (read-only)
+    ImGui::Separator();
+    ImGui::Text("Performance Info:");
+    ImGui::Text("Query Count: %u", spatial.spatialQueryCount);
+    ImGui::Text("Time Since Last Query: %.2fs", spatial.timeSinceLastQuery);
+
+    // Query throttling control
+    ImGui::Separator();
+    ImGui::Text("Query Throttling:");
+    bool needsUpdate = spatial.needsSpatialUpdate;
+    if (ImGui::Checkbox("Needs Spatial Update", &needsUpdate)) {
+        spatial.needsSpatialUpdate = needsUpdate;
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Forces spatial system update on next frame. Automatically set when entity moves.");
+    }
+
+    // Distance checks
+    ImGui::Separator();
+    ImGui::Text("Spatial Status:");
+    // Note: This would require current position to calculate, could be added as enhancement
+    ImGui::Text("Is Visible: %s", spatial.isVisible ? "Yes" : "No");
+    if (spatial.lastCullingDistance > 0.0f) {
+        ImGui::Text("Last Culling Distance: %.2f", spatial.lastCullingDistance);
+    }
+
+    return modified;
+}
+
 EntityID ECSInspector::createEntityFromTemplate(EntityTemplate templateType, const glm::vec3& position) {
     EntityID newEntity = world_->createEntity();
 
@@ -393,7 +489,7 @@ EntityID ECSInspector::createEntityFromTemplate(EntityTemplate templateType, con
         case EntityTemplate::CUBE:
             {
                 Renderable renderable;
-                renderable.meshPath = "test_cube.obj";
+                renderable.meshPath = "cube.obj";
                 renderable.materialId = 0; // Default material
                 world_->addComponent<Renderable>(newEntity, renderable);
                 break;
@@ -493,7 +589,7 @@ void ECSInspector::renderComponentAddition() {
     if (!entityManager.hasComponent<Renderable>(selectedEntity_)) {
         if (ImGui::Button("Add Renderable")) {
             Renderable renderable;
-            renderable.meshPath = "test_cube.obj";
+            renderable.meshPath = "cube.obj";
             renderable.materialId = 0;
             world_->addComponent<Renderable>(selectedEntity_, renderable);
             VKMON_INFO("Added Renderable component to Entity " + std::to_string(selectedEntity_));
@@ -509,6 +605,19 @@ void ECSInspector::renderComponentAddition() {
             camera.isActive = false;
             world_->addComponent<Camera>(selectedEntity_, camera);
             VKMON_INFO("Added Camera component to Entity " + std::to_string(selectedEntity_));
+        }
+        ImGui::SameLine();
+    }
+
+    // SpatialComponent
+    if (!entityManager.hasComponent<SpatialComponent>(selectedEntity_)) {
+        if (ImGui::Button("Add Spatial")) {
+            SpatialComponent spatial;
+            spatial.boundingRadius = 1.0f;
+            spatial.behavior = SpatialBehavior::DYNAMIC;
+            spatial.needsSpatialUpdate = true;
+            world_->addComponent<SpatialComponent>(selectedEntity_, spatial);
+            VKMON_INFO("Added SpatialComponent to Entity " + std::to_string(selectedEntity_));
         }
     }
 }
@@ -564,6 +673,43 @@ void ECSInspector::renderPerformanceProfiler() {
             }
 
             ImGui::EndTable();
+        }
+
+        // Spatial System Performance (if available)
+        if (world_->hasSystem<SpatialSystem>()) {
+            ImGui::Separator();
+            ImGui::Text("Spatial System Debug:");
+            ImGui::Indent();
+
+            auto* spatialSystem = world_->getSystem<SpatialSystem>();
+            if (spatialSystem) {
+                // Get spatial statistics
+                int nodeCount = 0, maxDepth = 0, totalEntities = 0;
+                spatialSystem->getSpatialStatistics(nodeCount, maxDepth, totalEntities);
+
+                ImGui::Text("Octree Nodes: %d", nodeCount);
+                ImGui::Text("Max Depth: %d", maxDepth);
+                ImGui::Text("Spatial Entities: %d", totalEntities);
+
+                // Get performance stats
+                const auto& spatialStats = spatialSystem->getSpatialPerformanceStats();
+                ImGui::Text("Spatial Queries: %zu", spatialStats.totalQueries);
+                ImGui::Text("Avg Query Time: %.3f ms", spatialStats.averageQueryTimeMs);
+                ImGui::Text("Last Query Time: %.3f ms", spatialStats.lastQueryTimeMs);
+                ImGui::Text("Entities Returned: %zu", spatialStats.totalEntitiesReturned);
+
+                // Frame stats
+                const auto& frameStats = spatialSystem->getFrameStats();
+                ImGui::Text("Frame Entities Tracked: %zu", frameStats.entitiesTracked);
+                ImGui::Text("Frame Entities Updated: %zu", frameStats.entitiesUpdated);
+
+                // World bounds
+                const auto& worldBounds = spatialSystem->getWorldBounds();
+                ImGui::Text("World Bounds: (%.1f,%.1f,%.1f) to (%.1f,%.1f,%.1f)",
+                           worldBounds.min.x, worldBounds.min.y, worldBounds.min.z,
+                           worldBounds.max.x, worldBounds.max.y, worldBounds.max.z);
+            }
+            ImGui::Unindent();
         }
 
         // Memory usage estimate

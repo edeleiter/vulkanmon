@@ -45,7 +45,8 @@ struct SpatialComponent {
 
     // Methods
     BoundingBox getWorldBounds(const glm::vec3& worldPosition) const {
-        return BoundingBox(worldPosition - boundingRadius, worldPosition + boundingRadius);
+        glm::vec3 radiusVector(boundingRadius, boundingRadius, boundingRadius);
+        return BoundingBox(worldPosition - radiusVector, worldPosition + radiusVector);
     }
 
     bool isNearHome(const glm::vec3& currentPos, float threshold = 5.0f) const {
