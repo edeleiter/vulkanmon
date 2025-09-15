@@ -17,6 +17,7 @@
 #include "../src/core/Camera.h"
 #include "fixtures/TestHelpers.h"
 #include <memory>
+#include <set>
 
 using namespace VulkanMon;
 using namespace VulkanMon::Testing;

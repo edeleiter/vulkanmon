@@ -148,10 +148,7 @@ std::unique_ptr<Mesh> ModelLoader::processAssimpMesh(aiMesh* assimpMesh, const a
         if (assimpMesh->mTextureCoords[0]) {
             vertex.texCoords = assimpToGlm(aiVector2D(assimpMesh->mTextureCoords[0][i].x, 
                                                      assimpMesh->mTextureCoords[0][i].y));
-            // Flip Y coordinate if needed
-            if (flipUVs_) {
-                vertex.texCoords.y = 1.0f - vertex.texCoords.y;
-            }
+            // Note: UV flipping handled by aiProcess_FlipUVs flag
         } else {
             vertex.texCoords = glm::vec2(0.0f, 0.0f);
         }
@@ -305,8 +302,8 @@ void ModelLoader::createMeshBuffers(Mesh& mesh) {
 unsigned int ModelLoader::getAssimpFlags() const {
     unsigned int flags = 0;
     
-    // Core flags
-    if (triangulate_) flags |= aiProcess_Triangulate;
+    // Core flags - always triangulate for triangle lists
+    flags |= aiProcess_Triangulate;
     if (generateNormals_) flags |= aiProcess_GenNormals;
     if (flipUVs_) flags |= aiProcess_FlipUVs;
     

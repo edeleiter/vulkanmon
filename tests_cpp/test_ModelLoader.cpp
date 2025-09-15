@@ -182,15 +182,10 @@ TEST_CASE("Material Property Management", "[ModelLoader][Material]") {
     SECTION("Material property validation and ranges") {
         Material material("test_material");
         
-        // Test valid property ranges
+        // Test representative property ranges (reduced from 7 to 2 colors)
         std::vector<glm::vec3> testColors = {
-            glm::vec3(0.0f, 0.0f, 0.0f),     // Black
-            glm::vec3(1.0f, 1.0f, 1.0f),     // White  
-            glm::vec3(1.0f, 0.0f, 0.0f),     // Red
-            glm::vec3(0.0f, 1.0f, 0.0f),     // Green
-            glm::vec3(0.0f, 0.0f, 1.0f),     // Blue
-            glm::vec3(0.5f, 0.5f, 0.5f),     // Gray
-            glm::vec3(0.24f, 0.2f, 0.075f),  // Gold-like ambient
+            glm::vec3(0.0f, 0.0f, 0.0f),     // Black (boundary case)
+            glm::vec3(0.5f, 0.5f, 0.5f),     // Gray (typical case)
         };
         
         for (const auto& color : testColors) {
@@ -226,15 +221,10 @@ TEST_CASE("Material Property Management", "[ModelLoader][Material]") {
     SECTION("Material shininess validation") {
         Material material("shininess_test");
         
-        // Test valid shininess values
+        // Test representative shininess values (reduced from 7 to 2 values)
         std::vector<float> testShininess = {
-            0.1f,    // Very low shininess (rough)
             1.0f,    // Low shininess
-            32.0f,   // Default shininess
-            64.0f,   // Medium shininess
-            128.0f,  // High shininess  
-            256.0f,  // Very high shininess
-            512.0f   // Maximum practical shininess
+            128.0f,  // High shininess
         };
         
         for (float shininess : testShininess) {

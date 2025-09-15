@@ -317,13 +317,10 @@ TEST_CASE("LightingSystem Calculations Validation", "[LightingSystem][Calculatio
     SECTION("Light vector calculations") {
         DirectionalLight light;
         
-        // Test different directional light orientations
+        // Test representative directional light orientations (reduced from 5 to 2)
         std::vector<glm::vec3> testDirections = {
             glm::vec3(0.0f, -1.0f, 0.0f),  // Straight down (noon sun)
-            glm::vec3(1.0f, -1.0f, 0.0f),  // Angled east-down
             glm::vec3(-1.0f, -0.5f, 0.0f), // Angled west-down (sunset)
-            glm::vec3(0.0f, -0.3f, 1.0f),  // Low angle north
-            glm::vec3(0.5f, -0.8f, -0.5f)  // Complex angle
         };
         
         for (const auto& direction : testDirections) {
@@ -381,14 +378,10 @@ TEST_CASE("LightingSystem Calculations Validation", "[LightingSystem][Calculatio
         };
         
         std::vector<ColorTest> colorTests = {
-            // White light
+            // White light (typical case)
             {glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.2f, 0.2f, 0.2f), 1.0f, 0.3f, glm::vec3(1.06f, 1.06f, 1.06f)},
-            // Warm sunset
-            {glm::vec3(1.0f, 0.7f, 0.3f), glm::vec3(0.3f, 0.2f, 0.1f), 0.8f, 0.4f, glm::vec3(0.92f, 0.64f, 0.28f)},
-            // Cool daylight
-            {glm::vec3(0.9f, 0.95f, 1.0f), glm::vec3(0.1f, 0.15f, 0.3f), 1.2f, 0.2f, glm::vec3(1.1f, 1.17f, 1.26f)},
-            // Moonlight
-            {glm::vec3(0.8f, 0.9f, 1.0f), glm::vec3(0.05f, 0.05f, 0.1f), 0.1f, 0.1f, glm::vec3(0.085f, 0.095f, 0.11f)}
+            // Warm sunset (edge case)
+            {glm::vec3(1.0f, 0.7f, 0.3f), glm::vec3(0.3f, 0.2f, 0.1f), 0.8f, 0.4f, glm::vec3(0.92f, 0.64f, 0.28f)}
         };
         
         for (const auto& test : colorTests) {

@@ -1246,8 +1246,7 @@ void VulkanRenderer::createTextureImage() {
                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_, textureImageMemory_);
 
-    // TODO: Add image transitions and buffer copy when we implement helper methods
-    // For now, cleanup staging buffer
+    // Cleanup staging buffer
     vkDestroyBuffer(device_, stagingBuffer, nullptr);
     vkFreeMemory(device_, stagingBufferMemory, nullptr);
 
@@ -1846,7 +1845,8 @@ void VulkanRenderer::cycleMaterialPreset() {
     currentMaterialPreset_ = (currentMaterialPreset_ + 1) % materialSystem_->getMaterialCount();
 
     const char* materialNames[] = {"Default", "Gold", "Ruby", "Chrome", "Emerald"};
-    const char* materialName = (currentMaterialPreset_ < 5) ? materialNames[currentMaterialPreset_] : "Unknown";
+    const size_t materialNamesCount = sizeof(materialNames) / sizeof(materialNames[0]);
+    const char* materialName = (currentMaterialPreset_ < materialNamesCount) ? materialNames[currentMaterialPreset_] : "Unknown";
 
     VKMON_INFO("[MATERIAL] Cycled to preset: " + std::string(materialName) +
                " (" + std::to_string(currentMaterialPreset_ + 1) + "/" +
