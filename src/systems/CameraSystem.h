@@ -4,6 +4,7 @@
 #include "../components/Transform.h"
 #include "../components/Camera.h"
 #include "../core/EntityManager.h"
+#include "../spatial/SpatialManager.h"
 
 namespace VulkanMon {
 
@@ -30,6 +31,9 @@ public:
 
     // Helper to get camera position for distance calculations
     glm::vec3 getActiveCameraPosition(EntityManager& entityManager);
+
+    // Generate frustum from active camera for spatial culling
+    Frustum getActiveCameraFrustum(EntityManager& entityManager);
 };
 
 } // namespace VulkanMon

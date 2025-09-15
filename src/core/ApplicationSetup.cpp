@@ -1,5 +1,7 @@
 #include "Application.h"
 #include "../utils/Logger.h"
+#include "../systems/SpatialSystem.h"
+#include "../components/SpatialComponent.h"
 #include <stdexcept>
 
 using namespace VulkanMon;
@@ -108,6 +110,16 @@ void Application::initializeECS() {
 
     // Add render system to handle rendering ECS entities
     renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
+    // Add spatial system for Pokemon-style spatial queries and management
+    // World bounds: (-10, -5, -10) to (10, 10, 10) - allows for expansion beyond current test objects
+    BoundingBox worldBounds(glm::vec3(-10.0f, -5.0f, -10.0f), glm::vec3(10.0f, 10.0f, 10.0f));
+    spatialSystem_ = world_->addSystem<SpatialSystem>(worldBounds);
+
+    // Connect RenderSystem with SpatialSystem for spatial frustum culling
+    if (renderSystem_ && spatialSystem_) {
+        renderSystem_->setSpatialSystem(spatialSystem_);
+        VKMON_INFO("RenderSystem connected to SpatialSystem for frustum culling");
+    }
 
     // Register ECS render callback with VulkanRenderer
     if (renderer_) {
@@ -153,6 +165,12 @@ void Application::createTestScene() {
     renderable1.isVisible = true;
     renderable1.renderLayer = 0;
     world_->addComponent(cube1, renderable1);
+    // Add spatial component for spatial system integration
+    SpatialComponent spatial1;
+    spatial1.boundingRadius = 1.0f;  // Default cube radius
+    spatial1.behavior = SpatialBehavior::STATIC;  // Static test objects
+    spatial1.needsSpatialUpdate = true;  // Initial registration needed
+    world_->addComponent(cube1, spatial1);
 
     // Object 2: Left sphere with different material
     EntityID cube2 = world_->createEntity();
@@ -169,6 +187,12 @@ void Application::createTestScene() {
     renderable2.isVisible = true;
     renderable2.renderLayer = 0;
     world_->addComponent(cube2, renderable2);
+    // Add spatial component
+    SpatialComponent spatial2;
+    spatial2.boundingRadius = 0.8f;  // Sphere radius
+    spatial2.behavior = SpatialBehavior::STATIC;
+    spatial2.needsSpatialUpdate = true;
+    world_->addComponent(cube2, spatial2);
 
     // Object 3: Right pyramid with different material
     EntityID cube3 = world_->createEntity();
@@ -185,6 +209,11 @@ void Application::createTestScene() {
     renderable3.isVisible = true;
     renderable3.renderLayer = 0;
     world_->addComponent(cube3, renderable3);
+    SpatialComponent spatial3;
+    spatial3.boundingRadius = 1.2f;  // Pyramid radius
+    spatial3.behavior = SpatialBehavior::STATIC;
+    spatial3.needsSpatialUpdate = true;
+    world_->addComponent(cube3, spatial3);
 
     // Object 4: Above center cube
     EntityID cube4 = world_->createEntity();
@@ -201,6 +230,11 @@ void Application::createTestScene() {
     renderable4.isVisible = true;
     renderable4.renderLayer = 0;
     world_->addComponent(cube4, renderable4);
+    SpatialComponent spatial4;
+    spatial4.boundingRadius = 0.6f;  // Small sphere radius
+    spatial4.behavior = SpatialBehavior::STATIC;
+    spatial4.needsSpatialUpdate = true;
+    world_->addComponent(cube4, spatial4);
 
     // Object 5: Back cube
     EntityID cube5 = world_->createEntity();
@@ -217,6 +251,11 @@ void Application::createTestScene() {
     renderable5.isVisible = true;
     renderable5.renderLayer = 0;
     world_->addComponent(cube5, renderable5);
+    SpatialComponent spatial5;
+    spatial5.boundingRadius = 1.5f;  // Ground plane radius
+    spatial5.behavior = SpatialBehavior::STATIC;
+    spatial5.needsSpatialUpdate = true;
+    world_->addComponent(cube5, spatial5);
 
     VKMON_DEBUG("Created 5 ECS test entities with diverse shapes:");
     VKMON_DEBUG("  Entity " + std::to_string(cube1) + ": Center cube (Default material)");
@@ -225,9 +264,26 @@ void Application::createTestScene() {
     VKMON_DEBUG("  Entity " + std::to_string(cube4) + ": Top sphere (Chrome material)");
     VKMON_DEBUG("  Entity " + std::to_string(cube5) + ": Ground plane (Emerald material)");
 
-    // Future: Create camera entity to replace legacy Camera class
-    // EntityID cameraEntity = world_->createEntity();
-    // ... add Camera component
+    // Create camera entity for spatial-render integration
+    EntityID cameraEntity = world_->createEntity();
+
+    // Camera transform (positioned to view the test scene)
+    Transform cameraTransform;
+    cameraTransform.position = glm::vec3(0.0f, 0.0f, 5.0f);  // Back from center
+    cameraTransform.rotation = glm::vec3(0.0f, 0.0f, 0.0f);  // Looking forward
+    cameraTransform.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    world_->addComponent(cameraEntity, cameraTransform);
+
+    // Camera component with reasonable perspective settings
+    Camera cameraComponent;
+    cameraComponent.fov = 45.0f;           // Standard FOV
+    cameraComponent.nearPlane = 0.1f;      // Close near plane
+    cameraComponent.farPlane = 1000.0f;    // Far viewing distance
+    cameraComponent.priority = 100;        // High priority (active camera)
+    cameraComponent.isActive = true;       // Enable this camera
+    world_->addComponent(cameraEntity, cameraComponent);
+
+    VKMON_INFO("Created ECS camera entity " + std::to_string(cameraEntity) + " for spatial culling");
 
     VKMON_INFO("Test scene ready - 5 objects loaded");
 }

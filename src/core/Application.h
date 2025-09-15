@@ -13,6 +13,7 @@
 #include "World.h"
 #include "../systems/RenderSystem.h"
 #include "../systems/CameraSystem.h"
+#include "../systems/SpatialSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
 #include "../debug/ECSInspector.h"
@@ -157,6 +158,7 @@ private:
     std::unique_ptr<World> world_;
     RenderSystem* renderSystem_ = nullptr;  // Owned by World
     CameraSystem* cameraSystem_ = nullptr;  // Owned by World
+    SpatialSystem* spatialSystem_ = nullptr;  // Owned by World
 
     // Debug tools
     std::unique_ptr<Debug::ECSInspector> ecsInspector_;

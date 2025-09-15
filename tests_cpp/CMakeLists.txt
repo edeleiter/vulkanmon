@@ -69,6 +69,7 @@ add_executable(vulkanmon_tests
     ../src/systems/MaterialSystem.cpp
     ../src/systems/RenderSystem.cpp
     ../src/systems/CameraSystem.cpp
+    ../src/spatial/SpatialManager.cpp
     ../src/io/AssetManager.cpp
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp

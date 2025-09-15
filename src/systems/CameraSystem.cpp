@@ -98,4 +98,16 @@ glm::vec3 CameraSystem::getActiveCameraPosition(EntityManager& entityManager) {
     return glm::vec3(0.0f);
 }
 
+Frustum CameraSystem::getActiveCameraFrustum(EntityManager& entityManager) {
+    Frustum frustum;
+
+    // Get view-projection matrix from active camera
+    glm::mat4 viewProjectionMatrix = getActiveViewProjectionMatrix(entityManager);
+
+    // Generate frustum planes from matrix
+    frustum.updateFromMatrix(viewProjectionMatrix);
+
+    return frustum;
+}
+
 } // namespace VulkanMon

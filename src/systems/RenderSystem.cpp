@@ -1,4 +1,5 @@
 #include "RenderSystem.h"
+#include "SpatialSystem.h"
 #include "../utils/Logger.h"
 
 namespace VulkanMon {
@@ -9,6 +10,90 @@ void RenderSystem::update(float deltaTime, EntityManager& entityManager) {
     culledObjectCount = 0;
 
     // Future: Update animations, LOD calculations, etc.
+}
+
+void RenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager) {
+    // Reset statistics
+    renderedObjectCount = 0;
+    culledObjectCount = 0;
+
+    // Get camera position for distance calculations (fallback)
+    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+    if (cameraSystem) {
+        cameraPos = cameraSystem->getActiveCameraPosition(entityManager);
+    }
+
+    // Collect potentially visible entities using spatial culling
+    std::vector<EntityID> candidateEntities;
+
+    if (spatialSystem && cameraSystem) {
+        // NEW: Use spatial frustum culling for efficiency
+        Frustum cameraFrustum = cameraSystem->getActiveCameraFrustum(entityManager);
+        candidateEntities = spatialSystem->queryFrustum(cameraFrustum);
+
+        #ifdef DEBUG_VERBOSE
+        VKMON_DEBUG("SpatialSystem frustum culling returned " + std::to_string(candidateEntities.size()) + " candidates");
+        #endif
+    } else {
+        // Fallback: Get all entities with Transform component
+        candidateEntities = entityManager.getEntitiesWithComponent<Transform>();
+
+        #ifdef DEBUG_VERBOSE
+        VKMON_DEBUG("Using fallback entity collection: " + std::to_string(candidateEntities.size()) + " entities");
+        #endif
+    }
+
+    // Build render commands from candidate entities
+    std::vector<RenderCommand> renderCommands;
+
+    for (EntityID entity : candidateEntities) {
+        // Check if entity has both Transform and Renderable components
+        if (hasRequiredComponents(entity, entityManager)) {
+            Transform& transform = entityManager.getComponent<Transform>(entity);
+            Renderable& renderable = entityManager.getComponent<Renderable>(entity);
+
+            // Skip if not visible
+            if (!renderable.isVisible) {
+                culledObjectCount++;
+                continue;
+            }
+
+            // Calculate distance to camera for LOD and additional culling
+            float distance = glm::length(transform.position - cameraPos);
+
+            // Additional distance-based culling for very far objects
+            if (!renderable.shouldRender(distance) || distance > maxRenderDistance) {
+                culledObjectCount++;
+                continue;
+            }
+
+            // Add to render commands
+            renderCommands.push_back({
+                entity,
+                &transform,
+                &renderable,
+                distance
+            });
+        }
+    }
+
+    // Sort render commands for optimal rendering
+    std::sort(renderCommands.begin(), renderCommands.end());
+
+    // Submit render commands to renderer
+    for (const auto& cmd : renderCommands) {
+        submitRenderCommand(renderer, cmd);
+        renderedObjectCount++;
+    }
+
+    // Log rendering statistics (only in debug builds)
+    #ifdef DEBUG
+    if ((renderedObjectCount + culledObjectCount) > 0) {
+        std::string cullingMethod = (spatialSystem && cameraSystem) ? "spatial+frustum" : "fallback";
+        VKMON_DEBUG("RenderSystem (" + cullingMethod + "): Rendered " + std::to_string(renderedObjectCount) +
+                   " objects, culled " + std::to_string(culledObjectCount));
+    }
+    #endif
 }
 
 void RenderSystem::submitRenderCommand(VulkanRenderer& renderer, const RenderCommand& cmd) {
