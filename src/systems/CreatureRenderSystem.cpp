@@ -14,9 +14,6 @@ CreatureRenderSystem::CreatureRenderSystem(CameraSystem* cameraSystem, SpatialSy
 }
 
 void CreatureRenderSystem::update(float deltaTime, EntityManager& entityManager) {
-    // Update stats timer for periodic logging
-    statsTimer_ += deltaTime;
-
     // Future: Update creature animations, behavior states, etc.
     // For now, just reset statistics for the next frame
     frameStats_.reset();
@@ -60,8 +57,9 @@ void CreatureRenderSystem::render(VulkanRenderer& renderer, EntityManager& entit
     auto frameEnd = std::chrono::high_resolution_clock::now();
     frameStats_.totalFrameTimeMs = std::chrono::duration<float, std::milli>(frameEnd - frameStart).count();
 
-    // Log performance stats periodically
-    if (shouldLogStats()) {
+    // Frame-counter based performance logging - the engine heartbeat
+    renderFrameCount_++;
+    if (renderFrameCount_ % LOG_EVERY_N_RENDERS == 0) {
         logPerformanceStats();
     }
 
@@ -242,13 +240,13 @@ std::string CreatureRenderSystem::generateBatchKey(const std::string& meshPath, 
     return meshPath + "_mat" + std::to_string(materialId);
 }
 
-bool CreatureRenderSystem::shouldLogStats() const {
-    return statsTimer_ >= STATS_LOG_INTERVAL;
-}
-
 void CreatureRenderSystem::logPerformanceStats() {
+    // Calculate estimated FPS from frame time
+    float estimatedFPS = frameStats_.totalFrameTimeMs > 0.0f ?
+                        (1000.0f / frameStats_.totalFrameTimeMs) : 0.0f;
+
     std::ostringstream stats;
-    stats << "CreatureRenderSystem Performance Report:\n"
+    stats << "CreatureRenderSystem Performance Report (Frame " << renderFrameCount_ << "):\n"
           << "  Creatures: " << frameStats_.renderedCreatures << "/" << frameStats_.totalCreatures
           << " (" << (frameStats_.cullingEfficiency() * 100.0f) << "% culled)\n"
           << "  Batches: " << frameStats_.instanceBatches << " (efficiency: "
@@ -257,12 +255,12 @@ void CreatureRenderSystem::logPerformanceStats() {
           << "ms, Batching=" << frameStats_.batchingTimeMs
           << "ms, Rendering=" << frameStats_.renderingTimeMs
           << "ms, Total=" << frameStats_.totalFrameTimeMs << "ms\n"
-          << "  Draw Calls: " << frameStats_.totalDrawCalls;
+          << "  Draw Calls: " << frameStats_.totalDrawCalls
+          << " | Est. FPS: ~" << static_cast<int>(estimatedFPS);
 
     VKMON_INFO(stats.str());
 
-    // Reset timer
-    statsTimer_ = 0.0f;
+    // No timer reset needed - frame counter handles periodicity automatically
 }
 
 std::vector<std::string> CreatureRenderSystem::getBatchMeshPaths() const {

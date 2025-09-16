@@ -111,8 +111,11 @@ private:
 
     // Performance optimization
     static constexpr size_t BATCH_RESERVE_SIZE = 128;
-    static constexpr float STATS_LOG_INTERVAL = 5.0f; // Log stats every 5 seconds
-    float statsTimer_ = 0.0f;
+
+    // Frame-based performance logging - the engine heartbeat
+    size_t renderFrameCount_ = 0;
+    static constexpr size_t LOG_EVERY_N_RENDERS = 300;     // ~5 seconds at 60 FPS
+    static constexpr float LOG_INTERVAL_SECONDS = 5.0f;    // Documentation
 
 public:
     explicit CreatureRenderSystem(CameraSystem* cameraSystem = nullptr, SpatialSystem* spatialSystem = nullptr);
@@ -160,8 +163,7 @@ private:
     void reserveBatchCapacity(const std::vector<EntityID>& entities, EntityManager& entityManager);
     std::string generateBatchKey(const std::string& meshPath, uint32_t materialId) const;
 
-    // Performance utilities
-    bool shouldLogStats() const;
+    // Performance utilities (none needed - frame counter handles this)
 };
 
 } // namespace VulkanMon
