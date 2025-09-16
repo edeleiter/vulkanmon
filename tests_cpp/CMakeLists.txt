@@ -72,6 +72,9 @@ add_executable(vulkanmon_tests
 
     # Spatial System tests (NEW)
     test_WorldConfig.cpp
+    spatial/test_SpatialSystem.cpp
+    spatial/test_SpatialPerformance.cpp
+    spatial/bench_SpatialSystem.cpp
 
     # Test utilities
     fixtures/TestHelpers.cpp
@@ -90,6 +93,8 @@ add_executable(vulkanmon_tests
     ../src/systems/CameraSystem.cpp
     ../src/spatial/SpatialManager.cpp
     ../src/spatial/WorldConfig.cpp
+    ../src/spatial/LayerMask.cpp
+    ../src/spatial/SpatialCache.cpp
     ../src/io/AssetManager.cpp
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp

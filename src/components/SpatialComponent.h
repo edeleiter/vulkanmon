@@ -2,6 +2,7 @@
 
 #include "../core/Entity.h"
 #include "../spatial/SpatialManager.h"
+#include "../spatial/LayerMask.h"
 #include <glm/glm.hpp>
 
 namespace VulkanMon {
@@ -25,6 +26,9 @@ struct SpatialComponent {
     bool isVisible = true;               // Last frame visibility result
     float lastCullingDistance = 0.0f;    // Distance when last culled
 
+    // Layer-based filtering for spatial queries
+    uint32_t spatialLayers = LayerMask::None;  // What layers this entity belongs to
+
     // Pokemon-specific spatial data
     float detectionRadius = 15.0f;       // How far creature can detect others
     float territoryRadius = 25.0f;       // Territory size for territorial creatures
@@ -32,14 +36,14 @@ struct SpatialComponent {
 
     // Performance tracking
     uint32_t spatialQueryCount = 0;      // How many queries this entity made
-    float timeSinceLastQuery = 0.0f;     // Throttle expensive queries
+    float timeSinceLastQuery = 1.0f;     // Throttle expensive queries (start >= interval for first query)
 
     // Default constructor
     SpatialComponent() = default;
 
     // Convenience constructor
-    SpatialComponent(float radius, SpatialBehavior behav = SpatialBehavior::DYNAMIC)
-        : boundingRadius(radius), behavior(behav) {
+    SpatialComponent(float radius, SpatialBehavior behav = SpatialBehavior::DYNAMIC, uint32_t layers = LayerMask::None)
+        : boundingRadius(radius), behavior(behav), spatialLayers(layers) {
         localBounds = BoundingBox(glm::vec3(0.0f), radius);
     }
 
@@ -59,6 +63,7 @@ struct SpatialComponent {
 
         if (timeSinceLastQuery >= minInterval) {
             timeSinceLastQuery = 0.0f;
+            spatialQueryCount++;
             return false; // Don't throttle
         }
         return true; // Throttle this query
@@ -73,6 +78,22 @@ struct SpatialComponent {
     void setBoundingRadius(float radius) {
         boundingRadius = radius;
         localBounds = BoundingBox(glm::vec3(0.0f), radius);
+    }
+
+    void setSpatialLayers(uint32_t layers) {
+        spatialLayers = layers;
+    }
+
+    void addSpatialLayer(uint32_t layer) {
+        spatialLayers |= layer;
+    }
+
+    void removeSpatialLayer(uint32_t layer) {
+        spatialLayers &= ~layer;
+    }
+
+    bool hasLayer(uint32_t layer) const {
+        return LayerMask::contains(spatialLayers, layer);
     }
 };
 

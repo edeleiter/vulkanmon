@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Entity.h"
+#include "LayerMask.h"
+#include "SpatialCache.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <unordered_map>
@@ -98,6 +100,8 @@ public:
         size_t totalEntitiesReturned = 0;
         float lastQueryTimeMs = 0.0f;
         float averageQueryTimeMs = 0.0f;
+        float cacheHitRate = 0.0f;
+        size_t cacheSize = 0;
     };
 
 private:
@@ -106,41 +110,51 @@ private:
 
     // Entity tracking for updates
     std::unordered_map<EntityID, glm::vec3> entityPositions_;
+    std::unordered_map<EntityID, uint32_t> entityLayers_;
 
     // Performance tracking
     mutable SpatialStats stats_;
+
+    // Query caching system
+    mutable PredictiveSpatialCache cache_;
 
 public:
     SpatialManager(const BoundingBox& worldBounds);
     ~SpatialManager() = default;
 
     // Entity management
-    void addEntity(EntityID entity, const glm::vec3& position);
+    void addEntity(EntityID entity, const glm::vec3& position, uint32_t layers = LayerMask::None);
     void removeEntity(EntityID entity);
     void updateEntity(EntityID entity, const glm::vec3& newPosition);
+    void updateEntityLayers(EntityID entity, uint32_t layers);
 
     // Spatial queries for Pokemon gameplay
-    std::vector<EntityID> queryRegion(const BoundingBox& region) const;
-    std::vector<EntityID> queryFrustum(const Frustum& frustum) const;
-    std::vector<EntityID> queryRadius(const glm::vec3& center, float radius) const;
+    std::vector<EntityID> queryRegion(const BoundingBox& region, uint32_t layerMask = LayerMask::All) const;
+    std::vector<EntityID> queryFrustum(const Frustum& frustum, uint32_t layerMask = LayerMask::All) const;
+    std::vector<EntityID> queryRadius(const glm::vec3& center, float radius, uint32_t layerMask = LayerMask::All) const;
 
     // Pokemon-specific queries
     std::vector<EntityID> findCreaturesInRadius(const glm::vec3& center, float radius) const;
     std::vector<EntityID> findVisibleCreatures(const Frustum& cameraFrustum) const;
 
     // Nearest neighbor queries (for creature AI)
-    std::vector<EntityID> findNearestEntities(const glm::vec3& position, int count, float maxDistance = std::numeric_limits<float>::max()) const;
-    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = std::numeric_limits<float>::max()) const;
+    std::vector<EntityID> findNearestEntities(const glm::vec3& position, int count, float maxDistance = std::numeric_limits<float>::max(), uint32_t layerMask = LayerMask::All) const;
+    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = std::numeric_limits<float>::max(), uint32_t layerMask = LayerMask::All) const;
 
     // Performance and debugging
     void getStatistics(int& nodeCount, int& maxDepth, int& totalEntities) const;
     const SpatialStats& getPerformanceStats() const { return stats_; }
     void clear();
 
+    // Cache management
+    void clearCache() { cache_.clear(); }
+    void cleanupCache() { cache_.cleanup(); }
+
     const BoundingBox& getWorldBounds() const { return worldBounds_; }
 
 private:
     void updateStatistics(float queryTimeMs, size_t entitiesReturned) const;
+    bool passesLayerFilter(EntityID entity, uint32_t layerMask) const;
 };
 
 } // namespace VulkanMon

@@ -170,6 +170,7 @@ void OctreeNode::query(const BoundingBox& region, std::vector<EntityID>& results
     }
 
     if (is_leaf_) {
+        // Only add entities that need further filtering - let SpatialManager handle position checks
         results.insert(results.end(), entities_.begin(), entities_.end());
     } else {
         for (int i = 0; i < 8; ++i) {
@@ -322,16 +323,21 @@ SpatialManager::SpatialManager(const BoundingBox& worldBounds)
     VKMON_INFO("SpatialManager initialized with world bounds");
 }
 
-void SpatialManager::addEntity(EntityID entity, const glm::vec3& position) {
+void SpatialManager::addEntity(EntityID entity, const glm::vec3& position, uint32_t layers) {
     auto it = entityPositions_.find(entity);
     if (it != entityPositions_.end()) {
         VKMON_WARNING("Entity already exists in spatial manager, updating position");
         updateEntity(entity, position);
+        updateEntityLayers(entity, layers);
         return;
     }
 
     entityPositions_[entity] = position;
+    entityLayers_[entity] = layers;
     octree_->insert(entity, position);
+
+    // Clear cache when spatial structure changes
+    cache_.clear();
 }
 
 void SpatialManager::removeEntity(EntityID entity) {
@@ -343,6 +349,10 @@ void SpatialManager::removeEntity(EntityID entity) {
 
     octree_->remove(entity, it->second);
     entityPositions_.erase(it);
+    entityLayers_.erase(entity);
+
+    // Clear cache when spatial structure changes
+    cache_.clear();
 }
 
 void SpatialManager::updateEntity(EntityID entity, const glm::vec3& newPosition) {
@@ -357,47 +367,41 @@ void SpatialManager::updateEntity(EntityID entity, const glm::vec3& newPosition)
     it->second = newPosition;
 
     octree_->update(entity, oldPosition, newPosition);
+
+    // Clear cache when spatial structure changes
+    cache_.clear();
 }
 
-std::vector<EntityID> SpatialManager::queryRegion(const BoundingBox& region) const {
+void SpatialManager::updateEntityLayers(EntityID entity, uint32_t layers) {
+    auto it = entityPositions_.find(entity);
+    if (it == entityPositions_.end()) {
+        VKMON_WARNING("Attempted to update layers for entity that doesn't exist in spatial manager");
+        return;
+    }
+
+    entityLayers_[entity] = layers;
+}
+
+std::vector<EntityID> SpatialManager::queryRegion(const BoundingBox& region, uint32_t layerMask) const {
+    // Try cache first
+    std::vector<EntityID> cachedResults;
+    if (cache_.tryGetRegionQuery(region, layerMask, cachedResults)) {
+        updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
+        return cachedResults;
+    }
+
     auto start = std::chrono::high_resolution_clock::now();
 
     std::vector<EntityID> results;
     octree_->query(region, results);
 
-    auto end = std::chrono::high_resolution_clock::now();
-    float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
-    updateStatistics(queryTime, results.size());
-
-    return results;
-}
-
-std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum) const {
-    auto start = std::chrono::high_resolution_clock::now();
-
-    std::vector<EntityID> results;
-    octree_->query(frustum, results);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
-    updateStatistics(queryTime, results.size());
-
-    return results;
-}
-
-std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float radius) const {
-    auto start = std::chrono::high_resolution_clock::now();
-
-    std::vector<EntityID> results;
-    octree_->queryRadius(center, radius, results);
-
-    // Filter results by actual distance (octree query returns candidates)
+    // Apply position and layer filtering
     std::vector<EntityID> filteredResults;
     for (EntityID entity : results) {
         auto it = entityPositions_.find(entity);
         if (it != entityPositions_.end()) {
-            float distance = glm::distance(center, it->second);
-            if (distance <= radius) {
+            // Check if entity position is actually within the region
+            if (region.contains(it->second) && passesLayerFilter(entity, layerMask)) {
                 filteredResults.push_back(entity);
             }
         }
@@ -407,21 +411,90 @@ std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float
     float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
     updateStatistics(queryTime, filteredResults.size());
 
+    // Cache the result
+    cache_.cacheRegionQuery(region, layerMask, filteredResults);
+
+    return filteredResults;
+}
+
+std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint32_t layerMask) const {
+    // Try cache first
+    std::vector<EntityID> cachedResults;
+    if (cache_.tryGetFrustumQuery(frustum, layerMask, cachedResults)) {
+        updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
+        return cachedResults;
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::vector<EntityID> results;
+    octree_->query(frustum, results);
+
+    // Apply layer filtering
+    std::vector<EntityID> filteredResults;
+    for (EntityID entity : results) {
+        if (passesLayerFilter(entity, layerMask)) {
+            filteredResults.push_back(entity);
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
+    updateStatistics(queryTime, filteredResults.size());
+
+    // Cache the result
+    cache_.cacheFrustumQuery(frustum, layerMask, filteredResults);
+
+    return filteredResults;
+}
+
+std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float radius, uint32_t layerMask) const {
+    // Try cache first
+    std::vector<EntityID> cachedResults;
+    if (cache_.tryGetRadiusQuery(center, radius, layerMask, cachedResults)) {
+        updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
+        return cachedResults;
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::vector<EntityID> results;
+    octree_->queryRadius(center, radius, results);
+
+    // Filter results by actual distance and layers (octree query returns candidates)
+    std::vector<EntityID> filteredResults;
+    for (EntityID entity : results) {
+        auto it = entityPositions_.find(entity);
+        if (it != entityPositions_.end()) {
+            float distance = glm::distance(center, it->second);
+            if (distance <= radius && passesLayerFilter(entity, layerMask)) {
+                filteredResults.push_back(entity);
+            }
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
+    updateStatistics(queryTime, filteredResults.size());
+
+    // Cache the result
+    cache_.cacheRadiusQuery(center, radius, layerMask, filteredResults);
+
     return filteredResults;
 }
 
 std::vector<EntityID> SpatialManager::findCreaturesInRadius(const glm::vec3& center, float radius) const {
-    return queryRadius(center, radius);
+    return queryRadius(center, radius, LayerMask::Creatures);
 }
 
 std::vector<EntityID> SpatialManager::findVisibleCreatures(const Frustum& cameraFrustum) const {
-    return queryFrustum(cameraFrustum);
+    return queryFrustum(cameraFrustum, LayerMask::Creatures);
 }
 
-std::vector<EntityID> SpatialManager::findNearestEntities(const glm::vec3& position, int count, float maxDistance) const {
+std::vector<EntityID> SpatialManager::findNearestEntities(const glm::vec3& position, int count, float maxDistance, uint32_t layerMask) const {
     // Query a region and sort by distance
     BoundingBox searchRegion(position, maxDistance);
-    std::vector<EntityID> candidates = queryRegion(searchRegion);
+    std::vector<EntityID> candidates = queryRegion(searchRegion, layerMask);
 
     // Calculate distances and sort
     std::vector<std::pair<float, EntityID>> distanceEntityPairs;
@@ -448,8 +521,8 @@ std::vector<EntityID> SpatialManager::findNearestEntities(const glm::vec3& posit
     return results;
 }
 
-EntityID SpatialManager::findNearestEntity(const glm::vec3& position, float maxDistance) const {
-    auto nearest = findNearestEntities(position, 1, maxDistance);
+EntityID SpatialManager::findNearestEntity(const glm::vec3& position, float maxDistance, uint32_t layerMask) const {
+    auto nearest = findNearestEntities(position, 1, maxDistance, layerMask);
     return nearest.empty() ? INVALID_ENTITY : nearest[0];
 }
 
@@ -463,6 +536,8 @@ void SpatialManager::getStatistics(int& nodeCount, int& maxDepth, int& totalEnti
 void SpatialManager::clear() {
     octree_->clear();
     entityPositions_.clear();
+    entityLayers_.clear();
+    cache_.clear();
     stats_ = SpatialStats{};
 }
 
@@ -474,6 +549,23 @@ void SpatialManager::updateStatistics(float queryTimeMs, size_t entitiesReturned
     // Update running average
     float alpha = 0.1f; // Smoothing factor
     stats_.averageQueryTimeMs = stats_.averageQueryTimeMs * (1.0f - alpha) + queryTimeMs * alpha;
+
+    // Update cache statistics
+    stats_.cacheHitRate = cache_.getCacheHitRate();
+    stats_.cacheSize = cache_.getCacheSize();
+}
+
+bool SpatialManager::passesLayerFilter(EntityID entity, uint32_t layerMask) const {
+    if (layerMask == LayerMask::All) {
+        return true;
+    }
+
+    auto it = entityLayers_.find(entity);
+    if (it == entityLayers_.end()) {
+        return layerMask == LayerMask::All; // If no layers set, only pass if querying all
+    }
+
+    return LayerMask::contains(layerMask, it->second);
 }
 
 } // namespace VulkanMon

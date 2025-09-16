@@ -69,6 +69,8 @@ add_executable(vulkanmon
     src/debug/ECSInspector.cpp
     src/spatial/SpatialManager.cpp
     src/spatial/WorldConfig.cpp
+    src/spatial/LayerMask.cpp
+    src/spatial/SpatialCache.cpp
 )
 
 # Make sure shaders are compiled before building the executable

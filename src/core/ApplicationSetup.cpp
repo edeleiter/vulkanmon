@@ -177,6 +177,7 @@ void Application::createTestScene() {
     SpatialComponent spatial1;
     spatial1.boundingRadius = 1.0f;  // Default cube radius
     spatial1.behavior = SpatialBehavior::STATIC;  // Static test objects
+    spatial1.spatialLayers = LayerMask::Terrain;  // Terrain object
     spatial1.needsSpatialUpdate = true;  // Initial registration needed
     world_->addComponent(cube1, spatial1);
 
@@ -199,6 +200,7 @@ void Application::createTestScene() {
     SpatialComponent spatial2;
     spatial2.boundingRadius = 0.8f;  // Sphere radius
     spatial2.behavior = SpatialBehavior::STATIC;
+    spatial2.spatialLayers = LayerMask::Creatures;  // Creature-like object
     spatial2.needsSpatialUpdate = true;
     world_->addComponent(cube2, spatial2);
 
@@ -220,6 +222,7 @@ void Application::createTestScene() {
     SpatialComponent spatial3;
     spatial3.boundingRadius = 1.2f;  // Pyramid radius
     spatial3.behavior = SpatialBehavior::STATIC;
+    spatial3.spatialLayers = LayerMask::Buildings;  // Structure object
     spatial3.needsSpatialUpdate = true;
     world_->addComponent(cube3, spatial3);
 
@@ -241,6 +244,7 @@ void Application::createTestScene() {
     SpatialComponent spatial4;
     spatial4.boundingRadius = 0.6f;  // Small sphere radius
     spatial4.behavior = SpatialBehavior::STATIC;
+    spatial4.spatialLayers = LayerMask::Items;  // Collectible item
     spatial4.needsSpatialUpdate = true;
     world_->addComponent(cube4, spatial4);
 
@@ -262,6 +266,7 @@ void Application::createTestScene() {
     SpatialComponent spatial5;
     spatial5.boundingRadius = 1.5f;  // Ground plane radius
     spatial5.behavior = SpatialBehavior::STATIC;
+    spatial5.spatialLayers = LayerMask::Grass;  // Environmental ground
     spatial5.needsSpatialUpdate = true;
     world_->addComponent(cube5, spatial5);
 
