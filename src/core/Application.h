@@ -12,6 +12,7 @@
 #include "../rendering/VulkanRenderer.h"
 #include "World.h"
 #include "../systems/RenderSystem.h"
+#include "../systems/CreatureRenderSystem.h"
 #include "../systems/CameraSystem.h"
 #include "../systems/SpatialSystem.h"
 #include "../components/Transform.h"
@@ -156,8 +157,9 @@ private:
 
     // ECS World and systems
     std::unique_ptr<World> world_;
-    RenderSystem* renderSystem_ = nullptr;  // Owned by World
-    CameraSystem* cameraSystem_ = nullptr;  // Owned by World
+    RenderSystem* renderSystem_ = nullptr;        // Owned by World
+    CreatureRenderSystem* creatureRenderSystem_ = nullptr;  // Owned by World
+    CameraSystem* cameraSystem_ = nullptr;        // Owned by World
     SpatialSystem* spatialSystem_ = nullptr;  // Owned by World
 
     // Debug tools

@@ -151,9 +151,10 @@ TEST_CASE("Spatial System Stress Tests", "[spatial][stress]") {
         // Verify performance targets from the guide
         INFO("Add time: " << addDuration << "ms for 10,000 entities");
         INFO("Query time: " << queryDuration << "ms for 100 queries");
+        size_t totalResults = 0;
+        for (size_t count : queryResults) { totalResults += count; }
         INFO("Average entities per query: " <<
-             (queryResults.empty() ? 0 :
-              std::accumulate(queryResults.begin(), queryResults.end(), 0) / queryResults.size()));
+             (queryResults.empty() ? 0.0 : static_cast<double>(totalResults) / queryResults.size()));
 
         // Performance targets from the guide (adjusted for debug builds)
         CHECK(addDuration < 1000.0f); // Should add 10k entities in under 1 second

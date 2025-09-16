@@ -38,6 +38,23 @@ struct PushConstants {
     glm::mat4 model;
 };
 
+// Forward declaration for instanced rendering (Phase 7.1)
+namespace VulkanMon {
+    // GPU instance data structure - matches shader layout
+    struct InstanceData {
+        glm::mat4 modelMatrix;     // 64 bytes - transformation matrix
+        glm::vec4 materialParams;  // 16 bytes - material ID + custom params
+        glm::vec4 lodParams;       // 16 bytes - LOD level + distance + custom
+
+        InstanceData() = default;
+        InstanceData(const glm::mat4& model, uint32_t materialId, float lodLevel = 0.0f)
+            : modelMatrix(model)
+            , materialParams(static_cast<float>(materialId), 0.0f, 0.0f, 0.0f)
+            , lodParams(lodLevel, 0.0f, 0.0f, 0.0f) {}
+    };
+    static_assert(sizeof(InstanceData) == 96, "InstanceData must be 96 bytes for GPU alignment");
+}
+
 /**
  * VulkanMon Vulkan Rendering System
  * 
@@ -249,6 +266,31 @@ public:
      * Submits all commands and presents frame
      */
     void endECSFrame();
+
+    // ===== INSTANCED RENDERING (Phase 7.1) =====
+    // GPU instancing for massive creature rendering
+
+    /**
+     * Render multiple instances of the same mesh with different transforms
+     * This is the high-performance path for rendering hundreds of identical objects
+     *
+     * @param meshPath Path to mesh file (will be loaded if needed)
+     * @param instanceData Array of instance data (transforms + material params)
+     * @param instanceCount Number of instances to render
+     * @param baseMaterialId Base material ID for all instances
+     */
+    void renderInstanced(const std::string& meshPath,
+                        const void* instanceData,
+                        uint32_t instanceCount,
+                        uint32_t baseMaterialId);
+
+    /**
+     * Convenience method for rendering instanced creatures using InstanceData struct
+     * This is the preferred method for CreatureRenderSystem
+     */
+    void renderInstancedCreatures(const std::string& meshPath,
+                                 const std::vector<VulkanMon::InstanceData>& instances,
+                                 uint32_t baseMaterialId);
 
     // ===== IMGUI DEBUG INTERFACE =====
     // Phase 6.3: ECS Inspector integration

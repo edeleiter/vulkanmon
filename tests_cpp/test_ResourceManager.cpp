@@ -213,7 +213,7 @@ TEST_CASE("ResourceManager Memory Management", "[ResourceManager][Memory]") {
         // Test that ResourceManager provides proper device access
         // This validates the Vulkan device handling
         
-        VkDevice mockDevice = reinterpret_cast<VkDevice>(0x87654321);
+        VkDevice mockDevice = reinterpret_cast<VkDevice>(static_cast<uintptr_t>(0x87654321));
         VkPhysicalDevice mockPhysicalDevice = reinterpret_cast<VkPhysicalDevice>(0x12345678);
         
         // Validate device handle types

@@ -195,10 +195,10 @@ TEST_CASE("LoadedTexture Data Structure", "[AssetManager][LoadedTexture]") {
 TEST_CASE("AssetManager Interface Design", "[AssetManager][Interface]") {
     SECTION("Constructor parameter validation") {
         // Test AssetManager constructor interface requirements
-        VkDevice mockDevice = reinterpret_cast<VkDevice>(0x12345678);
-        VkPhysicalDevice mockPhysicalDevice = reinterpret_cast<VkPhysicalDevice>(0x87654321);
-        VkCommandPool mockCommandPool = reinterpret_cast<VkCommandPool>(0x11111111);
-        VkQueue mockQueue = reinterpret_cast<VkQueue>(0x22222222);
+        VkDevice mockDevice = reinterpret_cast<VkDevice>(static_cast<uintptr_t>(0x12345678));
+        VkPhysicalDevice mockPhysicalDevice = reinterpret_cast<VkPhysicalDevice>(static_cast<uintptr_t>(0x87654321));
+        VkCommandPool mockCommandPool = reinterpret_cast<VkCommandPool>(static_cast<uintptr_t>(0x11111111));
+        VkQueue mockQueue = reinterpret_cast<VkQueue>(static_cast<uintptr_t>(0x22222222));
         std::string assetsPath = "test_assets/";
         
         // Validate constructor parameter types

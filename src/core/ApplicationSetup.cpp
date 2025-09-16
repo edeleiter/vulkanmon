@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "../utils/Logger.h"
 #include "../systems/SpatialSystem.h"
+#include "../systems/CreatureRenderSystem.h"
 #include "../components/SpatialComponent.h"
 #include "../spatial/WorldConfig.h"
 #include <stdexcept>
@@ -112,6 +113,9 @@ void Application::initializeECS() {
     // Add render system to handle rendering ECS entities
     renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
 
+    // Add creature render system for massive creature rendering (Phase 7.1)
+    creatureRenderSystem_ = world_->addSystem<CreatureRenderSystem>(cameraSystem_);
+
     // Add spatial system for Pokemon-style spatial queries and management
     WorldConfig worldConfig = WorldConfig::createTestWorld();
     VKMON_INFO("Using world config: " + worldConfig.name +
@@ -127,6 +131,12 @@ void Application::initializeECS() {
     if (renderSystem_ && spatialSystem_) {
         renderSystem_->setSpatialSystem(spatialSystem_);
         VKMON_INFO("RenderSystem connected to SpatialSystem for frustum culling");
+    }
+
+    // Connect CreatureRenderSystem with SpatialSystem for massive creature culling
+    if (creatureRenderSystem_ && spatialSystem_) {
+        creatureRenderSystem_->setSpatialSystem(spatialSystem_);
+        VKMON_INFO("CreatureRenderSystem connected to SpatialSystem for creature culling");
     }
 
     // Register ECS render callback with VulkanRenderer
@@ -298,7 +308,56 @@ void Application::createTestScene() {
 
     VKMON_INFO("Created ECS camera entity " + std::to_string(cameraEntity) + " for spatial culling");
 
-    VKMON_INFO("Test scene ready - 5 objects loaded");
+    // =============================================================================
+    // PHASE 7.1 TEST: Create 5 identical creatures for instanced rendering test
+    // =============================================================================
+
+    VKMON_INFO("Creating Phase 7.1 creature test entities...");
+
+    for (int i = 0; i < 5; ++i) {
+        EntityID creature = world_->createEntity();
+
+        // Transform - arrange in a line for easy testing
+        Transform creatureTransform;
+        creatureTransform.position = glm::vec3(
+            -8.0f + i * 4.0f,  // X: spread from -8 to +8
+            -1.0f,             // Y: slightly below center objects
+            0.0f               // Z: same depth as center objects
+        );
+        creatureTransform.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+        creatureTransform.scale = glm::vec3(0.5f, 0.5f, 0.5f);  // Smaller than main objects
+        world_->addComponent(creature, creatureTransform);
+
+        // Renderable - all use the same mesh and material for instancing
+        Renderable creatureRenderable;
+        creatureRenderable.meshPath = "sphere.obj";    // Same mesh for all creatures
+        creatureRenderable.texturePath = "default";
+        creatureRenderable.materialId = 1;             // Gold material for all creatures
+        creatureRenderable.isVisible = true;
+        creatureRenderable.renderLayer = 0;
+        world_->addComponent(creature, creatureRenderable);
+
+        // CreatureComponent - makes them creatures that CreatureRenderSystem will handle
+        CreatureComponent creatureComp;
+        creatureComp.state = CreatureState::IDLE;
+        creatureComp.detectionRadius = 10.0f;
+        creatureComp.type = CreatureComponent::CreatureType::PEACEFUL;
+        world_->addComponent(creature, creatureComp);
+
+        // SpatialComponent - for spatial system integration
+        SpatialComponent creatureSpatial;
+        creatureSpatial.spatialLayers = LayerMask::Creatures;
+        creatureSpatial.boundingRadius = 0.5f;  // Match the scale
+        world_->addComponent(creature, creatureSpatial);
+
+        VKMON_DEBUG("Created creature " + std::to_string(creature) +
+                   " at position (" + std::to_string(creatureTransform.position.x) +
+                   ", " + std::to_string(creatureTransform.position.y) +
+                   ", " + std::to_string(creatureTransform.position.z) + ")");
+    }
+
+    VKMON_INFO("Phase 7.1: Created 5 identical creatures for instanced rendering test");
+    VKMON_INFO("Test scene ready - 5 objects + 5 creatures loaded");
 }
 
 void Application::loadTestAssets() {

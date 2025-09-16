@@ -103,8 +103,10 @@ TEST_CASE("Spatial System Performance Validation", "[spatial][performance]") {
         float averageQueryTime = totalTime / 100.0f;
 
         INFO("Average query time: " << averageQueryTime << "ms for 50-unit radius");
+        size_t totalEntities = 0;
+        for (size_t count : querySizes) { totalEntities += count; }
         INFO("Average entities returned: " <<
-             (querySizes.empty() ? 0 : std::accumulate(querySizes.begin(), querySizes.end(), 0) / querySizes.size()));
+             (querySizes.empty() ? 0.0 : static_cast<double>(totalEntities) / querySizes.size()));
 
         CHECK(averageQueryTime < MAX_RADIUS_QUERY_TIME_MS);
     }

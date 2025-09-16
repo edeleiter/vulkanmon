@@ -377,6 +377,97 @@ void VulkanRenderer::endECSFrame() {
     VKMON_DEBUG("ECS frame completed and presented");
 }
 
+// =============================================================================
+// PHASE 7.1: Instanced Rendering Implementation
+// GPU instancing for massive creature rendering
+// =============================================================================
+
+void VulkanRenderer::renderInstanced(const std::string& meshPath,
+                                    const void* instanceData,
+                                    uint32_t instanceCount,
+                                    uint32_t baseMaterialId) {
+    if (!ecsFrameActive_) {
+        VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
+        return;
+    }
+
+    if (instanceCount == 0) {
+        return; // Nothing to render
+    }
+
+    // Ensure mesh is loaded
+    ensureMeshLoaded(meshPath);
+
+    // Bind material-specific descriptor set (set 1)
+    if (materialSystem_ && baseMaterialId < materialSystem_->getMaterialCount()) {
+        VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(baseMaterialId);
+        if (materialDescriptorSet != VK_NULL_HANDLE) {
+            // Bind the material descriptor set to set 1
+            vkCmdBindDescriptorSets(
+                commandBuffers_[currentImageIndex_],
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipelineLayout_,
+                1, 1, &materialDescriptorSet, 0, nullptr
+            );
+        }
+    }
+
+    // Find cached model and render all instances
+    auto modelIt = modelCache_.find(meshPath);
+    if (modelIt != modelCache_.end()) {
+        auto model = modelIt->second;
+        if (model && !model->meshes.empty()) {
+            for (const auto& mesh : model->meshes) {
+                // Bind vertex and index buffers
+                VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(commandBuffers_[currentImageIndex_], 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(commandBuffers_[currentImageIndex_], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+                // TODO: For proper instancing, we need to:
+                // 1. Create instance buffer and upload instanceData
+                // 2. Bind instance buffer as secondary vertex buffer
+                // 3. Use vkCmdDrawIndexed with instanceCount > 1
+                // For now, fallback to individual draws with push constants
+
+                const auto* instances = static_cast<const InstanceData*>(instanceData);
+                for (uint32_t i = 0; i < instanceCount; ++i) {
+                    // Use push constants for model matrix (temporary solution)
+                    PushConstants pushConstants{};
+                    pushConstants.model = instances[i].modelMatrix;
+
+                    vkCmdPushConstants(
+                        commandBuffers_[currentImageIndex_],
+                        pipelineLayout_,
+                        VK_SHADER_STAGE_VERTEX_BIT,
+                        0,
+                        sizeof(PushConstants),
+                        &pushConstants
+                    );
+
+                    // Draw single instance
+                    vkCmdDrawIndexed(commandBuffers_[currentImageIndex_],
+                                    static_cast<uint32_t>(mesh->indices.size()),
+                                    1, 0, 0, 0);
+                }
+            }
+        }
+        VKMON_DEBUG("Rendered " + std::to_string(instanceCount) + " instances of mesh: " + meshPath);
+    } else {
+        VKMON_WARNING("No model cached for instanced meshPath: " + meshPath);
+    }
+}
+
+void VulkanRenderer::renderInstancedCreatures(const std::string& meshPath,
+                                            const std::vector<VulkanMon::InstanceData>& instances,
+                                            uint32_t baseMaterialId) {
+    if (instances.empty()) {
+        return;
+    }
+
+    renderInstanced(meshPath, instances.data(), static_cast<uint32_t>(instances.size()), baseMaterialId);
+}
+
 void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
     // Check if model is already cached
     if (modelCache_.find(meshPath) != modelCache_.end()) {
