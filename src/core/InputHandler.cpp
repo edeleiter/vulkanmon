@@ -103,19 +103,25 @@ void InputHandler::processMouseInput(double xpos, double ypos) {
         if (world_->hasComponent<Transform>(activeCameraEntity)) {
             Transform& transform = world_->getComponent<Transform>(activeCameraEntity);
 
+            // Convert current rotation to Euler angles for modification
+            glm::vec3 currentEuler = glm::degrees(glm::eulerAngles(transform.rotation));
+
             // Update camera rotation (yaw and pitch)
-            // Yaw (Y rotation) - left/right mouse movement (flipped)
-            transform.rotation.y -= xoffset;  // Fixed: negative for proper left/right direction
+            // Yaw (Y rotation) - left/right mouse movement (negative for proper direction)
+            currentEuler.y -= xoffset;
 
             // Pitch (X rotation) - up/down mouse movement
-            transform.rotation.x += yoffset;
+            currentEuler.x += yoffset;
 
             // Clamp pitch to prevent over-rotation (±89 degrees)
-            transform.rotation.x = glm::clamp(transform.rotation.x, -89.0f, 89.0f);
+            currentEuler.x = glm::clamp(currentEuler.x, -89.0f, 89.0f);
 
             // Normalize yaw to 0-360 range
-            if (transform.rotation.y > 360.0f) transform.rotation.y -= 360.0f;
-            if (transform.rotation.y < 0.0f) transform.rotation.y += 360.0f;
+            if (currentEuler.y > 360.0f) currentEuler.y -= 360.0f;
+            if (currentEuler.y < 0.0f) currentEuler.y += 360.0f;
+
+            // Convert back to quaternion and update transform
+            transform.setRotationEuler(currentEuler.x, currentEuler.y, currentEuler.z);
         }
     }
 }
@@ -178,36 +184,26 @@ void InputHandler::handleCameraMovement(GLFWwindow* window, float deltaTime) {
 
     Transform& transform = world_->getComponent<Transform>(activeCameraEntity);
 
-    // Calculate movement vectors based on current camera rotation
-    float yaw = glm::radians(transform.rotation.y);
-    float pitch = glm::radians(transform.rotation.x);
-
-    // Calculate forward, right, and up vectors
-    // Fixed coordinate system: forward should be -Z direction in camera space
-    glm::vec3 forward;
-    forward.x = -sin(yaw) * cos(pitch);  // Fixed: negative sin for proper forward direction
-    forward.y = sin(pitch);
-    forward.z = cos(yaw) * cos(pitch);   // Fixed: cos for Z instead of sin
-    forward = glm::normalize(forward);
-
-    glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+    // Use Transform's direction vectors (calculated from quaternion rotation)
+    glm::vec3 forward = transform.getForward();
+    glm::vec3 right = transform.getRight();
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); // World up for Q/E movement
 
     // Calculate movement speed for this frame
     float speed = cameraSpeed_ * deltaTime / 1000.0f; // Convert deltaTime from ms to seconds
 
-    // WASD movement - fixed directions
+    // WASD movement - correct directions
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        transform.position -= forward * speed;  // Fixed: W should move forward (negative)
+        transform.position += forward * speed;  // W moves forward
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        transform.position += forward * speed;  // Fixed: S should move backward (positive)
+        transform.position -= forward * speed;  // S moves backward
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        transform.position += right * speed;    // Fixed: A should strafe left (positive right)
+        transform.position -= right * speed;    // A strafes left
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        transform.position -= right * speed;    // Fixed: D should strafe right (negative right)
+        transform.position += right * speed;    // D strafes right
     }
 
     // Q/E for up/down movement (like Minecraft creative mode)

@@ -488,8 +488,8 @@ void VulkanRenderer::renderInstanced(const std::string& meshPath,
                                 0);                                           // firstInstance
             }
         }
-        VKMON_INFO("GPU Instancing: Rendered " + std::to_string(instanceCount) +
-                  " instances in 1 draw call for: " + meshPath);
+        VKMON_DEBUG("GPU Instancing: Rendered " + std::to_string(instanceCount) +
+                   " instances in 1 draw call for: " + meshPath);
     } else {
         VKMON_WARNING("No model cached for instanced meshPath: " + meshPath);
     }

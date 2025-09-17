@@ -173,7 +173,7 @@ private:
     bool firstMouse_ = true;
     float lastMouseX_ = 400.0f;  // Default to window center
     float lastMouseY_ = 300.0f;  // Default to window center
-    float mouseSensitivity_ = 0.0005f;  // Ultra-low sensitivity for comfortable gameplay
+    float mouseSensitivity_ = 0.01f;  // Pokemon-style action game sensitivity
     bool mouseLocked_ = true;
     
     // Camera movement configuration
