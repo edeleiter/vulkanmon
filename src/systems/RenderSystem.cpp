@@ -1,6 +1,7 @@
 #include "RenderSystem.h"
 #include "SpatialSystem.h"
 #include "../utils/Logger.h"
+#include "../game/CreatureDetectionSystem.h"  // For CreatureComponent
 
 namespace VulkanMon {
 
@@ -49,6 +50,10 @@ void RenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager
     for (EntityID entity : candidateEntities) {
         // Check if entity has both Transform and Renderable components
         if (hasRequiredComponents(entity, entityManager)) {
+            // IMPORTANT: Skip entities with CreatureComponent - they're handled by CreatureRenderSystem
+            if (entityManager.hasComponent<CreatureComponent>(entity)) {
+                continue;
+            }
             Transform& transform = entityManager.getComponent<Transform>(entity);
             Renderable& renderable = entityManager.getComponent<Renderable>(entity);
 

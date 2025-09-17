@@ -110,4 +110,55 @@ Frustum CameraSystem::getActiveCameraFrustum(EntityManager& entityManager) {
     return frustum;
 }
 
+// =============================================================================
+// UNIFIED CAMERA INTERFACE - Clean matrix providers
+// =============================================================================
+
+glm::mat4 CameraSystem::getActiveViewMatrix() {
+    if (!cachedEntityManager_ || activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera or EntityManager for view matrix");
+        // Return default view matrix (camera at Z=25 looking at origin)
+        return glm::lookAt(glm::vec3(0.0f, 15.0f, 25.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+
+    Camera* camera = getActiveCamera(*cachedEntityManager_);
+    if (camera) {
+        // Ensure camera matrices are up to date
+        Transform* cameraTransform = getActiveCameraTransform(*cachedEntityManager_);
+        if (cameraTransform) {
+            camera->updateViewMatrix(cameraTransform->position, cameraTransform->getForward(), cameraTransform->getUp());
+        }
+        return camera->viewMatrix;
+    }
+
+    // Fallback
+    VKMON_WARNING("CameraSystem: Active camera component not found");
+    return glm::lookAt(glm::vec3(0.0f, 15.0f, 25.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+glm::mat4 CameraSystem::getActiveProjectionMatrix() {
+    if (!cachedEntityManager_ || activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera or EntityManager for projection matrix");
+        // Return default projection matrix using unified config
+        return glm::perspective(glm::radians(75.0f), 16.0f / 9.0f, 0.1f, 200.0f);
+    }
+
+    Camera* camera = getActiveCamera(*cachedEntityManager_);
+    if (camera) {
+        // Ensure projection matrix is up to date
+        camera->updateProjectionMatrix();
+        return camera->projectionMatrix;
+    }
+
+    // Fallback
+    VKMON_WARNING("CameraSystem: Active camera component not found");
+    return glm::perspective(glm::radians(75.0f), 16.0f / 9.0f, 0.1f, 200.0f);
+}
+
+bool CameraSystem::hasActiveCamera() {
+    return cachedEntityManager_ != nullptr &&
+           activeCameraEntity != INVALID_ENTITY &&
+           cachedEntityManager_->hasComponent<Camera>(activeCameraEntity);
+}
+
 } // namespace VulkanMon

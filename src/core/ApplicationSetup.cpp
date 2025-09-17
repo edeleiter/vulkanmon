@@ -4,6 +4,7 @@
 #include "../systems/CreatureRenderSystem.h"
 #include "../components/SpatialComponent.h"
 #include "../spatial/WorldConfig.h"
+#include "../config/CameraConfig.h"
 #include <stdexcept>
 
 using namespace VulkanMon;
@@ -18,7 +19,7 @@ void Application::initializeLogger() {
 }
 
 void Application::initializeWindow() {
-    window_ = std::make_unique<Window>(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, "VulkanMon");
+    window_ = std::make_unique<Window>(Config::Camera::DEFAULT_WINDOW_WIDTH, Config::Camera::DEFAULT_WINDOW_HEIGHT, "VulkanMon");
     window_->initialize();
     // Window logs its own initialization success
 }
@@ -117,6 +118,9 @@ void Application::initializeECS() {
 
     // Add camera system to handle ECS camera entities
     cameraSystem_ = world_->addSystem<CameraSystem>();
+
+    // Set up EntityManager caching for clean matrix interface
+    cameraSystem_->setCachedEntityManager(&world_->getEntityManager());
 
     // Add render system to handle rendering ECS entities
     renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
@@ -248,9 +252,9 @@ void Application::createTestScene() {
     world_->addComponent(cameraEntity, cameraTransform);
 
     Camera cameraComponent;
-    cameraComponent.fov = 45.0f;
-    cameraComponent.nearPlane = 0.1f;
-    cameraComponent.farPlane = 100.0f;
+    cameraComponent.fov = Config::Camera::DEFAULT_FOV;              // Using unified config
+    cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE; // Using unified config
+    cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;   // Using unified config
     cameraComponent.isActive = true;
     world_->addComponent(cameraEntity, cameraComponent);
 

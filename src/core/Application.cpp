@@ -198,8 +198,37 @@ void Application::handleWindowResize(int width, int height) {
 
 void Application::render(float deltaTime) {
     if (renderer_ && renderer_->isInitialized()) {
+        // Update camera matrices from ECS before rendering
+        updateCameraMatrices();
+
         // VulkanRenderer will call back to ECS during renderFrame()
         renderer_->renderFrame(deltaTime);
+    }
+}
+
+// =============================================================================
+// UNIFIED CAMERA INTERFACE - Bridge ECS camera to VulkanRenderer
+// =============================================================================
+
+void Application::updateCameraMatrices() {
+    if (!cameraSystem_ || !renderer_) {
+        VKMON_WARNING("Application::updateCameraMatrices: Missing cameraSystem or renderer");
+        return;
+    }
+
+    // Check if ECS camera is available
+    if (cameraSystem_->hasActiveCamera()) {
+        // Get matrices from ECS camera system (clean interface - no EntityManager needed)
+        glm::mat4 viewMatrix = cameraSystem_->getActiveViewMatrix();
+        glm::mat4 projectionMatrix = cameraSystem_->getActiveProjectionMatrix();
+
+        // Update VulkanRenderer with ECS camera data
+        renderer_->setViewMatrix(viewMatrix);
+        renderer_->setProjectionMatrix(projectionMatrix);
+
+        // ECS camera successfully integrated with VulkanRenderer
+    } else {
+        VKMON_WARNING("Application: No active ECS camera - VulkanRenderer will use fallback matrices");
     }
 }
 

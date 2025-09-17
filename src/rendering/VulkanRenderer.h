@@ -177,7 +177,17 @@ public:
      * @param callback Function to call for ECS rendering
      */
     void setECSRenderCallback(ECSRenderCallback callback);
-    
+
+    // =========================================================================
+    // UNIFIED CAMERA INTERFACE - Matrix setters for external camera data
+    // =========================================================================
+
+    /// Set view matrix from external camera system
+    void setViewMatrix(const glm::mat4& viewMatrix);
+
+    /// Set projection matrix from external camera system
+    void setProjectionMatrix(const glm::mat4& projectionMatrix);
+
     /**
      * Check if renderer is ready for rendering
      *
@@ -346,7 +356,20 @@ private:
 
     // Model cache for multi-object ECS rendering
     std::unordered_map<std::string, std::shared_ptr<Model>> modelCache_;
-    
+
+    // =========================================================================
+    // UNIFIED CAMERA INTERFACE - External matrix storage
+    // =========================================================================
+
+    /// Cached view matrix from external camera system
+    glm::mat4 externalViewMatrix_ = glm::mat4(1.0f);
+
+    /// Cached projection matrix from external camera system
+    glm::mat4 externalProjectionMatrix_ = glm::mat4(1.0f);
+
+    /// Flag to use external matrices instead of old camera system
+    bool useExternalMatrices_ = false;
+
     // Callbacks
     FrameUpdateCallback frameUpdateCallback_;
     ECSRenderCallback ecsRenderCallback_;

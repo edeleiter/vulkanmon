@@ -3,6 +3,7 @@
 #include "../io/ModelLoader.h"
 #include "../systems/MaterialSystem.h"
 #include "../utils/Logger.h"
+#include "../config/CameraConfig.h"
 #include <iostream>
 #include <stdexcept>
 #include <array>
@@ -180,6 +181,26 @@ void VulkanRenderer::setECSRenderCallback(ECSRenderCallback callback) {
 }
 
 // =============================================================================
+// UNIFIED CAMERA INTERFACE - Matrix setters for clean architecture
+// =============================================================================
+
+void VulkanRenderer::setViewMatrix(const glm::mat4& viewMatrix) {
+    externalViewMatrix_ = viewMatrix;
+    useExternalMatrices_ = true;
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("VulkanRenderer: External view matrix updated");
+    #endif
+}
+
+void VulkanRenderer::setProjectionMatrix(const glm::mat4& projectionMatrix) {
+    externalProjectionMatrix_ = projectionMatrix;
+    useExternalMatrices_ = true;
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("VulkanRenderer: External projection matrix updated");
+    #endif
+}
+
+// =============================================================================
 // ECS Integration Interface (Phase 6.2)
 // =============================================================================
 
@@ -230,7 +251,7 @@ void VulkanRenderer::beginECSFrame() {
     renderPassInfo.renderArea.extent = swapChainExtent_;
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearValues[0].color = {{0.2f, 0.3f, 0.6f, 1.0f}};  // Dark blue background to see objects
     clearValues[1].depthStencil = {1.0f, 0};
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -530,8 +551,7 @@ void VulkanRenderer::initVulkan() {
     // Create GPU instancing resources (Phase 7.1)
     createInstanceBuffer();
     
-    // Load test model
-    loadTestModel();
+    // Legacy test model removed - ECS provides test scene
     
     createUniformBuffer();
     createMaterialBuffer();
@@ -1849,7 +1869,7 @@ void VulkanRenderer::recordCommandBuffers() {
         renderPassInfo.renderArea.extent = swapChainExtent_;
 
         std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[0].color = {{0.2f, 0.3f, 0.6f, 1.0f}};  // Dark blue background to see objects
         clearValues[1].depthStencil = {1.0f, 0};
         
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -1869,19 +1889,7 @@ void VulkanRenderer::recordCommandBuffers() {
             }
         }
         
-        // Render loaded 3D model (if available)
-        if (currentModel_ && !currentModel_->meshes.empty()) {
-            for (const auto& mesh : currentModel_->meshes) {
-                if (mesh->vertexBuffer && mesh->indexBuffer) {
-                    VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
-                    VkDeviceSize offsets[] = {0};
-                    vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
-                    vkCmdBindIndexBuffer(commandBuffers_[i], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-                    
-                    vkCmdDrawIndexed(commandBuffers_[i], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
-                }
-            }
-        }
+        // Legacy 3D model rendering removed - ECS handles all object rendering
 
         // Render ImGui if enabled
         if (imguiEnabled_ && imguiInitialized_) {
@@ -1903,18 +1911,21 @@ void VulkanRenderer::updateUniformBuffer() {
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-    // Camera constants
-    constexpr float CAMERA_FOV = 45.0f;
-    constexpr float NEAR_PLANE = 0.1f;
-    constexpr float FAR_PLANE = 10.0f;
+    // Camera constants from unified configuration
+    using Config::Camera;
 
     UniformBufferObject ubo{};
 
-    // View matrix: use dynamic camera position from WASD input
-    ubo.view = camera_->getViewMatrix();
-
-    // Projection matrix: perspective projection
-    ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, NEAR_PLANE, FAR_PLANE);
+    // Use external matrices if available (unified camera system), otherwise fall back to old camera
+    if (useExternalMatrices_) {
+        // NEW: Use matrices from ECS camera system
+        ubo.view = externalViewMatrix_;
+        ubo.proj = externalProjectionMatrix_;
+    } else {
+        // LEGACY: Use old camera system
+        ubo.view = camera_->getViewMatrix();
+        ubo.proj = glm::perspective(glm::radians(Config::Camera::DEFAULT_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, Config::Camera::DEFAULT_NEAR_PLANE, Config::Camera::DEFAULT_FAR_PLANE);
+    }
 
     // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
     ubo.proj[1][1] *= -1;
@@ -2043,17 +2054,9 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
 }
 
 void VulkanRenderer::loadTestModel() {
-    VKMON_INFO("Loading test model...");
-    
-    // Load the test cube
-    currentModel_ = modelLoader_->loadModel("cube.obj");
-    VKMON_INFO("Test cube model loaded successfully!");
-    
-    // Create a default material for the model (simplified version)
-    currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
-    currentMaterialData_.diffuse = glm::vec4(0.8f, 0.8f, 0.8f, 0.0f);
-    currentMaterialData_.specular = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
-    currentMaterialData_.shininess = 32.0f;
+    // LEGACY METHOD - No longer used
+    // Test scene is now provided by ECS system in Application::createTestScene()
+    VKMON_INFO("Legacy test model loading skipped - ECS provides test scene");
 }
 
 void VulkanRenderer::cycleMaterialPreset() {

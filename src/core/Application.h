@@ -18,6 +18,7 @@
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
 #include "../debug/ECSInspector.h"
+#include "../config/CameraConfig.h"
 
 #include <memory>
 #include <chrono>
@@ -52,13 +53,7 @@ class Model;
 
 class Application {
 public:
-    // Configuration constants
-    static constexpr int DEFAULT_WINDOW_WIDTH = 800;
-    static constexpr int DEFAULT_WINDOW_HEIGHT = 600;
-    static constexpr float DEFAULT_CAMERA_SPEED = 2.5f;
-    static constexpr float DEFAULT_CAMERA_FOV = 45.0f;
-    static constexpr float DEFAULT_NEAR_PLANE = 0.1f;
-    static constexpr float DEFAULT_FAR_PLANE = 10.0f;
+    // Configuration constants moved to Config::Camera namespace for single source of truth
 
     /**
      * Create Application with default configuration
@@ -91,6 +86,12 @@ public:
      * @throws std::runtime_error if critical error occurs
      */
     void run();
+
+    /**
+     * Update camera matrices in VulkanRenderer from ECS CameraSystem
+     * Part of unified camera architecture - bridges ECS camera data to renderer
+     */
+    void updateCameraMatrices();
 
     /**
      * Request application shutdown
