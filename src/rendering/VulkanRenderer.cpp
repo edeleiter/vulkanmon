@@ -16,6 +16,8 @@ using namespace VulkanMon;
 // Shader file constants
 constexpr const char* VERTEX_SHADER_COMPILED = "shaders/vert.spv";
 constexpr const char* FRAGMENT_SHADER_COMPILED = "shaders/frag.spv";
+constexpr const char* INSTANCED_VERTEX_SHADER_COMPILED = "shaders/instanced_vert.spv";
+constexpr const char* INSTANCED_FRAGMENT_SHADER_COMPILED = "shaders/instanced_frag.spv";
 
 VulkanRenderer::VulkanRenderer(
     std::shared_ptr<Window> window,
@@ -261,8 +263,6 @@ void VulkanRenderer::beginECSFrame() {
 
     ecsFrameActive_ = true;
     frameLoadedMeshes_.clear();
-
-    VKMON_DEBUG("ECS frame begun, ready for object rendering");
 }
 
 void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
@@ -307,7 +307,6 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
                 vkCmdDrawIndexed(commandBuffers_[currentImageIndex_], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
             }
         }
-        VKMON_DEBUG("Rendered ECS object with mesh: " + meshPath);
     } else {
         VKMON_WARNING("No model cached for meshPath: " + meshPath);
     }
@@ -373,8 +372,6 @@ void VulkanRenderer::endECSFrame() {
     }
 
     ecsFrameActive_ = false;
-
-    VKMON_DEBUG("ECS frame completed and presented");
 }
 
 // =============================================================================
@@ -395,64 +392,63 @@ void VulkanRenderer::renderInstanced(const std::string& meshPath,
         return; // Nothing to render
     }
 
+    VKMON_DEBUG("GPU Instancing: Rendering " + std::to_string(instanceCount) + " instances of " + meshPath);
+
+    // Convert instance data to proper format
+    const auto* instances = static_cast<const InstanceData*>(instanceData);
+    std::vector<VulkanMon::InstanceData> instanceVector(instances, instances + instanceCount);
+
+    // Update instance buffer with current data
+    updateInstanceData(instanceVector);
+
     // Ensure mesh is loaded
     ensureMeshLoaded(meshPath);
 
-    // Bind material-specific descriptor set (set 1)
-    if (materialSystem_ && baseMaterialId < materialSystem_->getMaterialCount()) {
-        VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(baseMaterialId);
-        if (materialDescriptorSet != VK_NULL_HANDLE) {
-            // Bind the material descriptor set to set 1
-            vkCmdBindDescriptorSets(
-                commandBuffers_[currentImageIndex_],
-                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                pipelineLayout_,
-                1, 1, &materialDescriptorSet, 0, nullptr
-            );
-        }
-    }
-
-    // Find cached model and render all instances
+    // Find cached model and render all instances with GPU instancing
     auto modelIt = modelCache_.find(meshPath);
     if (modelIt != modelCache_.end()) {
         auto model = modelIt->second;
         if (model && !model->meshes.empty()) {
-            for (const auto& mesh : model->meshes) {
-                // Bind vertex and index buffers
-                VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
-                VkDeviceSize offsets[] = {0};
-                vkCmdBindVertexBuffers(commandBuffers_[currentImageIndex_], 0, 1, vertexBuffers, offsets);
-                vkCmdBindIndexBuffer(commandBuffers_[currentImageIndex_], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+            // Get current command buffer
+            VkCommandBuffer commandBuffer = commandBuffers_[currentImageIndex_];
 
-                // TODO: For proper instancing, we need to:
-                // 1. Create instance buffer and upload instanceData
-                // 2. Bind instance buffer as secondary vertex buffer
-                // 3. Use vkCmdDrawIndexed with instanceCount > 1
-                // For now, fallback to individual draws with push constants
+            // Bind instanced graphics pipeline
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedGraphicsPipeline_);
 
-                const auto* instances = static_cast<const InstanceData*>(instanceData);
-                for (uint32_t i = 0; i < instanceCount; ++i) {
-                    // Use push constants for model matrix (temporary solution)
-                    PushConstants pushConstants{};
-                    pushConstants.model = instances[i].modelMatrix;
+            // Bind global descriptor set (set 0)
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
+                                   0, 1, &globalDescriptorSet_, 0, nullptr);
 
-                    vkCmdPushConstants(
-                        commandBuffers_[currentImageIndex_],
-                        pipelineLayout_,
-                        VK_SHADER_STAGE_VERTEX_BIT,
-                        0,
-                        sizeof(PushConstants),
-                        &pushConstants
-                    );
-
-                    // Draw single instance
-                    vkCmdDrawIndexed(commandBuffers_[currentImageIndex_],
-                                    static_cast<uint32_t>(mesh->indices.size()),
-                                    1, 0, 0, 0);
+            // Bind material-specific descriptor set (set 1)
+            if (materialSystem_ && baseMaterialId < materialSystem_->getMaterialCount()) {
+                VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(baseMaterialId);
+                if (materialDescriptorSet != VK_NULL_HANDLE) {
+                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
+                                           1, 1, &materialDescriptorSet, 0, nullptr);
                 }
             }
+
+            // Render each mesh with instancing
+            for (const auto& mesh : model->meshes) {
+                // Bind vertex buffers: [0] = vertex data, [1] = instance data
+                VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer(), instanceBuffer_};
+                VkDeviceSize offsets[] = {0, 0};
+                vkCmdBindVertexBuffers(commandBuffer, 0, 2, vertexBuffers, offsets);
+
+                // Bind index buffer
+                vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+                // CRITICAL: GPU Instanced draw call - this renders ALL instances in one draw call!
+                vkCmdDrawIndexed(commandBuffer,
+                                static_cast<uint32_t>(mesh->indices.size()),  // indexCount
+                                instanceCount,                                 // instanceCount - THE MAGIC!
+                                0,                                            // firstIndex
+                                0,                                            // vertexOffset
+                                0);                                           // firstInstance
+            }
         }
-        VKMON_DEBUG("Rendered " + std::to_string(instanceCount) + " instances of mesh: " + meshPath);
+        VKMON_INFO("GPU Instancing: Rendered " + std::to_string(instanceCount) +
+                  " instances in 1 draw call for: " + meshPath);
     } else {
         VKMON_WARNING("No model cached for instanced meshPath: " + meshPath);
     }
@@ -519,13 +515,20 @@ void VulkanRenderer::initVulkan() {
     createDescriptorSetLayout();
     createShaderModules();
     createGraphicsPipeline();
+
+    // Create instanced rendering pipeline (Phase 7.1)
+    createInstancedShaderModules();
+    createInstancedGraphicsPipeline();
     createDepthResources();
     createFramebuffers();
     createCommandPool();
-    
+
     // Initialize core systems (after command pool creation)
     // TODO: This is temporary - will be moved to VulkanContext
     initializeCoreSystemsTemporary();
+
+    // Create GPU instancing resources (Phase 7.1)
+    createInstanceBuffer();
     
     // Load test model
     loadTestModel();
@@ -992,6 +995,136 @@ void VulkanRenderer::createGraphicsPipeline() {
     }
 
     VKMON_DEBUG("Graphics pipeline created successfully");
+}
+
+void VulkanRenderer::createInstancedShaderModules() {
+    VKMON_DEBUG("Creating instanced shader modules...");
+
+    // Load compiled instanced shaders
+    auto instancedVertShaderCode = Utils::readFile(INSTANCED_VERTEX_SHADER_COMPILED);
+    auto instancedFragShaderCode = Utils::readFile(INSTANCED_FRAGMENT_SHADER_COMPILED);
+
+    instancedVertShaderModule_ = createShaderModule(instancedVertShaderCode);
+    instancedFragShaderModule_ = createShaderModule(instancedFragShaderCode);
+
+    VKMON_DEBUG("Instanced shader modules created successfully");
+}
+
+void VulkanRenderer::createInstancedGraphicsPipeline() {
+    VKMON_DEBUG("Creating instanced graphics pipeline...");
+
+    // Shader stages
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = instancedVertShaderModule_;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = instancedFragShaderModule_;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    // Vertex input (using instanced binding descriptions)
+    auto bindingDescriptions = getInstancedBindingDescriptions();
+    auto attributeDescriptions = getInstancedAttributeDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+    // Input assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    // Viewport and scissor (same as regular pipeline)
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float) swapChainExtent_.width;
+    viewport.height = (float) swapChainExtent_.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapChainExtent_;
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    // Rasterizer (same as regular pipeline)
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    // Multisampling (same as regular pipeline)
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    // Depth stencil (same as regular pipeline)
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    // Color blending (same as regular pipeline)
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    // Graphics pipeline (reuse existing pipeline layout)
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.layout = pipelineLayout_;  // Reuse existing layout
+    pipelineInfo.renderPass = renderPass_;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &instancedGraphicsPipeline_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create instanced graphics pipeline!");
+    }
+
+    VKMON_DEBUG("Instanced graphics pipeline created successfully");
 }
 
 void VulkanRenderer::createFramebuffers() {
@@ -1985,7 +2118,10 @@ void VulkanRenderer::cleanup() {
     }
     
     cleanupSwapChain();
-    
+
+    // Cleanup GPU instancing resources (Phase 7.1)
+    cleanupInstanceBuffer();
+
     // Cleanup sync objects
     if (imageAvailableSemaphore_ != VK_NULL_HANDLE) {
         vkDestroySemaphore(device_, imageAvailableSemaphore_, nullptr);
@@ -2112,6 +2248,13 @@ void VulkanRenderer::cleanupSwapChain() {
         vkDestroyPipeline(device_, graphicsPipeline_, nullptr);
         graphicsPipeline_ = VK_NULL_HANDLE;
     }
+
+    // Cleanup instanced pipeline (Phase 7.1)
+    if (instancedGraphicsPipeline_ != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device_, instancedGraphicsPipeline_, nullptr);
+        instancedGraphicsPipeline_ = VK_NULL_HANDLE;
+    }
+
     if (pipelineLayout_ != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         pipelineLayout_ = VK_NULL_HANDLE;
@@ -2131,6 +2274,16 @@ void VulkanRenderer::cleanupSwapChain() {
     if (fragShaderModule_ != VK_NULL_HANDLE) {
         vkDestroyShaderModule(device_, fragShaderModule_, nullptr);
         fragShaderModule_ = VK_NULL_HANDLE;
+    }
+
+    // Cleanup instanced shader modules (Phase 7.1)
+    if (instancedVertShaderModule_ != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device_, instancedVertShaderModule_, nullptr);
+        instancedVertShaderModule_ = VK_NULL_HANDLE;
+    }
+    if (instancedFragShaderModule_ != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device_, instancedFragShaderModule_, nullptr);
+        instancedFragShaderModule_ = VK_NULL_HANDLE;
     }
     
     // Cleanup image views
@@ -2279,4 +2432,118 @@ void VulkanRenderer::endImGuiFrame() {
     // The ImGui draw data will be recorded to the command buffer
     // in the existing command buffer recording (renderFrame method)
 }
+
+// =============================================================================
+// GPU Instancing Implementation (Phase 7.1)
+// =============================================================================
+
+void VulkanRenderer::createInstanceBuffer() {
+    VKMON_INFO("Creating GPU instance buffer for " + std::to_string(maxInstances_) + " creatures");
+
+    instanceBufferSize_ = maxInstances_ * sizeof(VulkanMon::InstanceData);
+
+    // Create persistently mapped buffer for dynamic updates
+    createBuffer(instanceBufferSize_,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                instanceBuffer_,
+                instanceBufferMemory_);
+
+    // Map the buffer persistently for efficient updates
+    VkResult result = vkMapMemory(device_, instanceBufferMemory_, 0, instanceBufferSize_, 0, &instanceBufferMapped_);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to map instance buffer memory!");
+    }
+
+    VKMON_INFO("GPU instance buffer created: " + std::to_string(instanceBufferSize_ / 1024) + " KB");
+}
+
+void VulkanRenderer::updateInstanceData(const std::vector<VulkanMon::InstanceData>& instances) {
+    if (instances.size() > maxInstances_) {
+        throw std::runtime_error("Too many instances: " + std::to_string(instances.size()) +
+                                " (max: " + std::to_string(maxInstances_) + ")");
+    }
+
+    if (instanceBufferMapped_ == nullptr) {
+        VKMON_ERROR("Instance buffer not mapped!");
+        return;
+    }
+
+    // Fast memcpy to GPU-visible memory
+    size_t dataSize = instances.size() * sizeof(VulkanMon::InstanceData);
+    memcpy(instanceBufferMapped_, instances.data(), dataSize);
+
+    // No need to flush due to HOST_COHERENT_BIT
+}
+
+void VulkanRenderer::cleanupInstanceBuffer() {
+    if (instanceBufferMapped_ != nullptr) {
+        vkUnmapMemory(device_, instanceBufferMemory_);
+        instanceBufferMapped_ = nullptr;
+    }
+
+    if (instanceBuffer_ != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device_, instanceBuffer_, nullptr);
+        instanceBuffer_ = VK_NULL_HANDLE;
+    }
+
+    if (instanceBufferMemory_ != VK_NULL_HANDLE) {
+        vkFreeMemory(device_, instanceBufferMemory_, nullptr);
+        instanceBufferMemory_ = VK_NULL_HANDLE;
+    }
+
+    VKMON_INFO("GPU instance buffer cleanup complete");
+}
+
+std::vector<VkVertexInputBindingDescription> VulkanRenderer::getInstancedBindingDescriptions() {
+    std::vector<VkVertexInputBindingDescription> bindings(2);
+
+    // Binding 0: Per-vertex data (same as before)
+    bindings[0].binding = 0;
+    bindings[0].stride = sizeof(ModelVertex);
+    bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    // Binding 1: Per-instance data (NEW for GPU instancing)
+    bindings[1].binding = 1;
+    bindings[1].stride = sizeof(VulkanMon::InstanceData);
+    bindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+    return bindings;
+}
+
+std::vector<VkVertexInputAttributeDescription> VulkanRenderer::getInstancedAttributeDescriptions() {
+    std::vector<VkVertexInputAttributeDescription> attributes(12);
+
+    // Per-vertex attributes (locations 0-3) - unchanged
+    attributes[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ModelVertex, position)};
+    attributes[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ModelVertex, normal)};
+    attributes[2] = {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ModelVertex, texCoords)};
+    attributes[3] = {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ModelVertex, color)};
+
+    // Per-instance attributes (locations 4-11) - NEW for GPU instancing
+    // Instance model matrix (4 vec4s = locations 4,5,6,7)
+    for (uint32_t i = 0; i < 4; i++) {
+        attributes[4 + i] = {
+            4 + i,                                                    // location
+            1,                                                        // binding 1 (instance data)
+            VK_FORMAT_R32G32B32A32_SFLOAT,                           // vec4 format
+            static_cast<uint32_t>(offsetof(VulkanMon::InstanceData, modelMatrix) + sizeof(glm::vec4) * i)
+        };
+    }
+
+    // Instance material params (location 8) - vec4
+    attributes[8] = {8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(VulkanMon::InstanceData, materialParams))};
+
+    // Instance LOD params (location 9) - vec4
+    attributes[9] = {9, 1, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(VulkanMon::InstanceData, lodParams))};
+
+    // Reserve locations 10-11 for future expansion
+    attributes[10] = {10, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0}; // Unused
+    attributes[11] = {11, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0}; // Unused
+
+    // Return only the first 10 attributes (0-9) for now
+    attributes.resize(10);
+    return attributes;
+}
+
 

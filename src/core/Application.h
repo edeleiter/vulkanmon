@@ -189,7 +189,6 @@ private:
     void initializeInputSystem();
     void initializeECS();           // Initialize ECS World and systems
     void createTestScene();         // Create test entities for ECS
-    void loadTestAssets();
 
     // Main loop methods
     void processFrame();

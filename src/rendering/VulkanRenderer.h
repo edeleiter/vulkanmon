@@ -378,6 +378,11 @@ private:
     VkShaderModule fragShaderModule_ = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline_ = VK_NULL_HANDLE;
+
+    // Instanced graphics pipeline (Phase 7.1)
+    VkShaderModule instancedVertShaderModule_ = VK_NULL_HANDLE;
+    VkShaderModule instancedFragShaderModule_ = VK_NULL_HANDLE;
+    VkPipeline instancedGraphicsPipeline_ = VK_NULL_HANDLE;
     
     // Command processing
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -435,6 +440,13 @@ private:
     bool imguiEnabled_ = true;
     VkDescriptorPool imguiDescriptorPool_ = VK_NULL_HANDLE;
     bool imguiInitialized_ = false;
+
+    // GPU Instancing members (Phase 7.1)
+    VkBuffer instanceBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory instanceBufferMemory_ = VK_NULL_HANDLE;
+    void* instanceBufferMapped_ = nullptr;
+    size_t instanceBufferSize_ = 0;
+    static constexpr size_t maxInstances_ = 1000;  // Target: 200+ creatures + headroom
     
     // Vulkan initialization methods
     void initVulkan();
@@ -446,6 +458,8 @@ private:
     void createRenderPass();
     void createShaderModules();
     void createGraphicsPipeline();
+    void createInstancedShaderModules();
+    void createInstancedGraphicsPipeline();
     
     // Shader helper methods
     VkShaderModule createShaderModule(const std::vector<char>& code);
@@ -484,6 +498,13 @@ private:
     // ECS Integration helper methods
     void recordECSCommandBuffer(uint32_t imageIndex);
     void ensureMeshLoaded(const std::string& meshPath);
+
+    // GPU Instancing helper methods (Phase 7.1)
+    void createInstanceBuffer();
+    void updateInstanceData(const std::vector<VulkanMon::InstanceData>& instances);
+    void cleanupInstanceBuffer();
+    std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();
+    std::vector<VkVertexInputAttributeDescription> getInstancedAttributeDescriptions();
     
     // Helper methods
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

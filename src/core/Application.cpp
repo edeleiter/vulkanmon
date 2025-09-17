@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "../utils/Utils.h"
 #include "../utils/Logger.h"
+#include "../game/CreatureDetectionSystem.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -43,7 +44,6 @@ void Application::initialize() {
         initializeECS();            // Initialize ECS after renderer is ready
         initializeInputSystem();
         createTestScene();          // Create test entities after ECS is set up
-        loadTestAssets();
 
         initialized_ = true;
         VKMON_INFO("VulkanMon ready!");
@@ -156,9 +156,12 @@ void Application::updateECS(float deltaTime) {
         }
 
         for (EntityID entity : entities) {
-            auto& transform = world_->getComponent<Transform>(entity);
-            // Apply rotation to all test cubes
-            transform.setRotationEuler(0.0f, rotationAngle, 0.0f);
+            // Only rotate entities that have CreatureComponent (not cameras)
+            if (world_->hasComponent<CreatureComponent>(entity)) {
+                auto& transform = world_->getComponent<Transform>(entity);
+                // Apply rotation to creatures only
+                transform.setRotationEuler(0.0f, rotationAngle, 0.0f);
+            }
         }
 
         world_->update(deltaTime);
