@@ -5,7 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include "../core/Window.h"
-#include "../core/Camera.h"
+// Old Camera.h dependency removed - using unified ECS camera system
 #include "ResourceManager.h"
 #include "../io/AssetManager.h"
 #include "../io/ModelLoader.h"
@@ -102,7 +102,6 @@ public:
      */
     VulkanRenderer(
         std::shared_ptr<Window> window,
-        std::shared_ptr<Camera> camera,
         std::shared_ptr<ResourceManager> resourceManager,
         std::shared_ptr<AssetManager> assetManager,
         std::shared_ptr<ModelLoader> modelLoader,
@@ -187,6 +186,9 @@ public:
 
     /// Set projection matrix from external camera system
     void setProjectionMatrix(const glm::mat4& projectionMatrix);
+
+    /// Set camera position from external camera system (for lighting calculations)
+    void setCameraPosition(const glm::vec3& cameraPosition);
 
     /**
      * Check if renderer is ready for rendering
@@ -344,7 +346,7 @@ public:
 private:
     // System references (shared ownership - systems created by renderer)
     std::shared_ptr<Window> window_;
-    std::shared_ptr<Camera> camera_;
+    // Old camera_ member removed - using external matrices from ECS camera system
     std::shared_ptr<ResourceManager> resourceManager_;
     std::shared_ptr<AssetManager> assetManager_;
     std::shared_ptr<ModelLoader> modelLoader_;
@@ -367,8 +369,11 @@ private:
     /// Cached projection matrix from external camera system
     glm::mat4 externalProjectionMatrix_ = glm::mat4(1.0f);
 
-    /// Flag to use external matrices instead of old camera system
-    bool useExternalMatrices_ = false;
+    /// Cached camera position from external camera system
+    glm::vec3 externalCameraPosition_ = glm::vec3(0.0f, 8.0f, 15.0f);
+
+    /// Flag to use external camera data (matrices + position) instead of fallback
+    bool useExternalCamera_ = false;
 
     // Callbacks
     FrameUpdateCallback frameUpdateCallback_;

@@ -161,4 +161,25 @@ bool CameraSystem::hasActiveCamera() {
            cachedEntityManager_->hasComponent<Camera>(activeCameraEntity);
 }
 
+glm::vec3 CameraSystem::getActiveCameraPosition() {
+    if (!cachedEntityManager_) {
+        VKMON_WARNING("CameraSystem: No cached EntityManager for camera position");
+        return glm::vec3(0.0f, 8.0f, 15.0f);  // ECS camera fallback position
+    }
+
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera entity for position");
+        return glm::vec3(0.0f, 8.0f, 15.0f);  // ECS camera fallback position
+    }
+
+    if (cachedEntityManager_->hasComponent<Transform>(activeCameraEntity)) {
+        Transform& transform = cachedEntityManager_->getComponent<Transform>(activeCameraEntity);
+        return transform.position;
+    }
+
+    // Fallback
+    VKMON_WARNING("CameraSystem: Active camera transform not found");
+    return glm::vec3(0.0f, 8.0f, 15.0f);  // ECS camera fallback position
+}
+
 } // namespace VulkanMon

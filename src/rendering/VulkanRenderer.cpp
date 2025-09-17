@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <array>
 #include <filesystem>
+#include <glm/gtc/matrix_transform.hpp>  // For lookAt and perspective
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -22,14 +23,12 @@ constexpr const char* INSTANCED_FRAGMENT_SHADER_COMPILED = "shaders/instanced_fr
 
 VulkanRenderer::VulkanRenderer(
     std::shared_ptr<Window> window,
-    std::shared_ptr<Camera> camera,
     std::shared_ptr<ResourceManager> resourceManager,
     std::shared_ptr<AssetManager> assetManager,
     std::shared_ptr<ModelLoader> modelLoader,
     std::shared_ptr<LightingSystem> lightingSystem,
     std::shared_ptr<MaterialSystem> materialSystem
 ) : window_(window),
-    camera_(camera),
     resourceManager_(resourceManager),
     assetManager_(assetManager),
     modelLoader_(modelLoader),
@@ -181,12 +180,22 @@ void VulkanRenderer::setECSRenderCallback(ECSRenderCallback callback) {
 }
 
 // =============================================================================
-// UNIFIED CAMERA INTERFACE - Matrix setters for clean architecture
+// UNIFIED CAMERA INTERFACE - ECS Camera Data Integration
+// =============================================================================
+//
+// These methods provide a clean interface for receiving camera data from the
+// ECS camera system. All camera data (matrices + position) is coordinated
+// through a single useExternalCamera_ flag to ensure consistency.
+//
+// Design Philosophy:
+// - Single source of truth: All camera data comes from ECS
+// - Consistent state: Matrices and position always updated together
+// - Clean fallback: Graceful degradation when ECS camera unavailable
 // =============================================================================
 
 void VulkanRenderer::setViewMatrix(const glm::mat4& viewMatrix) {
     externalViewMatrix_ = viewMatrix;
-    useExternalMatrices_ = true;
+    useExternalCamera_ = true;
     #ifdef DEBUG_VERBOSE
     VKMON_DEBUG("VulkanRenderer: External view matrix updated");
     #endif
@@ -194,9 +203,20 @@ void VulkanRenderer::setViewMatrix(const glm::mat4& viewMatrix) {
 
 void VulkanRenderer::setProjectionMatrix(const glm::mat4& projectionMatrix) {
     externalProjectionMatrix_ = projectionMatrix;
-    useExternalMatrices_ = true;
+    useExternalCamera_ = true;
     #ifdef DEBUG_VERBOSE
     VKMON_DEBUG("VulkanRenderer: External projection matrix updated");
+    #endif
+}
+
+void VulkanRenderer::setCameraPosition(const glm::vec3& cameraPosition) {
+    externalCameraPosition_ = cameraPosition;
+    useExternalCamera_ = true;
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("VulkanRenderer: External camera position updated: (" +
+               std::to_string(cameraPosition.x) + ", " +
+               std::to_string(cameraPosition.y) + ", " +
+               std::to_string(cameraPosition.z) + ")");
     #endif
 }
 
@@ -1916,22 +1936,30 @@ void VulkanRenderer::updateUniformBuffer() {
 
     UniformBufferObject ubo{};
 
-    // Use external matrices if available (unified camera system), otherwise fall back to old camera
-    if (useExternalMatrices_) {
-        // NEW: Use matrices from ECS camera system
+    // UNIFIED CAMERA SYSTEM: Use ECS camera data if available, otherwise fallback
+    if (useExternalCamera_) {
+        // PRIMARY PATH: Use unified camera data from ECS camera system
+        // All data (view matrix, projection matrix, position) comes from same ECS camera entity
+        // This ensures consistency between rendering, spatial culling, and lighting calculations
         ubo.view = externalViewMatrix_;
         ubo.proj = externalProjectionMatrix_;
+        ubo.cameraPos = externalCameraPosition_;
     } else {
-        // LEGACY: Use old camera system
-        ubo.view = camera_->getViewMatrix();
-        ubo.proj = glm::perspective(glm::radians(Config::Camera::DEFAULT_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, Config::Camera::DEFAULT_NEAR_PLANE, Config::Camera::DEFAULT_FAR_PLANE);
+        // FALLBACK PATH: When ECS camera system unavailable (should be rare)
+        VKMON_WARNING("VulkanRenderer: No ECS camera data available, using fallback camera");
+
+        // Use consistent fallback values that match ECS camera defaults
+        glm::vec3 fallbackPosition(0.0f, 8.0f, 15.0f);
+        ubo.view = glm::lookAt(fallbackPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj = glm::perspective(glm::radians(Config::Camera::DEFAULT_FOV),
+                                   swapChainExtent_.width / (float) swapChainExtent_.height,
+                                   Config::Camera::DEFAULT_NEAR_PLANE,
+                                   Config::Camera::DEFAULT_FAR_PLANE);
+        ubo.cameraPos = fallbackPosition;
     }
 
     // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
     ubo.proj[1][1] *= -1;
-
-    // Camera position for specular lighting calculations
-    ubo.cameraPos = camera_->position;
     ubo._padding = 0.0f;
 
     void* data;

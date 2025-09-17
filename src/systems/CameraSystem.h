@@ -48,6 +48,9 @@ public:
     /// Check if active camera is available
     bool hasActiveCamera();
 
+    /// Get camera position from active camera (encapsulated ECS access)
+    glm::vec3 getActiveCameraPosition();
+
 private:
     // Internal EntityManager reference for encapsulated access
     EntityManager* cachedEntityManager_ = nullptr;

@@ -55,7 +55,6 @@ add_executable(vulkanmon
     src/rendering/VulkanRenderer.cpp
     src/core/Window.cpp
     src/core/InputHandler.cpp
-    src/core/Camera.cpp
     src/utils/Utils.cpp
     src/stb_image_impl.cpp
     src/rendering/ResourceManager.cpp

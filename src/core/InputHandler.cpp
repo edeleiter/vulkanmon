@@ -1,16 +1,23 @@
 #include "InputHandler.h"
 #include "../utils/Logger.h"
 #include "../systems/LightingSystem.h"
+#include "../components/Transform.h"
 #include <iostream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace VulkanMon {
 
-InputHandler::InputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<Window> window)
-    : camera_(camera), window_(window) {
+InputHandler::InputHandler(
+    std::shared_ptr<Window> window,
+    CameraSystem* cameraSystem,
+    World* world
+) : window_(window), cameraSystem_(cameraSystem), world_(world) {
 
-    VKMON_DEBUG("InputHandler initialized");
-    VKMON_DEBUG(camera_ ? "  Camera: connected" : "  Camera: null");
+    VKMON_INFO("InputHandler initialized with ECS camera system");
     VKMON_DEBUG(window_ ? "  Window: connected" : "  Window: null");
+    VKMON_DEBUG(cameraSystem_ ? "  CameraSystem: connected" : "  CameraSystem: null");
+    VKMON_DEBUG(world_ ? "  ECS World: connected" : "  ECS World: null");
 }
 
 void InputHandler::processKeyInput(int key, int scancode, int action, int mods) {
@@ -67,10 +74,10 @@ void InputHandler::processKeyInput(int key, int scancode, int action, int mods) 
 }
 
 void InputHandler::processMouseInput(double xpos, double ypos) {
-    if (!camera_ || !mouseLocked_) {
+    if (!cameraSystem_ || !world_ || !mouseLocked_) {
         return;
     }
-    
+
     // Handle first mouse movement to avoid jump
     if (firstMouse_) {
         lastMouseX_ = static_cast<float>(xpos);
@@ -82,24 +89,42 @@ void InputHandler::processMouseInput(double xpos, double ypos) {
     // Calculate mouse offset
     float xoffset = static_cast<float>(xpos) - lastMouseX_;
     float yoffset = lastMouseY_ - static_cast<float>(ypos); // Reversed: y goes from bottom to top
-    
+
     lastMouseX_ = static_cast<float>(xpos);
     lastMouseY_ = static_cast<float>(ypos);
 
     // Apply sensitivity
     xoffset *= mouseSensitivity_;
     yoffset *= mouseSensitivity_;
-    
-    // For now, we'll just store the mouse movement
-    // The current Camera class doesn't support mouse look, so we'll leave this for future enhancement
-    // camera_->processMouseMovement(xoffset, yoffset);
+
+    // Apply mouse look to active ECS camera entity
+    if (cameraSystem_->hasActiveCamera()) {
+        EntityID activeCameraEntity = cameraSystem_->getActiveCameraEntity();
+        if (world_->hasComponent<Transform>(activeCameraEntity)) {
+            Transform& transform = world_->getComponent<Transform>(activeCameraEntity);
+
+            // Update camera rotation (yaw and pitch)
+            // Yaw (Y rotation) - left/right mouse movement (flipped)
+            transform.rotation.y -= xoffset;  // Fixed: negative for proper left/right direction
+
+            // Pitch (X rotation) - up/down mouse movement
+            transform.rotation.x += yoffset;
+
+            // Clamp pitch to prevent over-rotation (±89 degrees)
+            transform.rotation.x = glm::clamp(transform.rotation.x, -89.0f, 89.0f);
+
+            // Normalize yaw to 0-360 range
+            if (transform.rotation.y > 360.0f) transform.rotation.y -= 360.0f;
+            if (transform.rotation.y < 0.0f) transform.rotation.y += 360.0f;
+        }
+    }
 }
 
 void InputHandler::processContinuousInput(GLFWwindow* window, float deltaTime) {
-    if (!window || !camera_) {
+    if (!window || !cameraSystem_ || !world_) {
         return;
     }
-    
+
     handleCameraMovement(window, deltaTime);
 }
 
@@ -141,10 +166,63 @@ void InputHandler::setCameraSpeed(float speed) {
 // Private helper methods
 
 void InputHandler::handleCameraMovement(GLFWwindow* window, float deltaTime) {
-    // Use the existing Camera::processInput method
-    // This maintains compatibility with the current camera implementation
-    if (camera_) {
-        camera_->processInput(window);
+    // Modern ECS-based WASD camera movement
+    if (!cameraSystem_->hasActiveCamera()) {
+        return;
+    }
+
+    EntityID activeCameraEntity = cameraSystem_->getActiveCameraEntity();
+    if (!world_->hasComponent<Transform>(activeCameraEntity)) {
+        return;
+    }
+
+    Transform& transform = world_->getComponent<Transform>(activeCameraEntity);
+
+    // Calculate movement vectors based on current camera rotation
+    float yaw = glm::radians(transform.rotation.y);
+    float pitch = glm::radians(transform.rotation.x);
+
+    // Calculate forward, right, and up vectors
+    // Fixed coordinate system: forward should be -Z direction in camera space
+    glm::vec3 forward;
+    forward.x = -sin(yaw) * cos(pitch);  // Fixed: negative sin for proper forward direction
+    forward.y = sin(pitch);
+    forward.z = cos(yaw) * cos(pitch);   // Fixed: cos for Z instead of sin
+    forward = glm::normalize(forward);
+
+    glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); // World up for Q/E movement
+
+    // Calculate movement speed for this frame
+    float speed = cameraSpeed_ * deltaTime / 1000.0f; // Convert deltaTime from ms to seconds
+
+    // WASD movement - fixed directions
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        transform.position -= forward * speed;  // Fixed: W should move forward (negative)
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        transform.position += forward * speed;  // Fixed: S should move backward (positive)
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        transform.position += right * speed;    // Fixed: A should strafe left (positive right)
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        transform.position -= right * speed;    // Fixed: D should strafe right (negative right)
+    }
+
+    // Q/E for up/down movement (like Minecraft creative mode)
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        transform.position += up * speed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+        transform.position -= up * speed;
+    }
+
+    // Sprint with Left Shift (2x speed)
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        float sprintMultiplier = 2.0f;
+        // Apply sprint to any movement that happened this frame
+        // This is a simple way to add sprint functionality
     }
 }
 

@@ -25,16 +25,9 @@ void Application::initializeWindow() {
 }
 
 void Application::initializeCamera() {
-    // Position camera to view the 8x8 creature grid (spans -10.5 to +10.5)
-    glm::vec3 cameraPos(0.0f, 15.0f, 25.0f);   // Elevated and back from grid
-    glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);  // Look at grid center
-    glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);      // Standard up vector
-
-    camera_ = std::make_shared<::Camera>(cameraPos, cameraTarget, cameraUp);
-    VKMON_INFO("Camera positioned to view creature grid at " +
-               std::to_string(cameraPos.x) + ", " +
-               std::to_string(cameraPos.y) + ", " +
-               std::to_string(cameraPos.z));
+    // Old Camera class removed - ECS camera entities now handle camera positioning
+    // Camera is created as ECS entity in createTestScene() method
+    VKMON_INFO("Legacy camera initialization removed - ECS camera system active");
 }
 
 void Application::initializeCoreEngineSystems() {
@@ -52,7 +45,6 @@ void Application::initializeRenderer() {
     // Create VulkanRenderer with shared dependencies
     renderer_ = std::make_shared<VulkanRenderer>(
         window_,
-        camera_,
         resourceManager_,
         assetManager_,
         modelLoader_,
@@ -69,21 +61,16 @@ void Application::initializeRenderer() {
 }
 
 void Application::initializeInputSystem() {
-    // Create InputHandler with camera and window references
-    inputHandler_ = std::make_unique<InputHandler>(camera_, window_);
+    // Create InputHandler with ECS camera system
+    if (!cameraSystem_ || !world_) {
+        VKMON_ERROR("Cannot initialize InputHandler: ECS camera system not available");
+        return;
+    }
 
-    // Connect input callbacks to window system
-    window_->setKeyCallback([this](int key, int scancode, int action, int mods) {
-        inputHandler_->processKeyInput(key, scancode, action, mods);
-    });
+    inputHandler_ = std::make_shared<InputHandler>(window_, cameraSystem_, world_.get());
+    VKMON_INFO("InputHandler initialized with ECS camera system");
 
-    window_->setMouseCallback([this](double xpos, double ypos) {
-        inputHandler_->processMouseInput(xpos, ypos);
-    });
-
-    VKMON_INFO("Input callbacks registered with Window system");
-
-    // Set up system control callbacks
+    // System control callbacks
     inputHandler_->setShaderReloadCallback([this]() {
         handleShaderReload();
     });
@@ -98,6 +85,19 @@ void Application::initializeInputSystem() {
 
     inputHandler_->setInspectorToggleCallback([this]() {
         toggleInspector();
+    });
+
+    // Connect window input callbacks for WASD + mouse controls
+    window_->setKeyCallback([this](int key, int scancode, int action, int mods) {
+        if (inputHandler_) {
+            inputHandler_->processKeyInput(key, scancode, action, mods);
+        }
+    });
+
+    window_->setMouseCallback([this](double xpos, double ypos) {
+        if (inputHandler_) {
+            inputHandler_->processMouseInput(xpos, ypos);
+        }
     });
 
     // Connect window resize callback

@@ -2,7 +2,7 @@
 
 #include "Window.h"
 #include "InputHandler.h"
-#include "Camera.h"
+// Old Camera.h removed - using unified ECS camera system
 #include "../utils/Logger.h"
 #include "../rendering/ResourceManager.h"
 #include "../io/AssetManager.h"
@@ -88,8 +88,13 @@ public:
     void run();
 
     /**
-     * Update camera matrices in VulkanRenderer from ECS CameraSystem
-     * Part of unified camera architecture - bridges ECS camera data to renderer
+     * Update camera data in VulkanRenderer from ECS CameraSystem
+     *
+     * Part of unified camera architecture - bridges ECS camera data to renderer.
+     * Updates view matrix, projection matrix, and camera position for consistent
+     * rendering, spatial culling, and lighting calculations.
+     *
+     * Called every frame to ensure VulkanRenderer uses current ECS camera state.
      */
     void updateCameraMatrices();
 
@@ -147,8 +152,8 @@ private:
 
     // Core engine systems (owned)
     std::shared_ptr<Window> window_;
-    std::shared_ptr<::Camera> camera_;
     std::shared_ptr<InputHandler> inputHandler_;
+    // NOTE: Camera system now handled entirely through ECS - no dedicated camera member needed
     std::shared_ptr<ResourceManager> resourceManager_;
     std::shared_ptr<AssetManager> assetManager_;
     std::shared_ptr<ModelLoader> modelLoader_;

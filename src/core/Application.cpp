@@ -210,6 +210,21 @@ void Application::render(float deltaTime) {
 // UNIFIED CAMERA INTERFACE - Bridge ECS camera to VulkanRenderer
 // =============================================================================
 
+/**
+ * Updates VulkanRenderer with camera data from active ECS camera entity
+ *
+ * Unified Camera Architecture Data Flow:
+ * 1. CameraSystem finds active camera entity with Camera component
+ * 2. CameraSystem calculates view/projection matrices from Transform + Camera components
+ * 3. CameraSystem extracts camera position from Transform component
+ * 4. Application bridges all camera data to VulkanRenderer via clean interface
+ * 5. VulkanRenderer uses unified camera data for both rendering and lighting calculations
+ *
+ * This design ensures:
+ * - Single source of truth: All camera data comes from ECS entities
+ * - Clean interfaces: No EntityManager dependencies outside ECS systems
+ * - Consistent data: Same camera used for rendering, spatial culling, and lighting
+ */
 void Application::updateCameraMatrices() {
     if (!cameraSystem_ || !renderer_) {
         VKMON_WARNING("Application::updateCameraMatrices: Missing cameraSystem or renderer");
@@ -221,10 +236,12 @@ void Application::updateCameraMatrices() {
         // Get matrices from ECS camera system (clean interface - no EntityManager needed)
         glm::mat4 viewMatrix = cameraSystem_->getActiveViewMatrix();
         glm::mat4 projectionMatrix = cameraSystem_->getActiveProjectionMatrix();
+        glm::vec3 cameraPosition = cameraSystem_->getActiveCameraPosition();
 
         // Update VulkanRenderer with ECS camera data
         renderer_->setViewMatrix(viewMatrix);
         renderer_->setProjectionMatrix(projectionMatrix);
+        renderer_->setCameraPosition(cameraPosition);
 
         // ECS camera successfully integrated with VulkanRenderer
     } else {
@@ -277,10 +294,7 @@ void Application::cleanup() {
     assetManager_.reset();
     resourceManager_.reset();
 
-    if (camera_) {
-        // Camera cleanup is automatic (RAII)
-        camera_.reset();
-    }
+    // Old camera_ cleanup removed - ECS camera entities managed by World
 
     if (window_) {
         // Window cleanup is automatic (RAII)

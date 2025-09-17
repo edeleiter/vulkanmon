@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Camera.h"
 #include "Window.h"
 #include "../systems/LightingSystem.h"
 #include "../systems/MaterialSystem.h"
+#include "../systems/CameraSystem.h"
+#include "World.h"
 #include <GLFW/glfw3.h>
 #include <memory>
 #include <functional>
@@ -39,13 +40,18 @@ public:
     using InspectorToggleCallback = std::function<void()>;
 
     /**
-     * Create InputHandler with camera and window references
-     * Other systems are controlled via callbacks
+     * Create InputHandler with ECS camera system and window references
+     * Modern ECS-based architecture for WASD + mouse camera controls
      *
-     * @param camera Camera system for movement controls
      * @param window Window system for cursor mode control
+     * @param cameraSystem ECS camera system for movement controls (raw pointer, owned by World)
+     * @param world ECS world for accessing camera entities
      */
-    InputHandler(std::shared_ptr<Camera> camera, std::shared_ptr<Window> window);
+    InputHandler(
+        std::shared_ptr<Window> window,
+        CameraSystem* cameraSystem,
+        World* world
+    );
     
     /**
      * Destructor - no special cleanup needed
@@ -159,14 +165,15 @@ public:
 
 private:
     // System references (not owned)
-    std::shared_ptr<Camera> camera_;
     std::shared_ptr<Window> window_;
+    CameraSystem* cameraSystem_;
+    World* world_;
     
     // Mouse input state
     bool firstMouse_ = true;
     float lastMouseX_ = 400.0f;  // Default to window center
     float lastMouseY_ = 300.0f;  // Default to window center
-    float mouseSensitivity_ = 0.1f;
+    float mouseSensitivity_ = 0.0005f;  // Ultra-low sensitivity for comfortable gameplay
     bool mouseLocked_ = true;
     
     // Camera movement configuration
