@@ -142,14 +142,14 @@ void CameraSystem::handleWindowResize(int width, int height, EntityManager& enti
 // UNIFIED CAMERA INTERFACE - Clean matrix providers
 // =============================================================================
 
-glm::mat4 CameraSystem::getActiveViewMatrix() {
-    if (!cachedEntityManager_ || activeCameraEntity == INVALID_ENTITY) {
-        VKMON_WARNING("CameraSystem: No active camera or EntityManager for view matrix");
+glm::mat4 CameraSystem::getActiveViewMatrix(EntityManager& entityManager) {
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera for view matrix");
         // Return default view matrix (camera at Z=25 looking at origin)
         return glm::lookAt(glm::vec3(0.0f, 15.0f, 25.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     }
 
-    Camera* camera = getActiveCamera(*cachedEntityManager_);
+    Camera* camera = getActiveCamera(entityManager);
     if (camera) {
         // Pure getter - matrices are updated in the update() method
         return camera->viewMatrix;
@@ -160,14 +160,14 @@ glm::mat4 CameraSystem::getActiveViewMatrix() {
     return glm::lookAt(glm::vec3(0.0f, 15.0f, 25.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-glm::mat4 CameraSystem::getActiveProjectionMatrix() {
-    if (!cachedEntityManager_ || activeCameraEntity == INVALID_ENTITY) {
-        VKMON_WARNING("CameraSystem: No active camera or EntityManager for projection matrix");
+glm::mat4 CameraSystem::getActiveProjectionMatrix(EntityManager& entityManager) {
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera for projection matrix");
         // Return default projection matrix using unified config
         return glm::perspective(glm::radians(75.0f), 16.0f / 9.0f, 0.1f, 200.0f);
     }
 
-    Camera* camera = getActiveCamera(*cachedEntityManager_);
+    Camera* camera = getActiveCamera(entityManager);
     if (camera) {
         // Pure getter - projection matrix should be updated elsewhere when needed
         return camera->projectionMatrix;
@@ -178,31 +178,10 @@ glm::mat4 CameraSystem::getActiveProjectionMatrix() {
     return glm::perspective(glm::radians(75.0f), 16.0f / 9.0f, 0.1f, 200.0f);
 }
 
-bool CameraSystem::hasActiveCamera() {
-    return cachedEntityManager_ != nullptr &&
-           activeCameraEntity != INVALID_ENTITY &&
-           cachedEntityManager_->hasComponent<Camera>(activeCameraEntity);
+bool CameraSystem::hasActiveCamera(EntityManager& entityManager) {
+    return activeCameraEntity != INVALID_ENTITY &&
+           entityManager.hasComponent<Camera>(activeCameraEntity);
 }
 
-glm::vec3 CameraSystem::getActiveCameraPosition() {
-    if (!cachedEntityManager_) {
-        VKMON_WARNING("CameraSystem: No cached EntityManager for camera position");
-        return glm::vec3(0.0f, 8.0f, 15.0f);  // ECS camera fallback position
-    }
-
-    if (activeCameraEntity == INVALID_ENTITY) {
-        VKMON_WARNING("CameraSystem: No active camera entity for position");
-        return glm::vec3(0.0f, 8.0f, 15.0f);  // ECS camera fallback position
-    }
-
-    if (cachedEntityManager_->hasComponent<Transform>(activeCameraEntity)) {
-        Transform& transform = cachedEntityManager_->getComponent<Transform>(activeCameraEntity);
-        return transform.position;
-    }
-
-    // Fallback
-    VKMON_WARNING("CameraSystem: Active camera transform not found");
-    return glm::vec3(0.0f, 8.0f, 15.0f);  // ECS camera fallback position
-}
 
 } // namespace VulkanMon

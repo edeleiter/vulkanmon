@@ -39,28 +39,17 @@ public:
     void handleWindowResize(int width, int height, EntityManager& entityManager);
 
     // =========================================================================
-    // UNIFIED CAMERA INTERFACE - Simple matrix providers (no EntityManager needed)
+    // UNIFIED CAMERA INTERFACE - Simple matrix providers (require EntityManager parameter)
     // =========================================================================
 
-    /// Get view matrix from active camera (encapsulated ECS access)
-    glm::mat4 getActiveViewMatrix();
+    /// Get view matrix from active camera
+    glm::mat4 getActiveViewMatrix(EntityManager& entityManager);
 
-    /// Get projection matrix from active camera (encapsulated ECS access)
-    glm::mat4 getActiveProjectionMatrix();
+    /// Get projection matrix from active camera
+    glm::mat4 getActiveProjectionMatrix(EntityManager& entityManager);
 
     /// Check if active camera is available
-    bool hasActiveCamera();
-
-    /// Get camera position from active camera (encapsulated ECS access)
-    glm::vec3 getActiveCameraPosition();
-
-private:
-    // Internal EntityManager reference for encapsulated access
-    EntityManager* cachedEntityManager_ = nullptr;
-
-public:
-    // Allow CameraSystem to cache EntityManager reference for encapsulated access
-    void setCachedEntityManager(EntityManager* entityManager) { cachedEntityManager_ = entityManager; }
+    bool hasActiveCamera(EntityManager& entityManager);
 };
 
 } // namespace VulkanMon

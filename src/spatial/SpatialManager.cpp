@@ -250,7 +250,7 @@ void OctreeNode::getStatistics(int& nodeCount, int& maxDepth, int& totalEntities
     }
 }
 
-void OctreeNode::subdivide(const std::function<glm::vec3(EntityID)>& getPosition) {
+void OctreeNode::subdivide(std::function<glm::vec3(EntityID)> getPosition) {
     if (depth_ >= MAX_DEPTH) {
         return; // Max depth reached
     }

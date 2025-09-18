@@ -74,7 +74,7 @@ public:
     void update(EntityID entity, const glm::vec3& oldPos, const glm::vec3& newPos);
 
     // Subdivision with position lookup
-    void subdivide(const std::function<glm::vec3(EntityID)>& getPosition);
+    void subdivide(std::function<glm::vec3(EntityID)> getPosition);
 
     // Spatial queries
     void query(const BoundingBox& region, std::vector<EntityID>& results) const;

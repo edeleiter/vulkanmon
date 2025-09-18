@@ -7,6 +7,7 @@
 #include "../core/Window.h"
 // Old Camera.h dependency removed - using unified ECS camera system
 #include "ResourceManager.h"
+#include "MappedBuffer.h"
 #include "../io/AssetManager.h"
 #include "../io/ModelLoader.h"
 #include "../systems/LightingSystem.h"
@@ -472,7 +473,7 @@ private:
     // GPU Instancing members (Phase 7.1)
     VkBuffer instanceBuffer_ = VK_NULL_HANDLE;
     VkDeviceMemory instanceBufferMemory_ = VK_NULL_HANDLE;
-    void* instanceBufferMapped_ = nullptr;
+    MappedBuffer instanceBufferMapped_;  // RAII protected
     size_t instanceBufferSize_ = 0;
     static constexpr size_t maxInstances_ = 1000;  // Target: 200+ creatures + headroom
     

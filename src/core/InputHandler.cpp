@@ -98,7 +98,7 @@ void InputHandler::processMouseInput(double xpos, double ypos) {
     yoffset *= mouseSensitivity_;
 
     // Apply mouse look to active ECS camera entity
-    if (cameraSystem_->hasActiveCamera()) {
+    if (cameraSystem_->hasActiveCamera(world_->getEntityManager())) {
         EntityID activeCameraEntity = cameraSystem_->getActiveCameraEntity();
         if (world_->hasComponent<Transform>(activeCameraEntity)) {
             Transform& transform = world_->getComponent<Transform>(activeCameraEntity);
@@ -173,7 +173,7 @@ void InputHandler::setCameraSpeed(float speed) {
 
 void InputHandler::handleCameraMovement(GLFWwindow* window, float deltaTime) {
     // Modern ECS-based WASD camera movement
-    if (!cameraSystem_->hasActiveCamera()) {
+    if (!cameraSystem_->hasActiveCamera(world_->getEntityManager())) {
         return;
     }
 

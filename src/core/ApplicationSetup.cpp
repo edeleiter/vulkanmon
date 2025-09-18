@@ -120,9 +120,6 @@ void Application::initializeECS() {
     // Add camera system to handle ECS camera entities
     cameraSystem_ = world_->addSystem<CameraSystem>();
 
-    // Set up EntityManager caching for clean matrix interface
-    cameraSystem_->setCachedEntityManager(&world_->getEntityManager());
-
     // Add render system to handle rendering ECS entities
     renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
 

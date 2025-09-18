@@ -242,12 +242,15 @@ void Application::updateCameraMatrices() {
         return;
     }
 
+    // Get EntityManager reference for camera access
+    auto& entityManager = world_->getEntityManager();
+
     // Check if ECS camera is available
-    if (cameraSystem_->hasActiveCamera()) {
-        // Get matrices from ECS camera system (clean interface - no EntityManager needed)
-        glm::mat4 viewMatrix = cameraSystem_->getActiveViewMatrix();
-        glm::mat4 projectionMatrix = cameraSystem_->getActiveProjectionMatrix();
-        glm::vec3 cameraPosition = cameraSystem_->getActiveCameraPosition();
+    if (cameraSystem_->hasActiveCamera(entityManager)) {
+        // Get matrices from ECS camera system
+        glm::mat4 viewMatrix = cameraSystem_->getActiveViewMatrix(entityManager);
+        glm::mat4 projectionMatrix = cameraSystem_->getActiveProjectionMatrix(entityManager);
+        glm::vec3 cameraPosition = cameraSystem_->getActiveCameraPosition(entityManager);
 
         // Update VulkanRenderer with ECS camera data
         renderer_->setViewMatrix(viewMatrix);

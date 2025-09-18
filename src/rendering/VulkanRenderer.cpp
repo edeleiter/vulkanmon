@@ -2494,10 +2494,14 @@ void VulkanRenderer::createInstanceBuffer() {
                 instanceBufferMemory_);
 
     // Map the buffer persistently for efficient updates
-    VkResult result = vkMapMemory(device_, instanceBufferMemory_, 0, instanceBufferSize_, 0, &instanceBufferMapped_);
+    void* mappedPtr = nullptr;
+    VkResult result = vkMapMemory(device_, instanceBufferMemory_, 0, instanceBufferSize_, 0, &mappedPtr);
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to map instance buffer memory!");
     }
+
+    // Create RAII wrapper for mapped memory
+    instanceBufferMapped_ = MappedBuffer(device_, instanceBufferMemory_, mappedPtr);
 
     VKMON_INFO("GPU instance buffer created: " + std::to_string(instanceBufferSize_ / 1024) + " KB");
 }
@@ -2508,14 +2512,14 @@ void VulkanRenderer::updateInstanceData(const std::vector<VulkanMon::InstanceDat
                                 " (max: " + std::to_string(maxInstances_) + ")");
     }
 
-    if (instanceBufferMapped_ == nullptr) {
+    if (!instanceBufferMapped_.isValid()) {
         VKMON_ERROR("Instance buffer not mapped!");
         return;
     }
 
     // Fast memcpy to GPU-visible memory
     size_t dataSize = instances.size() * sizeof(VulkanMon::InstanceData);
-    memcpy(instanceBufferMapped_, instances.data(), dataSize);
+    memcpy(instanceBufferMapped_.get(), instances.data(), dataSize);
 
     // No need to flush due to HOST_COHERENT_BIT
 }
@@ -2526,7 +2530,7 @@ void VulkanRenderer::updateInstanceDataDirect(const InstanceData* instances, uin
                                 " (max: " + std::to_string(maxInstances_) + ")");
     }
 
-    if (instanceBufferMapped_ == nullptr) {
+    if (!instanceBufferMapped_.isValid()) {
         VKMON_ERROR("Instance buffer not mapped!");
         return;
     }
@@ -2538,16 +2542,13 @@ void VulkanRenderer::updateInstanceDataDirect(const InstanceData* instances, uin
 
     // Direct memcpy from validated pointer to GPU-visible memory - no intermediate copy
     size_t dataSize = instanceCount * sizeof(VulkanMon::InstanceData);
-    memcpy(instanceBufferMapped_, instances, dataSize);
+    memcpy(instanceBufferMapped_.get(), instances, dataSize);
 
     // No need to flush due to HOST_COHERENT_BIT
 }
 
 void VulkanRenderer::cleanupInstanceBuffer() {
-    if (instanceBufferMapped_ != nullptr) {
-        vkUnmapMemory(device_, instanceBufferMemory_);
-        instanceBufferMapped_ = nullptr;
-    }
+    // MappedBuffer RAII wrapper handles automatic unmapping
 
     if (instanceBuffer_ != VK_NULL_HANDLE) {
         vkDestroyBuffer(device_, instanceBuffer_, nullptr);
