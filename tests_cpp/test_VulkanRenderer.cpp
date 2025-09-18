@@ -1,11 +1,11 @@
 /*
  * VulkanMon VulkanRenderer Unit Tests
- * 
+ *
  * Focused tests for the VulkanRenderer class following our philosophy:
  * - "Simple is Powerful" - Test component interfaces without full Vulkan setup
  * - "Test, Test, Test" - Verify constructor safety and state management
  * - "Document Often" - Clear test names that document expected behavior
- * 
+ *
  * Note: These tests focus on VulkanRenderer logic without initializing Vulkan systems
  */
 
@@ -14,7 +14,7 @@
 
 #include "../src/rendering/VulkanRenderer.h"
 #include "../src/core/Window.h"
-#include "../src/core/Camera.h"
+#include "../src/systems/CameraSystem.h"
 #include "fixtures/TestHelpers.h"
 #include <memory>
 #include <set>
@@ -28,7 +28,7 @@ TEST_CASE("VulkanRenderer Basic Construction", "[VulkanRenderer][Basic]") {
         // This is a minimal test to verify the class exists
         REQUIRE(true); // If we can include the header, this passes
     }
-    
+
     SECTION("VulkanRenderer constants") {
         // Test any public constants if they exist
         REQUIRE(true); // Placeholder for future constant tests

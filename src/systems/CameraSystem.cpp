@@ -151,11 +151,7 @@ glm::mat4 CameraSystem::getActiveViewMatrix() {
 
     Camera* camera = getActiveCamera(*cachedEntityManager_);
     if (camera) {
-        // Ensure camera matrices are up to date
-        Transform* cameraTransform = getActiveCameraTransform(*cachedEntityManager_);
-        if (cameraTransform) {
-            camera->updateViewMatrix(cameraTransform->position, cameraTransform->getForward(), cameraTransform->getUp());
-        }
+        // Pure getter - matrices are updated in the update() method
         return camera->viewMatrix;
     }
 
@@ -173,8 +169,7 @@ glm::mat4 CameraSystem::getActiveProjectionMatrix() {
 
     Camera* camera = getActiveCamera(*cachedEntityManager_);
     if (camera) {
-        // Ensure projection matrix is up to date
-        camera->updateProjectionMatrix();
+        // Pure getter - projection matrix should be updated elsewhere when needed
         return camera->projectionMatrix;
     }
 

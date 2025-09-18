@@ -52,7 +52,10 @@ public:
 
         frameStats_.entitiesTracked = entityIds.size();
 
-        for (size_t i = 0; i < transforms.size(); ++i) {
+        // Ensure both vectors have the same size to prevent out-of-bounds access
+        size_t maxIndex = std::min(transforms.size(), entityIds.size());
+
+        for (size_t i = 0; i < maxIndex; ++i) {
             EntityID entity = entityIds[i];
 
             // Check if entity has both components
@@ -108,7 +111,6 @@ public:
     // Entity lifecycle management
     void addEntity(EntityID entity, const glm::vec3& position, uint32_t layers = LayerMask::None) {
         spatialManager_->addEntity(entity, position, layers);
-        frameStats_.entitiesAdded++;
     }
 
     void removeEntity(EntityID entity) {

@@ -2,22 +2,22 @@
 #include "../src/core/World.h"
 #include "../src/components/Transform.h"
 #include "../src/components/Renderable.h"
-#include "../src/components/VulkanMon::Camera.h"
+#include "../src/components/Camera.h"
 #include "../src/systems/RenderSystem.h"
-#include "../src/systems/VulkanMon::CameraSystem.h"
+#include "../src/systems/CameraSystem.h"
 
 using namespace VulkanMon;
 
 TEST_CASE("[ECS Integration] Complete system integration test", "[ECS][Integration]") {
     World world;
 
-    SECTION("VulkanMon::Camera and render system integration") {
+    SECTION("Camera and render system integration") {
         // Add systems to world
-        auto* cameraSystem = world.addSystem<VulkanMon::CameraSystem>();
+        auto* cameraSystem = world.addSystem<CameraSystem>();
         auto* renderSystem = world.addSystem<RenderSystem>();
 
         // Connect systems
-        renderSystem->setVulkanMon::CameraSystem(cameraSystem);
+        renderSystem->setCameraSystem(cameraSystem);
 
         // Initialize world
         world.initialize();
@@ -28,7 +28,7 @@ TEST_CASE("[ECS Integration] Complete system integration test", "[ECS][Integrati
         Transform cameraTransform;
         cameraTransform.setPosition(glm::vec3(0.0f, 5.0f, 10.0f));
 
-        VulkanMon::VulkanMon::Camera camera;
+        Camera camera;
         camera.setPerspective(45.0f, 16.0f/9.0f, 0.1f, 1000.0f);
         camera.setActive(true);
         camera.setPriority(1);
@@ -53,13 +53,13 @@ TEST_CASE("[ECS Integration] Complete system integration test", "[ECS][Integrati
         world.update(0.016f);
 
         // Verify systems are working
-        REQUIRE(cameraSystem->getActiveVulkanMon::CameraEntity() == cameraEntity);
+        REQUIRE(cameraSystem->getActiveCameraEntity() == cameraEntity);
 
-        VulkanMon::Camera* activeVulkanMon::Camera = cameraSystem->getActiveVulkanMon::Camera(world.getEntityManager());
-        REQUIRE(activeVulkanMon::Camera != nullptr);
-        REQUIRE(activeVulkanMon::Camera->isActive == true);
+        Camera* activeCamera = cameraSystem->getActiveCamera(world.getEntityManager());
+        REQUIRE(activeCamera != nullptr);
+        REQUIRE(activeCamera->isActive == true);
 
-        glm::vec3 camPos = cameraSystem->getActiveVulkanMon::CameraPosition(world.getEntityManager());
+        glm::vec3 camPos = cameraSystem->getActiveCameraPosition(world.getEntityManager());
         REQUIRE(camPos == glm::vec3(0.0f, 5.0f, 10.0f));
 
         // Test render system statistics
@@ -69,57 +69,57 @@ TEST_CASE("[ECS Integration] Complete system integration test", "[ECS][Integrati
     }
 
     SECTION("Multiple cameras with priority system") {
-        auto* cameraSystem = world.addSystem<VulkanMon::CameraSystem>();
+        auto* cameraSystem = world.addSystem<CameraSystem>();
         world.initialize();
 
         // Create low priority camera
-        EntityID lowPriorityVulkanMon::Camera = world.createEntity();
+        EntityID lowPriorityCamera = world.createEntity();
         Transform lowTransform;
         lowTransform.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-        VulkanMon::Camera lowVulkanMon::Camera;
-        lowVulkanMon::Camera.setActive(true);
-        lowVulkanMon::Camera.setPriority(1);
+        Camera lowCamera;
+        lowCamera.setActive(true);
+        lowCamera.setPriority(1);
 
-        world.addComponent(lowPriorityVulkanMon::Camera, lowTransform);
-        world.addComponent(lowPriorityVulkanMon::Camera, lowVulkanMon::Camera);
+        world.addComponent(lowPriorityCamera, lowTransform);
+        world.addComponent(lowPriorityCamera, lowCamera);
 
         // Create high priority camera
-        EntityID highPriorityVulkanMon::Camera = world.createEntity();
+        EntityID highPriorityCamera = world.createEntity();
         Transform highTransform;
         highTransform.setPosition(glm::vec3(10.0f, 10.0f, 10.0f));
-        VulkanMon::Camera highVulkanMon::Camera;
-        highVulkanMon::Camera.setActive(true);
-        highVulkanMon::Camera.setPriority(10);
+        Camera highCamera;
+        highCamera.setActive(true);
+        highCamera.setPriority(10);
 
-        world.addComponent(highPriorityVulkanMon::Camera, highTransform);
-        world.addComponent(highPriorityVulkanMon::Camera, highVulkanMon::Camera);
+        world.addComponent(highPriorityCamera, highTransform);
+        world.addComponent(highPriorityCamera, highCamera);
 
         // Update to process cameras
         world.update(0.016f);
 
         // High priority camera should be active
-        REQUIRE(cameraSystem->getActiveVulkanMon::CameraEntity() == highPriorityVulkanMon::Camera);
+        REQUIRE(cameraSystem->getActiveCameraEntity() == highPriorityCamera);
 
-        glm::vec3 activeCamPos = cameraSystem->getActiveVulkanMon::CameraPosition(world.getEntityManager());
+        glm::vec3 activeCamPos = cameraSystem->getActiveCameraPosition(world.getEntityManager());
         REQUIRE(activeCamPos == glm::vec3(10.0f, 10.0f, 10.0f));
 
         // Disable high priority camera
-        VulkanMon::Camera& highVulkanMon::CameraRef = world.getComponent<VulkanMon::Camera>(highPriorityVulkanMon::Camera);
-        highVulkanMon::CameraRef.setActive(false);
+        Camera& highCameraRef = world.getComponent<Camera>(highPriorityCamera);
+        highCameraRef.setActive(false);
 
         // Update again
         world.update(0.016f);
 
         // Low priority camera should now be active
-        REQUIRE(cameraSystem->getActiveVulkanMon::CameraEntity() == lowPriorityVulkanMon::Camera);
+        REQUIRE(cameraSystem->getActiveCameraEntity() == lowPriorityCamera);
 
         world.shutdown();
     }
 }
 
-TEST_CASE("[ECS Integration] VulkanMon::Camera component functionality", "[ECS][VulkanMon::Camera]") {
+TEST_CASE("[ECS Integration] Camera component functionality", "[ECS][Camera]") {
     SECTION("Perspective camera matrix calculation") {
-        VulkanMon::VulkanMon::Camera camera;
+        Camera camera;
         camera.setPerspective(90.0f, 1.0f, 1.0f, 100.0f);
 
         // Update matrices
@@ -137,20 +137,20 @@ TEST_CASE("[ECS Integration] VulkanMon::Camera component functionality", "[ECS][
     }
 
     SECTION("Orthographic camera setup") {
-        VulkanMon::VulkanMon::Camera camera;
+        Camera camera;
         camera.setOrthographic(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 100.0f);
 
-        REQUIRE(camera.type == VulkanMon::Camera::Type::ORTHOGRAPHIC);
+        REQUIRE(camera.type == Camera::Type::ORTHOGRAPHIC);
         REQUIRE(camera.orthoLeft == -10.0f);
         REQUIRE(camera.orthoRight == 10.0f);
     }
 
-    SECTION("VulkanMon::Camera priority and active state") {
-        VulkanMon::Camera camera1;
+    SECTION("Camera priority and active state") {
+        Camera camera1;
         camera1.setPriority(5);
         camera1.setActive(true);
 
-        VulkanMon::Camera camera2;
+        Camera camera2;
         camera2.setPriority(10);
         camera2.setActive(false);
 
@@ -166,24 +166,24 @@ TEST_CASE("[ECS Integration] Pokemon game scenario test", "[ECS][Pokemon]") {
 
     SECTION("Pokemon world with creatures and environment") {
         // Add systems
-        auto* cameraSystem = world.addSystem<VulkanMon::CameraSystem>();
+        auto* cameraSystem = world.addSystem<CameraSystem>();
         auto* renderSystem = world.addSystem<RenderSystem>();
-        renderSystem->setVulkanMon::CameraSystem(cameraSystem);
+        renderSystem->setCameraSystem(cameraSystem);
 
         world.initialize();
 
         // Create player camera
-        EntityID playerVulkanMon::Camera = world.createEntity();
+        EntityID playerCamera = world.createEntity();
         Transform cameraTransform;
         cameraTransform.setPosition(glm::vec3(0.0f, 2.0f, 5.0f));
 
-        VulkanMon::VulkanMon::Camera camera;
+        Camera camera;
         camera.setPerspective(75.0f, 16.0f/9.0f, 0.1f, 1000.0f);
         camera.setActive(true);
         camera.setPriority(100); // Player camera has highest priority
 
-        world.addComponent(playerVulkanMon::Camera, cameraTransform);
-        world.addComponent(playerVulkanMon::Camera, camera);
+        world.addComponent(playerCamera, cameraTransform);
+        world.addComponent(playerCamera, camera);
 
         // Create Pokemon creatures
         std::vector<EntityID> pokemon;
@@ -229,21 +229,21 @@ TEST_CASE("[ECS Integration] Pokemon game scenario test", "[ECS][Pokemon]") {
             world.update(0.016f); // ~60 FPS
 
             // Verify camera is active
-            REQUIRE(cameraSystem->getActiveVulkanMon::CameraEntity() == playerVulkanMon::Camera);
+            REQUIRE(cameraSystem->getActiveCameraEntity() == playerCamera);
 
             // Move camera (simulate player movement)
-            Transform& camTransform = world.getComponent<Transform>(playerVulkanMon::Camera);
+            Transform& camTransform = world.getComponent<Transform>(playerCamera);
             camTransform.setPosition(camTransform.position + glm::vec3(1.0f, 0.0f, 0.0f));
         }
 
         // Verify final camera position
-        Transform& finalCamTransform = world.getComponent<Transform>(playerVulkanMon::Camera);
-        REQUIRE(finalCamTransform.position.x > 0.0f); // VulkanMon::Camera moved
+        Transform& finalCamTransform = world.getComponent<Transform>(playerCamera);
+        REQUIRE(finalCamTransform.position.x > 0.0f); // Camera moved
 
         // Verify we have the expected number of entities
-        REQUIRE(world.getComponentCount<Transform>() == 1 + 3 + 10); // VulkanMon::Camera + Pokemon + Environment
+        REQUIRE(world.getComponentCount<Transform>() == 1 + 3 + 10); // Camera + Pokemon + Environment
         REQUIRE(world.getComponentCount<Renderable>() == 3 + 10); // Pokemon + Environment (camera has no renderable)
-        REQUIRE(world.getComponentCount<VulkanMon::Camera>() == 1); // Just the player camera
+        REQUIRE(world.getComponentCount<Camera>() == 1); // Just the player camera
 
         world.shutdown();
     }

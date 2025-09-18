@@ -29,11 +29,11 @@ add_executable(vulkanmon_tests
     test_Logger.cpp
     # test_Camera.cpp  # Removed - old Camera class deleted
     test_Window.cpp
-    # test_InputHandler.cpp  # Temporarily disabled - needs ECS integration
+    test_InputHandler.cpp  # Re-enabled - simple integration approach
     
     # TODO: Application and VulkanRenderer require integration tests
-    # test_Application.cpp
-    # test_VulkanRenderer.cpp
+    test_Application.cpp    # Re-enabled - fixed Config namespace references
+    test_VulkanRenderer.cpp
     
     # Simple unit tests that work in isolation
     test_Utils.cpp
@@ -49,7 +49,7 @@ add_executable(vulkanmon_tests
 
     # Phase 6: ECS Framework tests
     test_ecs.cpp
-    # test_ecs_integration.cpp  # Temporarily disabled for compilation fix
+    test_ecs_integration.cpp  # Re-enabled - fixed compilation issues
 
     # Phase 6.3: ECS Inspector tests (NEW)
     test_ECSInspector.cpp
@@ -68,7 +68,8 @@ add_executable(vulkanmon_tests
     
     # Source files under test (individual components only)
     ../src/core/Window.cpp
-    # ../src/core/InputHandler.cpp  # Temporarily disabled - needs ECS integration
+    ../src/core/InputHandler.cpp  # Re-enabled with ECS integration
+    ../src/core/Application.cpp  # Re-enabled for Application tests
     # ../src/core/Camera.cpp  # Removed - old Camera class deleted
     ../src/utils/Utils.cpp
     ../src/stb_image_impl.cpp
@@ -77,6 +78,7 @@ add_executable(vulkanmon_tests
     ../src/systems/LightingSystem.cpp
     ../src/systems/MaterialSystem.cpp
     ../src/systems/RenderSystem.cpp
+    ../src/systems/CreatureRenderSystem.cpp  # Required by Application.cpp
     ../src/systems/CameraSystem.cpp
     ../src/spatial/SpatialManager.cpp
     ../src/spatial/WorldConfig.cpp
