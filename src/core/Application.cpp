@@ -191,8 +191,19 @@ void Application::toggleInspector() {
 void Application::handleWindowResize(int width, int height) {
     VKMON_INFO("Window resize event: " + std::to_string(width) + "x" + std::to_string(height));
 
+    // Update Vulkan viewport and swapchain
     if (renderer_) {
         renderer_->handleWindowResize(width, height);
+    }
+
+    // Update camera aspect ratio
+    if (cameraSystem_ && world_) {
+        cameraSystem_->handleWindowResize(width, height, world_->getEntityManager());
+
+        // VIEWPORT FIX: Immediately update projection matrix after camera resize
+        // This ensures the GPU gets the correct projection matrix right away,
+        // instead of waiting for the next frame update cycle
+        updateCameraMatrices();
     }
 }
 

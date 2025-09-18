@@ -283,20 +283,24 @@ void VulkanRenderer::beginECSFrame() {
     // Bind graphics pipeline
     vkCmdBindPipeline(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-    // Set viewport dynamically (essential for proper resize handling)
+    // Set viewport dynamically (now that pipeline supports dynamic state)
+    VkExtent2D currentWindowExtent = window_->getExtent();
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapChainExtent_.width);
-    viewport.height = static_cast<float>(swapChainExtent_.height);
+    viewport.width = static_cast<float>(currentWindowExtent.width);
+    viewport.height = static_cast<float>(currentWindowExtent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
+
+
     vkCmdSetViewport(commandBuffers_[currentImageIndex_], 0, 1, &viewport);
 
-    // Set scissor rectangle
+    // Set scissor rectangle (must match viewport for proper rendering)
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent_;
+    scissor.extent.width = currentWindowExtent.width;
+    scissor.extent.height = currentWindowExtent.height;
     vkCmdSetScissor(commandBuffers_[currentImageIndex_], 0, 1, &scissor);
 
     // Bind global descriptor set (set 0: UBO, texture, lighting)
@@ -715,8 +719,6 @@ int VulkanRenderer::findGraphicsQueueFamily() {
 }
 
 void VulkanRenderer::createSwapChain() {
-    VKMON_DEBUG("Creating swapchain...");
-    
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice_, surface_, &capabilities);
 
@@ -735,12 +737,11 @@ void VulkanRenderer::createSwapChain() {
     }
 
     // Choose extent based on window dimensions
-    if (capabilities.currentExtent.width != UINT32_MAX) {
-        swapChainExtent_ = capabilities.currentExtent;
-    } else {
-        // Get window extent from Window system
-        swapChainExtent_ = window_->getExtent();
-    }
+    VkExtent2D windowExtent = window_->getExtent();
+
+    // VIEWPORT FIX: Always use window extent to ensure viewport matches actual window size
+    // Surface capabilities can be stale during resize events, causing viewport scaling issues
+    swapChainExtent_ = windowExtent;
 
     uint32_t imageCount = capabilities.minImageCount + 1;
     if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
@@ -949,25 +950,24 @@ void VulkanRenderer::createGraphicsPipeline() {
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    // Viewport and scissor
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float) swapChainExtent_.width;
-    viewport.height = (float) swapChainExtent_.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent_;
-
+    // Viewport and scissor (use dynamic state so we can resize at runtime)
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
+    viewportState.pViewports = nullptr;  // Dynamic state - will be set with vkCmdSetViewport
     viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    viewportState.pScissors = nullptr;   // Dynamic state - will be set with vkCmdSetScissor
+
+    // VIEWPORT FIX: Enable dynamic viewport and scissor state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
 
     // Rasterizer
     VkPipelineRasterizationStateCreateInfo rasterizer{};
@@ -1037,6 +1037,7 @@ void VulkanRenderer::createGraphicsPipeline() {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;  // VIEWPORT FIX: Enable dynamic state
     pipelineInfo.layout = pipelineLayout_;
     pipelineInfo.renderPass = renderPass_;
     pipelineInfo.subpass = 0;
@@ -1097,25 +1098,24 @@ void VulkanRenderer::createInstancedGraphicsPipeline() {
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    // Viewport and scissor (same as regular pipeline)
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float) swapChainExtent_.width;
-    viewport.height = (float) swapChainExtent_.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent_;
-
+    // Viewport and scissor (use dynamic state like regular pipeline)
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
+    viewportState.pViewports = nullptr;  // Dynamic state - will be set with vkCmdSetViewport
     viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    viewportState.pScissors = nullptr;   // Dynamic state - will be set with vkCmdSetScissor
+
+    // INSTANCED PIPELINE FIX: Enable dynamic viewport and scissor state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
 
     // Rasterizer (same as regular pipeline)
     VkPipelineRasterizationStateCreateInfo rasterizer{};
@@ -1167,6 +1167,7 @@ void VulkanRenderer::createInstancedGraphicsPipeline() {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;  // INSTANCED PIPELINE FIX: Enable dynamic state
     pipelineInfo.layout = pipelineLayout_;  // Reuse existing layout
     pipelineInfo.renderPass = renderPass_;
     pipelineInfo.subpass = 0;
@@ -1952,6 +1953,7 @@ void VulkanRenderer::updateUniformBuffer() {
         ubo.view = externalViewMatrix_;
         ubo.proj = externalProjectionMatrix_;
         ubo.cameraPos = externalCameraPosition_;
+
     } else {
         // FALLBACK PATH: When ECS camera system unavailable (should be rare)
         VKMON_WARNING("VulkanRenderer: No ECS camera data available, using fallback camera");
@@ -2403,6 +2405,7 @@ void VulkanRenderer::initializeImGui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.IniFilename = nullptr;                                 // Disable imgui.ini file creation
 
     // Setup ImGui style (dark theme)
     ImGui::StyleColorsDark();

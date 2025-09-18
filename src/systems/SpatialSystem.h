@@ -123,7 +123,7 @@ public:
         spatialManager_->getStatistics(nodeCount, maxDepth, totalEntities);
     }
 
-    const SpatialManager::SpatialStats& getSpatialPerformanceStats() const {
+    SpatialManager::SpatialStats getSpatialPerformanceStats() const {
         return spatialManager_->getPerformanceStats();
     }
 

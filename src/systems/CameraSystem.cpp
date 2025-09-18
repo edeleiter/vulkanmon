@@ -110,6 +110,34 @@ Frustum CameraSystem::getActiveCameraFrustum(EntityManager& entityManager) {
     return frustum;
 }
 
+void CameraSystem::handleWindowResize(int width, int height, EntityManager& entityManager) {
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera entity for resize handling");
+        return; // No active camera to update
+    }
+
+    Camera* camera = getActiveCamera(entityManager);
+    if (!camera) {
+        VKMON_WARNING("CameraSystem: Active camera component not found for entity " + std::to_string(static_cast<uint32_t>(activeCameraEntity)));
+        return; // Camera component not found
+    }
+
+    // Calculate new aspect ratio
+    float newAspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    float oldAspectRatio = camera->aspectRatio;
+
+    // Update camera aspect ratio and regenerate projection matrix
+    if (camera->type == Camera::Type::PERSPECTIVE) {
+        camera->setPerspective(camera->fov, newAspectRatio, camera->nearPlane, camera->farPlane);
+
+        VKMON_INFO("Camera aspect ratio updated from " + std::to_string(oldAspectRatio) +
+                   " to " + std::to_string(newAspectRatio) +
+                   " for window size " + std::to_string(width) + "x" + std::to_string(height));
+    }
+    // Note: Orthographic cameras don't use aspect ratio in the same way,
+    // they would need different handling if needed in the future
+}
+
 // =============================================================================
 // UNIFIED CAMERA INTERFACE - Clean matrix providers
 // =============================================================================

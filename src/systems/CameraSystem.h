@@ -35,6 +35,9 @@ public:
     // Generate frustum from active camera for spatial culling
     Frustum getActiveCameraFrustum(EntityManager& entityManager);
 
+    // Window resize handling - updates camera aspect ratio
+    void handleWindowResize(int width, int height, EntityManager& entityManager);
+
     // =========================================================================
     // UNIFIED CAMERA INTERFACE - Simple matrix providers (no EntityManager needed)
     // =========================================================================

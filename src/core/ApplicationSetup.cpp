@@ -3,6 +3,7 @@
 #include "../systems/SpatialSystem.h"
 #include "../systems/CreatureRenderSystem.h"
 #include "../components/SpatialComponent.h"
+#include "../components/Camera.h"
 #include "../spatial/WorldConfig.h"
 #include "../config/CameraConfig.h"
 #include <stdexcept>
@@ -262,7 +263,9 @@ void Application::createTestScene() {
     cameraComponent.fov = Config::Camera::DEFAULT_FOV;              // Using unified config
     cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE; // Using unified config
     cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;   // Using unified config
+    cameraComponent.aspectRatio = 16.0f / 9.0f;                     // Set initial aspect ratio for resize testing
     cameraComponent.isActive = true;
+    cameraComponent.updateProjectionMatrix();                       // Generate initial projection matrix
     world_->addComponent(cameraEntity, cameraComponent);
 
     SpatialComponent cameraSpatial;

@@ -189,9 +189,9 @@ TEST_CASE("Spatial System Performance Validation", "[spatial][performance]") {
 
         INFO("Layer filtering time for 150 queries: " << totalTime << "ms");
         INFO("Average creatures found: " <<
-             (creatureResults.empty() ? 0 : std::accumulate(creatureResults.begin(), creatureResults.end(), 0) / creatureResults.size()));
+             (creatureResults.empty() ? 0 : std::accumulate(creatureResults.begin(), creatureResults.end(), size_t(0)) / creatureResults.size()));
         INFO("Average players found: " <<
-             (playerResults.empty() ? 0 : std::accumulate(playerResults.begin(), playerResults.end(), 0) / playerResults.size()));
+             (playerResults.empty() ? 0 : std::accumulate(playerResults.begin(), playerResults.end(), size_t(0)) / playerResults.size()));
 
         // Verify layer filtering works correctly
         for (size_t i = 0; i < creatureResults.size(); ++i) {
