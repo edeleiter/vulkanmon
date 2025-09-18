@@ -70,6 +70,7 @@ add_executable(vulkanmon_tests
     ../src/core/Window.cpp
     ../src/core/InputHandler.cpp  # Re-enabled with ECS integration
     ../src/core/Application.cpp  # Re-enabled for Application tests
+    ../src/core/World.cpp  # Added for World::connectSystems() support
     # ../src/core/Camera.cpp  # Removed - old Camera class deleted
     ../src/utils/Utils.cpp
     ../src/stb_image_impl.cpp

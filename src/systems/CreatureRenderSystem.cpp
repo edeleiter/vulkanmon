@@ -1,4 +1,5 @@
 #include "CreatureRenderSystem.h"
+#include <cassert>
 #include <algorithm>
 #include <sstream>
 
@@ -20,6 +21,10 @@ void CreatureRenderSystem::update(float deltaTime, EntityManager& entityManager)
 }
 
 void CreatureRenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager) {
+    // Debug safety assertions (zero cost in release builds)
+    assert(cameraSystem_ && "CameraSystem must be set before rendering");
+    assert(spatialSystem_ && "SpatialSystem must be set before rendering");
+
     auto frameStart = std::chrono::high_resolution_clock::now();
 
     // Step 1: Get camera position for distance calculations

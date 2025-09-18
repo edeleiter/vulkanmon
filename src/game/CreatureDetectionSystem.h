@@ -9,6 +9,7 @@
 #include "../utils/Logger.h"
 #include <memory>
 #include <random>
+#include <cassert>
 
 namespace VulkanMon {
 
@@ -56,7 +57,7 @@ struct CreatureComponent {
 
 class CreatureDetectionSystem : public System<Transform, SpatialComponent, CreatureComponent> {
 private:
-    SpatialSystem* spatialSystem_ = nullptr;
+    SpatialSystem* spatialSystem_ = nullptr;  // Non-owning, lifetime managed by World
 
     // Performance tracking
     struct DetectionStats {
@@ -78,9 +79,13 @@ public:
 
     void setSpatialSystem(SpatialSystem* spatialSystem) {
         spatialSystem_ = spatialSystem;
+        VKMON_INFO("CreatureDetectionSystem: SpatialSystem reference updated");
     }
 
     void update(float deltaTime, EntityManager& entityManager) override {
+        // Debug safety assertion (zero cost in release builds)
+        assert(spatialSystem_ && "SpatialSystem must be set before creature detection");
+
         if (!spatialSystem_) {
             VKMON_WARNING("CreatureDetectionSystem: No spatial system available");
             return;

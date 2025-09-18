@@ -16,6 +16,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <cassert>
 
 namespace VulkanMon {
 
@@ -96,9 +97,9 @@ struct CreatureRenderStats {
  */
 class CreatureRenderSystem : public System<Transform, Renderable, CreatureComponent> {
 private:
-    // System dependencies
-    CameraSystem* cameraSystem_ = nullptr;
-    SpatialSystem* spatialSystem_ = nullptr;
+    // System dependencies (non-owning, lifetime managed by World)
+    CameraSystem* cameraSystem_ = nullptr;   // Safe: World guarantees lifetime
+    SpatialSystem* spatialSystem_ = nullptr; // Safe: World guarantees lifetime
 
     // Instanced rendering data
     std::unordered_map<std::string, InstancedBatch> instanceBatches_;
@@ -125,9 +126,16 @@ public:
     void update(float deltaTime, EntityManager& entityManager) override;
     void render(VulkanRenderer& renderer, EntityManager& entityManager) override;
 
-    // System dependencies
-    void setCameraSystem(CameraSystem* cameraSystem) { cameraSystem_ = cameraSystem; }
-    void setSpatialSystem(SpatialSystem* spatialSystem) { spatialSystem_ = spatialSystem; }
+    // System dependencies (with safety logging)
+    void setCameraSystem(CameraSystem* cameraSystem) {
+        cameraSystem_ = cameraSystem;
+        VKMON_INFO("CreatureRenderSystem: CameraSystem reference updated");
+    }
+
+    void setSpatialSystem(SpatialSystem* spatialSystem) {
+        spatialSystem_ = spatialSystem;
+        VKMON_INFO("CreatureRenderSystem: SpatialSystem reference updated");
+    }
 
     // Configuration
     void setMaxRenderDistance(float distance) { maxRenderDistance_ = distance; }

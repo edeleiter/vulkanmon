@@ -8,6 +8,7 @@
 #include "CameraSystem.h"
 #include <vector>
 #include <algorithm>
+#include <cassert>
 
 // Forward declaration to avoid circular dependency
 namespace VulkanMon {
@@ -25,9 +26,9 @@ private:
     // Simple frustum culling distance (will be enhanced later)
     float maxRenderDistance = 1000.0f;
 
-    // References to other systems
-    CameraSystem* cameraSystem = nullptr;
-    SpatialSystem* spatialSystem = nullptr;
+    // References to other systems (non-owning, lifetime managed by World)
+    CameraSystem* cameraSystem = nullptr;   // Safe: World guarantees lifetime
+    SpatialSystem* spatialSystem = nullptr; // Safe: World guarantees lifetime
 
     // Render command structure for sorting
     struct RenderCommand {
@@ -58,9 +59,16 @@ public:
     RenderSystem(CameraSystem* camSystem = nullptr, SpatialSystem* spatialSys = nullptr)
         : cameraSystem(camSystem), spatialSystem(spatialSys) {}
 
-    // Set system references
-    void setCameraSystem(CameraSystem* camSystem) { cameraSystem = camSystem; }
-    void setSpatialSystem(SpatialSystem* spatialSys) { spatialSystem = spatialSys; }
+    // Set system references (with safety logging)
+    void setCameraSystem(CameraSystem* camSystem) {
+        cameraSystem = camSystem;
+        VKMON_INFO("RenderSystem: CameraSystem reference updated");
+    }
+
+    void setSpatialSystem(SpatialSystem* spatialSys) {
+        spatialSystem = spatialSys;
+        VKMON_INFO("RenderSystem: SpatialSystem reference updated");
+    }
 
     void update(float deltaTime, EntityManager& entityManager) override;
 

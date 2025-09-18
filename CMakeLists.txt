@@ -52,6 +52,7 @@ add_custom_target(shaders
 add_executable(vulkanmon
     src/main.cpp
     src/core/Application.cpp
+    src/core/World.cpp
     src/rendering/VulkanRenderer.cpp
     src/core/Window.cpp
     src/core/InputHandler.cpp

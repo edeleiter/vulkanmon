@@ -137,24 +137,12 @@ void Application::initializeECS() {
                            std::to_string(worldConfig.maxBounds.z) + ")");
     spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
 
-    // Connect RenderSystem with SpatialSystem for spatial frustum culling
-    if (renderSystem_ && spatialSystem_) {
-        renderSystem_->setSpatialSystem(spatialSystem_);
-        VKMON_INFO("RenderSystem connected to SpatialSystem for frustum culling");
-    }
-
-    // Connect CreatureRenderSystem with SpatialSystem for massive creature culling
-    if (creatureRenderSystem_ && spatialSystem_) {
-        creatureRenderSystem_->setSpatialSystem(spatialSystem_);
-        VKMON_INFO("CreatureRenderSystem connected to SpatialSystem for creature culling");
-    }
-
     // Add CreatureDetectionSystem for AI behavior and spatial detection
     creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
-    if (creatureDetectionSystem_ && spatialSystem_) {
-        creatureDetectionSystem_->setSpatialSystem(spatialSystem_);
-        VKMON_INFO("CreatureDetectionSystem initialized and connected to SpatialSystem");
-    }
+
+    // Use centralized system connection with validation
+    world_->connectSystems();
+    VKMON_INFO("System dependency connection completed via World::connectSystems()");
 
     // Register ECS render callback with VulkanRenderer
     if (renderer_) {

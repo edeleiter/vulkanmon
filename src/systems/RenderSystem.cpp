@@ -1,5 +1,6 @@
 #include "RenderSystem.h"
 #include "SpatialSystem.h"
+#include <cassert>
 #include "../utils/Logger.h"
 #include "../game/CreatureDetectionSystem.h"  // For CreatureComponent
 
@@ -14,6 +15,10 @@ void RenderSystem::update(float deltaTime, EntityManager& entityManager) {
 }
 
 void RenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager) {
+    // Debug safety assertions (zero cost in release builds)
+    assert(cameraSystem && "CameraSystem must be set before rendering");
+    assert(spatialSystem && "SpatialSystem must be set before rendering");
+
     // Reset statistics
     renderedObjectCount = 0;
     culledObjectCount = 0;
