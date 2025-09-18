@@ -340,9 +340,16 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants);
 
     // Render the specific model for this meshPath
-    auto modelIt = modelCache_.find(meshPath);
-    if (modelIt != modelCache_.end() && modelIt->second && !modelIt->second->meshes.empty()) {
-        auto model = modelIt->second;
+    std::shared_ptr<Model> model;
+    {
+        std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+        auto modelIt = modelCache_.find(meshPath);
+        if (modelIt != modelCache_.end() && modelIt->second && !modelIt->second->meshes.empty()) {
+            model = modelIt->second;
+        }
+    }
+
+    if (model) {
         for (const auto& mesh : model->meshes) {
             if (mesh->vertexBuffer && mesh->indexBuffer) {
                 VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
@@ -462,47 +469,52 @@ void VulkanRenderer::renderInstanced(const std::string& meshPath,
     ensureMeshLoaded(meshPath);
 
     // Find cached model and render all instances with GPU instancing
-    auto modelIt = modelCache_.find(meshPath);
-    if (modelIt != modelCache_.end()) {
-        auto model = modelIt->second;
-        if (model && !model->meshes.empty()) {
-            // Get current command buffer
-            VkCommandBuffer commandBuffer = commandBuffers_[currentImageIndex_];
+    std::shared_ptr<Model> model;
+    {
+        std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+        auto modelIt = modelCache_.find(meshPath);
+        if (modelIt != modelCache_.end()) {
+            model = modelIt->second;
+        }
+    }
 
-            // Bind instanced graphics pipeline
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedGraphicsPipeline_);
+    if (model && !model->meshes.empty()) {
+        // Get current command buffer
+        VkCommandBuffer commandBuffer = commandBuffers_[currentImageIndex_];
 
-            // Bind global descriptor set (set 0)
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
-                                   0, 1, &globalDescriptorSet_, 0, nullptr);
+        // Bind instanced graphics pipeline
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedGraphicsPipeline_);
 
-            // Bind material-specific descriptor set (set 1)
-            if (materialSystem_ && baseMaterialId < materialSystem_->getMaterialCount()) {
-                VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(baseMaterialId);
-                if (materialDescriptorSet != VK_NULL_HANDLE) {
-                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
-                                           1, 1, &materialDescriptorSet, 0, nullptr);
-                }
+        // Bind global descriptor set (set 0)
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
+                               0, 1, &globalDescriptorSet_, 0, nullptr);
+
+        // Bind material-specific descriptor set (set 1)
+        if (materialSystem_ && baseMaterialId < materialSystem_->getMaterialCount()) {
+            VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(baseMaterialId);
+            if (materialDescriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
+                                       1, 1, &materialDescriptorSet, 0, nullptr);
             }
+        }
 
-            // Render each mesh with instancing
-            for (const auto& mesh : model->meshes) {
-                // Bind vertex buffers: [0] = vertex data, [1] = instance data
-                VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer(), instanceBuffer_};
-                VkDeviceSize offsets[] = {0, 0};
-                vkCmdBindVertexBuffers(commandBuffer, 0, 2, vertexBuffers, offsets);
+        // Render each mesh with instancing
+        for (const auto& mesh : model->meshes) {
+            // Bind vertex buffers: [0] = vertex data, [1] = instance data
+            VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer(), instanceBuffer_};
+            VkDeviceSize offsets[] = {0, 0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 2, vertexBuffers, offsets);
 
-                // Bind index buffer
-                vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+            // Bind index buffer
+            vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-                // CRITICAL: GPU Instanced draw call - this renders ALL instances in one draw call!
-                vkCmdDrawIndexed(commandBuffer,
-                                static_cast<uint32_t>(mesh->indices.size()),  // indexCount
-                                instanceCount,                                 // instanceCount - THE MAGIC!
-                                0,                                            // firstIndex
-                                0,                                            // vertexOffset
-                                0);                                           // firstInstance
-            }
+            // CRITICAL: GPU Instanced draw call - this renders ALL instances in one draw call!
+            vkCmdDrawIndexed(commandBuffer,
+                            static_cast<uint32_t>(mesh->indices.size()),  // indexCount
+                            instanceCount,                                 // instanceCount - THE MAGIC!
+                            0,                                            // firstIndex
+                            0,                                            // vertexOffset
+                            0);                                           // firstInstance
         }
         VKMON_DEBUG("GPU Instancing: Rendered " + std::to_string(instanceCount) +
                    " instances in 1 draw call for: " + meshPath);
@@ -523,8 +535,11 @@ void VulkanRenderer::renderInstancedCreatures(const std::string& meshPath,
 
 void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
     // Check if model is already cached
-    if (modelCache_.find(meshPath) != modelCache_.end()) {
-        return; // Already loaded
+    {
+        std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+        if (modelCache_.find(meshPath) != modelCache_.end()) {
+            return; // Already loaded
+        }
     }
 
     // Load the model using ModelLoader
@@ -534,13 +549,19 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
             auto model = modelLoader_->loadModel(meshPath);
 
             if (model && !model->meshes.empty()) {
-                modelCache_[meshPath] = std::move(model);
+                {
+                    std::unique_lock<std::shared_mutex> lock(modelCacheMutex_);
+                    modelCache_[meshPath] = std::move(model);
+                }
                 VKMON_INFO("Model loaded and cached: " + meshPath);
             } else {
                 VKMON_WARNING("Failed to load model or model is empty: " + meshPath);
                 // Use fallback - add current model as cache for this path
                 if (currentModel_) {
-                    modelCache_[meshPath] = currentModel_;
+                    {
+                        std::unique_lock<std::shared_mutex> lock(modelCacheMutex_);
+                        modelCache_[meshPath] = currentModel_;
+                    }
                     VKMON_WARNING("Using fallback model for: " + meshPath);
                 }
             }
@@ -548,7 +569,10 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
             VKMON_ERROR("Exception loading model " + meshPath + ": " + std::string(e.what()));
             // Use fallback
             if (currentModel_) {
-                modelCache_[meshPath] = currentModel_;
+                {
+                    std::unique_lock<std::shared_mutex> lock(modelCacheMutex_);
+                    modelCache_[meshPath] = currentModel_;
+                }
                 VKMON_WARNING("Using fallback model due to exception: " + meshPath);
             }
         }
@@ -1505,7 +1529,7 @@ void VulkanRenderer::createTextureImage() {
     
     VkDeviceSize imageSize = texWidth * texHeight * texChannels;
 
-    // Create staging buffer with RAII for automatic cleanup
+    // Create staging buffer for efficient GPU transfer
     auto stagingBuffer = resourceManager_->createBuffer(
         imageSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1513,15 +1537,26 @@ void VulkanRenderer::createTextureImage() {
         "texture_staging_checkered"
     );
 
-    // Copy pixel data to staging buffer
+    // Upload pixel data to staging buffer
     stagingBuffer->updateData(pixels, imageSize);
 
-    // Create image - if this fails, staging buffer is automatically cleaned up by RAII
+    // Create GPU-local image for optimal rendering performance
     createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_, textureImageMemory_);
 
-    // Staging buffer automatically cleaned up when it goes out of scope
+    // Transition image layout for transfer destination
+    transitionImageLayout(textureImage_, VK_FORMAT_R8G8B8A8_SRGB,
+                         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Copy data from staging buffer to GPU image
+    copyBufferToImage(stagingBuffer->getBuffer(), textureImage_, texWidth, texHeight);
+
+    // Transition image layout for shader access
+    transitionImageLayout(textureImage_, VK_FORMAT_R8G8B8A8_SRGB,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // Staging buffer automatically cleaned up after GPU copy completes
 
     VKMON_DEBUG("Texture image created successfully (basic version)");
 }
@@ -2612,6 +2647,108 @@ std::vector<VkVertexInputAttributeDescription> VulkanRenderer::getInstancedAttri
     // Return only the first 10 attributes (0-9) for now
     attributes.resize(10);
     return attributes;
+}
+
+// =============================================================================
+// Image Transfer Helper Methods
+// =============================================================================
+
+VkCommandBuffer VulkanRenderer::beginSingleTimeCommands() {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool_;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(device_, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    return commandBuffer;
+}
+
+void VulkanRenderer::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue_);
+
+    vkFreeCommandBuffers(device_, commandPool_, 1, &commandBuffer);
+}
+
+void VulkanRenderer::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else {
+        throw std::invalid_argument("Unsupported layout transition!");
+    }
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage, destinationStage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanRenderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {width, height, 1};
+
+    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    endSingleTimeCommands(commandBuffer);
 }
 
 

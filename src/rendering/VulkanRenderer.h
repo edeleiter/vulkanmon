@@ -18,6 +18,7 @@
 #include <vector>
 #include <chrono>
 #include <functional>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <glm/glm.hpp>
@@ -359,6 +360,7 @@ private:
 
     // Model cache for multi-object ECS rendering
     std::unordered_map<std::string, std::shared_ptr<Model>> modelCache_;
+    mutable std::shared_mutex modelCacheMutex_;  // Protects modelCache_
 
     // =========================================================================
     // UNIFIED CAMERA INTERFACE - External matrix storage
@@ -542,6 +544,12 @@ private:
     VkFormat findDepthFormat();
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     bool hasStencilComponent(VkFormat format);
+
+    // Image transfer helper methods
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
     
     // Cleanup methods
     void cleanup();

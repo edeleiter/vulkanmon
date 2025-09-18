@@ -359,7 +359,10 @@ void SpatialManager::addEntity(EntityID entity, const glm::vec3& position, uint3
     octree_->insert(entity, position);
 
     // Clear cache when spatial structure changes
-    cache_.clear();
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.clear();
+    }
 }
 
 void SpatialManager::removeEntity(EntityID entity) {
@@ -374,7 +377,10 @@ void SpatialManager::removeEntity(EntityID entity) {
     entityLayers_.erase(entity);
 
     // Clear cache when spatial structure changes
-    cache_.clear();
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.clear();
+    }
 }
 
 void SpatialManager::updateEntity(EntityID entity, const glm::vec3& newPosition) {
@@ -391,7 +397,10 @@ void SpatialManager::updateEntity(EntityID entity, const glm::vec3& newPosition)
     octree_->update(entity, oldPosition, newPosition);
 
     // Clear cache when spatial structure changes
-    cache_.clear();
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.clear();
+    }
 }
 
 void SpatialManager::updateEntityLayers(EntityID entity, uint32_t layers) {
@@ -407,9 +416,12 @@ void SpatialManager::updateEntityLayers(EntityID entity, uint32_t layers) {
 std::vector<EntityID> SpatialManager::queryRegion(const BoundingBox& region, uint32_t layerMask) const {
     // Try cache first
     std::vector<EntityID> cachedResults;
-    if (cache_.tryGetRegionQuery(region, layerMask, cachedResults)) {
-        updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
-        return cachedResults;
+    {
+        std::shared_lock<std::shared_mutex> lock(cacheMutex_);
+        if (cache_.tryGetRegionQuery(region, layerMask, cachedResults)) {
+            updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
+            return cachedResults;
+        }
     }
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -434,7 +446,10 @@ std::vector<EntityID> SpatialManager::queryRegion(const BoundingBox& region, uin
     updateStatistics(queryTime, filteredResults.size());
 
     // Cache the result
-    cache_.cacheRegionQuery(region, layerMask, filteredResults);
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.cacheRegionQuery(region, layerMask, filteredResults);
+    }
 
     return filteredResults;
 }
@@ -442,9 +457,12 @@ std::vector<EntityID> SpatialManager::queryRegion(const BoundingBox& region, uin
 std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint32_t layerMask) const {
     // Try cache first
     std::vector<EntityID> cachedResults;
-    if (cache_.tryGetFrustumQuery(frustum, layerMask, cachedResults)) {
-        updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
-        return cachedResults;
+    {
+        std::shared_lock<std::shared_mutex> lock(cacheMutex_);
+        if (cache_.tryGetFrustumQuery(frustum, layerMask, cachedResults)) {
+            updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
+            return cachedResults;
+        }
     }
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -465,7 +483,10 @@ std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint3
     updateStatistics(queryTime, filteredResults.size());
 
     // Cache the result
-    cache_.cacheFrustumQuery(frustum, layerMask, filteredResults);
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.cacheFrustumQuery(frustum, layerMask, filteredResults);
+    }
 
     return filteredResults;
 }
@@ -473,9 +494,12 @@ std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint3
 std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float radius, uint32_t layerMask) const {
     // Try cache first
     std::vector<EntityID> cachedResults;
-    if (cache_.tryGetRadiusQuery(center, radius, layerMask, cachedResults)) {
-        updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
-        return cachedResults;
+    {
+        std::shared_lock<std::shared_mutex> lock(cacheMutex_);
+        if (cache_.tryGetRadiusQuery(center, radius, layerMask, cachedResults)) {
+            updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
+            return cachedResults;
+        }
     }
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -500,7 +524,10 @@ std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float
     updateStatistics(queryTime, filteredResults.size());
 
     // Cache the result
-    cache_.cacheRadiusQuery(center, radius, layerMask, filteredResults);
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.cacheRadiusQuery(center, radius, layerMask, filteredResults);
+    }
 
     return filteredResults;
 }
@@ -559,7 +586,10 @@ void SpatialManager::clear() {
     octree_->clear();
     entityPositions_.clear();
     entityLayers_.clear();
-    cache_.clear();
+    {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.clear();
+    }
 
     // Reset statistics with thread safety
     {
@@ -580,8 +610,11 @@ void SpatialManager::updateStatistics(float queryTimeMs, size_t entitiesReturned
     stats_.averageQueryTimeMs = stats_.averageQueryTimeMs * (1.0f - alpha) + queryTimeMs * alpha;
 
     // Update cache statistics
-    stats_.cacheHitRate = cache_.getCacheHitRate();
-    stats_.cacheSize = cache_.getCacheSize();
+    {
+        std::shared_lock<std::shared_mutex> cacheLock(cacheMutex_);
+        stats_.cacheHitRate = cache_.getCacheHitRate();
+        stats_.cacheSize = cache_.getCacheSize();
+    }
 }
 
 bool SpatialManager::passesLayerFilter(EntityID entity, uint32_t layerMask) const {

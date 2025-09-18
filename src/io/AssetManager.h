@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <memory>
 #include <functional>
+#include <shared_mutex>
 
 /**
  * VulkanMon Asset Loading Pipeline
@@ -115,7 +116,10 @@ public:
     
     // Cache management
     void clearTextureCache();
-    size_t getTextureCount() const { return textureCache_.size(); }
+    size_t getTextureCount() const {
+        std::shared_lock<std::shared_mutex> lock(textureCacheMutex_);
+        return textureCache_.size();
+    }
     size_t getTotalTextureMemory() const;
     
     // Performance and debugging
@@ -138,6 +142,7 @@ private:
     
     // Asset caches
     std::unordered_map<std::string, std::shared_ptr<LoadedTexture>> textureCache_;
+    mutable std::shared_mutex textureCacheMutex_;  // Protects textureCache_
     
     // Configuration
     bool performanceLogging_ = true;

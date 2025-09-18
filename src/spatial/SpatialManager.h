@@ -11,6 +11,7 @@
 #include <functional>
 #include <limits>
 #include <mutex>
+#include <shared_mutex>
 
 namespace VulkanMon {
 
@@ -119,6 +120,7 @@ private:
 
     // Query caching system
     mutable PredictiveSpatialCache cache_;
+    mutable std::shared_mutex cacheMutex_;  // Protects cache_ from race conditions
 
 public:
     SpatialManager(const BoundingBox& worldBounds);
@@ -152,8 +154,14 @@ public:
     void clear();
 
     // Cache management
-    void clearCache() { cache_.clear(); }
-    void cleanupCache() { cache_.cleanup(); }
+    void clearCache() {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.clear();
+    }
+    void cleanupCache() {
+        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
+        cache_.cleanup();
+    }
 
     const BoundingBox& getWorldBounds() const { return worldBounds_; }
 
