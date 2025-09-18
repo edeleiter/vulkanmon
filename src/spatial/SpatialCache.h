@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <chrono>
+#include <variant>
 
 namespace VulkanMon {
 
@@ -18,29 +19,33 @@ struct SpatialCacheEntry {
     float timestamp;
     uint32_t layerMask;
 
-    // Query parameters for validation
-    union QueryParams {
-        struct RadiusQuery {
-            glm::vec3 center;
-            float radius;
-        } radius;
+    // Query parameters for type-safe validation (replaces unsafe union)
+    struct RadiusQuery {
+        glm::vec3 center;
+        float radius;
 
-        struct RegionQuery {
-            glm::vec3 min;
-            glm::vec3 max;
-        } region;
+        RadiusQuery(const glm::vec3& c, float r) : center(c), radius(r) {}
+    };
 
-        // For frustum queries, we store a hash since frustum data is large
+    struct RegionQuery {
+        glm::vec3 min;
+        glm::vec3 max;
+
+        RegionQuery(const glm::vec3& minBounds, const glm::vec3& maxBounds)
+            : min(minBounds), max(maxBounds) {}
+    };
+
+    struct FrustumQuery {
         size_t frustumHash;
-    } params;
 
-    enum class QueryType {
-        RADIUS,
-        REGION,
-        FRUSTUM
-    } type;
+        FrustumQuery(size_t hash) : frustumHash(hash) {}
+    };
 
-    SpatialCacheEntry() : timestamp(0.0f), layerMask(0) {}
+    // Type-safe variant instead of unsafe union
+    std::variant<RadiusQuery, RegionQuery, FrustumQuery> params;
+
+    // Default constructor with proper initialization
+    SpatialCacheEntry() : timestamp(0.0f), layerMask(0), params(FrustumQuery(0)) {}
 };
 
 class PredictiveSpatialCache {

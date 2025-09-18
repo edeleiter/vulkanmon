@@ -5,13 +5,12 @@
 #include "../components/SpatialComponent.h"
 #include "../spatial/LayerMask.h"
 #include "../spatial/SpatialManager.h"
+#include "../systems/SpatialSystem.h"
 #include "../utils/Logger.h"
 #include <memory>
+#include <random>
 
 namespace VulkanMon {
-
-// Forward declarations
-class SpatialSystem;
 
 enum class CreatureState : uint8_t {
     IDLE = 0,
@@ -57,7 +56,7 @@ struct CreatureComponent {
 
 class CreatureDetectionSystem : public System<Transform, SpatialComponent, CreatureComponent> {
 private:
-    std::shared_ptr<SpatialSystem> spatialSystem_;
+    SpatialSystem* spatialSystem_ = nullptr;
 
     // Performance tracking
     struct DetectionStats {
@@ -67,10 +66,18 @@ private:
         float updateTimeMs = 0.0f;
     } frameStats_;
 
+    // Modern C++11 random generation (thread-safe, high quality)
+    mutable std::mt19937 randomGenerator_;
+    mutable std::uniform_real_distribution<float> randomDistribution_;
+
 public:
-    CreatureDetectionSystem(std::shared_ptr<SpatialSystem> spatialSystem)
-        : spatialSystem_(spatialSystem) {
+    CreatureDetectionSystem()
+        : randomGenerator_(std::random_device{}()), randomDistribution_(0.0f, 1.0f) {
         VKMON_INFO("CreatureDetectionSystem initialized");
+    }
+
+    void setSpatialSystem(SpatialSystem* spatialSystem) {
+        spatialSystem_ = spatialSystem;
     }
 
     void update(float deltaTime, EntityManager& entityManager) override {
@@ -101,7 +108,7 @@ public:
                 auto& spatial = entityManager.getComponent<SpatialComponent>(entity);
                 auto& creature = entityManager.getComponent<CreatureComponent>(entity);
 
-                updateCreatureBehavior(entity, transform, spatial, creature, deltaTime);
+                updateCreatureBehavior(entity, transform, spatial, creature, deltaTime, entityManager);
             }
         }
 
@@ -125,7 +132,7 @@ public:
 
 private:
     void updateCreatureBehavior(EntityID entity, const Transform& transform,
-                               const SpatialComponent& spatial, CreatureComponent& creature, float deltaTime) {
+                               const SpatialComponent& spatial, CreatureComponent& creature, float deltaTime, EntityManager& entityManager) {
 
         // Update timing
         creature.lastDetectionCheck += deltaTime;
@@ -135,17 +142,14 @@ private:
         if (creature.lastDetectionCheck >= creature.detectionCheckInterval) {
             creature.lastDetectionCheck = 0.0f;
 
-            // TODO: Query for players and other creatures in detection radius
-            // Temporarily commented out to fix compilation issue
-            /*
+            // Query for players and other creatures in detection radius
             auto nearbyEntities = spatialSystem_->queryRadius(
                 transform.position,
                 creature.detectionRadius,
                 LayerMask::Player | LayerMask::Creatures
             );
 
-            processDetectedEntities(entity, transform, creature, nearbyEntities);
-            */
+            processDetectedEntities(entity, transform, creature, nearbyEntities, entityManager);
         }
 
         // Update creature state based on current conditions
@@ -153,7 +157,7 @@ private:
     }
 
     void processDetectedEntities(EntityID entity, const Transform& transform,
-                                CreatureComponent& creature, const std::vector<EntityID>& nearbyEntities) {
+                                CreatureComponent& creature, const std::vector<EntityID>& nearbyEntities, EntityManager& entityManager) {
 
         EntityID closestPlayer = INVALID_ENTITY;
         float closestPlayerDistance = creature.detectionRadius;
@@ -162,19 +166,23 @@ private:
         for (EntityID nearbyEntity : nearbyEntities) {
             if (nearbyEntity == entity) continue; // Skip self
 
-            // TODO: Check if it's a player (for simplicity, assume first entity with Player layer)
-            // In a real implementation, you'd check for a PlayerComponent
-            // Temporarily commented out to fix compilation issue
-            /*
-            auto playersInRadius = spatialSystem_->queryRadius(transform.position, 0.1f, LayerMask::Player);
-            if (!playersInRadius.empty() && playersInRadius[0] == nearbyEntity) {
-                float distance = glm::distance(transform.position, transform.position); // Would get actual position
-                if (distance < closestPlayerDistance) {
-                    closestPlayer = nearbyEntity;
-                    closestPlayerDistance = distance;
+            // For now, treat any entity with Player layer as a player
+            // Since we already have nearbyEntities from spatial query, just check if it's a player
+            auto playersInRadius = spatialSystem_->queryRadius(transform.position, creature.detectionRadius, LayerMask::Player);
+            for (EntityID playerEntity : playersInRadius) {
+                if (playerEntity == nearbyEntity) {
+                    // Get player's actual Transform component for distance calculation
+                    if (entityManager.hasComponent<Transform>(playerEntity)) {
+                        auto& playerTransform = entityManager.getComponent<Transform>(playerEntity);
+                        float distance = glm::distance(transform.position, playerTransform.position);
+                        if (distance < closestPlayerDistance) {
+                            closestPlayer = nearbyEntity;
+                            closestPlayerDistance = distance;
+                        }
+                    }
+                    break; // Found the player match
                 }
             }
-            */
         }
 
         // React to closest player if found
@@ -234,7 +242,7 @@ private:
         switch (creature.state) {
             case CreatureState::IDLE:
                 // Occasionally switch to wandering
-                if (static_cast<float>(rand()) / RAND_MAX < 0.01f) { // 1% chance per frame
+                if (randomDistribution_(randomGenerator_) < 0.01f) { // 1% chance per frame
                     creature.state = CreatureState::WANDERING;
                     frameStats_.stateChanges++;
                 }
@@ -242,7 +250,7 @@ private:
 
             case CreatureState::WANDERING:
                 // Wander for a while, then return to idle
-                if (static_cast<float>(rand()) / RAND_MAX < 0.005f) { // 0.5% chance per frame
+                if (randomDistribution_(randomGenerator_) < 0.005f) { // 0.5% chance per frame
                     creature.state = CreatureState::IDLE;
                     frameStats_.stateChanges++;
                 }

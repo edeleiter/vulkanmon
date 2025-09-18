@@ -10,6 +10,7 @@
 #include <memory>
 #include <functional>
 #include <limits>
+#include <mutex>
 
 namespace VulkanMon {
 
@@ -112,8 +113,9 @@ private:
     std::unordered_map<EntityID, glm::vec3> entityPositions_;
     std::unordered_map<EntityID, uint32_t> entityLayers_;
 
-    // Performance tracking
+    // Performance tracking (thread-safe)
     mutable SpatialStats stats_;
+    mutable std::mutex statsMutex_;
 
     // Query caching system
     mutable PredictiveSpatialCache cache_;
@@ -143,7 +145,10 @@ public:
 
     // Performance and debugging
     void getStatistics(int& nodeCount, int& maxDepth, int& totalEntities) const;
-    const SpatialStats& getPerformanceStats() const { return stats_; }
+    SpatialStats getPerformanceStats() const {
+        std::lock_guard<std::mutex> lock(statsMutex_);
+        return stats_;
+    }
     void clear();
 
     // Cache management

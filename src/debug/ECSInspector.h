@@ -114,7 +114,9 @@ private:
         "cube.obj", "sphere.obj", "pyramid.obj", "plane.obj"
     };
 
-    const char* materialNames_[5] = {
+    // Material names for ImGui combo (fixed size for safe access)
+    static constexpr size_t MATERIAL_COUNT = 5;
+    const char* materialNames_[MATERIAL_COUNT] = {
         "Default", "Gold", "Ruby", "Chrome", "Emerald"
     };
 

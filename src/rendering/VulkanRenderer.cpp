@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <array>
 #include <filesystem>
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>  // For lookAt and perspective
 
 #define GLFW_INCLUDE_VULKAN
@@ -1492,27 +1493,23 @@ void VulkanRenderer::createTextureImage() {
     
     VkDeviceSize imageSize = texWidth * texHeight * texChannels;
 
-    // Create staging buffer
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-                stagingBuffer, stagingBufferMemory);
+    // Create staging buffer with RAII for automatic cleanup
+    auto stagingBuffer = resourceManager_->createBuffer(
+        imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        "texture_staging_checkered"
+    );
 
     // Copy pixel data to staging buffer
-    void* data;
-    vkMapMemory(device_, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device_, stagingBufferMemory);
+    stagingBuffer->updateData(pixels, imageSize);
 
-    // Create image - simplified for now, will add transitions later
-    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, 
-               VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+    // Create image - if this fails, staging buffer is automatically cleaned up by RAII
+    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+               VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_, textureImageMemory_);
 
-    // Cleanup staging buffer
-    vkDestroyBuffer(device_, stagingBuffer, nullptr);
-    vkFreeMemory(device_, stagingBufferMemory, nullptr);
+    // Staging buffer automatically cleaned up when it goes out of scope
 
     VKMON_DEBUG("Texture image created successfully (basic version)");
 }
@@ -2096,11 +2093,13 @@ void VulkanRenderer::cycleMaterialPreset() {
     // Ensure we have the standard material presets in MaterialSystem
     ensureStandardMaterialsExist();
 
-    // Cycle to next material preset
-    currentMaterialPreset_ = (currentMaterialPreset_ + 1) % materialSystem_->getMaterialCount();
-
     const char* materialNames[] = {"Default", "Gold", "Ruby", "Chrome", "Emerald"};
     const size_t materialNamesCount = sizeof(materialNames) / sizeof(materialNames[0]);
+
+    // Cycle to next material preset, but ensure it doesn't exceed our known material names
+    currentMaterialPreset_ = (currentMaterialPreset_ + 1) % std::min(materialSystem_->getMaterialCount(), materialNamesCount);
+
+    // Safe bounds-checked access to material name
     const char* materialName = (currentMaterialPreset_ < materialNamesCount) ? materialNames[currentMaterialPreset_] : "Unknown";
 
     VKMON_INFO("[MATERIAL] Cycled to preset: " + std::string(materialName) +

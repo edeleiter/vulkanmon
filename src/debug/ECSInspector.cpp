@@ -299,11 +299,14 @@ bool ECSInspector::renderRenderableEditor(Renderable& renderable) {
         renderHelpTooltip("3D model file to render. Changes take effect immediately.");
     }
 
-    // Material ID with preset names
+    // Material ID with preset names (bounds-checked)
     int currentMaterial = static_cast<int>(renderable.materialId);
-    if (ImGui::Combo("Material", &currentMaterial, materialNames_, 5)) {
-        renderable.materialId = static_cast<uint32_t>(currentMaterial);
-        modified = true;
+    if (ImGui::Combo("Material", &currentMaterial, materialNames_, MATERIAL_COUNT)) {
+        // Ensure the selected material is within valid bounds
+        if (currentMaterial >= 0 && currentMaterial < static_cast<int>(MATERIAL_COUNT)) {
+            renderable.materialId = static_cast<uint32_t>(currentMaterial);
+            modified = true;
+        }
     }
     if (showComponentHelp_ && ImGui::IsItemHovered()) {
         renderHelpTooltip("Material preset affecting color and lighting response");

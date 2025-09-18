@@ -263,15 +263,37 @@ void OctreeNode::subdivide(const std::function<glm::vec3(EntityID)>& getPosition
         children_[i] = std::make_unique<OctreeNode>(childBounds, depth_ + 1);
     }
 
-    // Redistribute entities to children using position lookup
+    // Redistribute entities to children using position lookup with exception safety
     std::vector<EntityID> entitiesToRedistribute = std::move(entities_);
     entities_.clear();
 
-    for (EntityID entity : entitiesToRedistribute) {
-        glm::vec3 position = getPosition(entity);
-        int childIndex = getChildIndex(position);
-        if (children_[childIndex]) {
-            children_[childIndex]->insert(entity, position);
+    // Process entities with exception handling to prevent entity loss
+    for (size_t i = 0; i < entitiesToRedistribute.size(); ++i) {
+        EntityID entity = entitiesToRedistribute[i];
+
+        try {
+            glm::vec3 position = getPosition(entity);
+            int childIndex = getChildIndex(position);
+            if (children_[childIndex]) {
+                children_[childIndex]->insert(entity, position);
+            }
+        } catch (...) {
+            // If getPosition throws, restore all remaining entities to prevent loss
+            // This includes the current entity and all subsequent ones
+            for (size_t j = i; j < entitiesToRedistribute.size(); ++j) {
+                entities_.push_back(entitiesToRedistribute[j]);
+            }
+
+            // Restore to leaf state since subdivision failed
+            is_leaf_ = true;
+
+            // Clean up child nodes since subdivision is incomplete
+            for (int k = 0; k < 8; ++k) {
+                children_[k].reset();
+            }
+
+            // Re-throw the exception to notify caller
+            throw;
         }
     }
 }
@@ -538,10 +560,17 @@ void SpatialManager::clear() {
     entityPositions_.clear();
     entityLayers_.clear();
     cache_.clear();
-    stats_ = SpatialStats{};
+
+    // Reset statistics with thread safety
+    {
+        std::lock_guard<std::mutex> lock(statsMutex_);
+        stats_ = SpatialStats{};
+    }
 }
 
 void SpatialManager::updateStatistics(float queryTimeMs, size_t entitiesReturned) const {
+    std::lock_guard<std::mutex> lock(statsMutex_);
+
     stats_.totalQueries++;
     stats_.totalEntitiesReturned += entitiesReturned;
     stats_.lastQueryTimeMs = queryTimeMs;

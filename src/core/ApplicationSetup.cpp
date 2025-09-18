@@ -151,6 +151,13 @@ void Application::initializeECS() {
         VKMON_INFO("CreatureRenderSystem connected to SpatialSystem for creature culling");
     }
 
+    // Add CreatureDetectionSystem for AI behavior and spatial detection
+    creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
+    if (creatureDetectionSystem_ && spatialSystem_) {
+        creatureDetectionSystem_->setSpatialSystem(spatialSystem_);
+        VKMON_INFO("CreatureDetectionSystem initialized and connected to SpatialSystem");
+    }
+
     // Register ECS render callback with VulkanRenderer
     if (renderer_) {
         renderer_->setECSRenderCallback([this](VulkanRenderer& renderer) {
@@ -205,7 +212,7 @@ void Application::createTestScene() {
                 GRID_OFFSET + z * CREATURE_SPACING   // Z: grid spread
             );
             // Add some variation to rotations and scales
-            creatureTransform.rotation = glm::vec3(0.0f, (x + z) * 30.0f, 0.0f);
+            creatureTransform.setRotationEuler(0.0f, (x + z) * 30.0f, 0.0f);
             creatureTransform.scale = glm::vec3(0.6f + (x + z) * 0.05f);
             world_->addComponent(creature, creatureTransform);
 
@@ -247,7 +254,7 @@ void Application::createTestScene() {
     EntityID cameraEntity = world_->createEntity();
     Transform cameraTransform;
     cameraTransform.position = glm::vec3(0.0f, 8.0f, 15.0f);  // Elevated view of the grid center
-    cameraTransform.rotation = glm::vec3(-25.0f, 0.0f, 0.0f); // Look down at the grid
+    cameraTransform.setRotationEuler(-25.0f, 0.0f, 0.0f); // Look down at the grid
     cameraTransform.scale = glm::vec3(1.0f);
     world_->addComponent(cameraEntity, cameraTransform);
 
@@ -263,6 +270,22 @@ void Application::createTestScene() {
     cameraSpatial.boundingRadius = 0.1f;
     cameraSpatial.behavior = SpatialBehavior::DYNAMIC;
     world_->addComponent(cameraEntity, cameraSpatial);
+
+    // Create test player entity for creature detection testing
+    EntityID playerEntity = world_->createEntity();
+
+    // Add Transform component positioned at center of creature grid
+    Transform playerTransform;
+    playerTransform.position = glm::vec3(0.0f, 1.0f, 0.0f); // Center of 6x6 grid, slightly elevated
+    playerTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+    playerTransform.scale = glm::vec3(1.0f);
+    world_->addComponent(playerEntity, playerTransform);
+
+    // Add SpatialComponent with Player layer
+    SpatialComponent playerSpatial(2.0f, SpatialBehavior::DYNAMIC, LayerMask::Player);
+    world_->addComponent(playerEntity, playerSpatial);
+
+    VKMON_INFO("Test player entity created at center for creature detection testing");
 
     VKMON_INFO("GPU Instancing Stress Test Scene Complete!");
     VKMON_INFO("Performance Target: 60+ FPS with " + std::to_string(totalCreatures) + " creatures");

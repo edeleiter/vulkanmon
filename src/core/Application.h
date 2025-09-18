@@ -15,6 +15,7 @@
 #include "../systems/CreatureRenderSystem.h"
 #include "../systems/CameraSystem.h"
 #include "../systems/SpatialSystem.h"
+#include "../game/CreatureDetectionSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
 #include "../debug/ECSInspector.h"
@@ -167,6 +168,7 @@ private:
     CreatureRenderSystem* creatureRenderSystem_ = nullptr;  // Owned by World
     CameraSystem* cameraSystem_ = nullptr;        // Owned by World
     SpatialSystem* spatialSystem_ = nullptr;  // Owned by World
+    CreatureDetectionSystem* creatureDetectionSystem_ = nullptr;  // Owned by World
 
     // Debug tools
     std::unique_ptr<Debug::ECSInspector> ecsInspector_;

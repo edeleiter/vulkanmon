@@ -60,7 +60,7 @@ public:
                 auto& transform = transforms[i];
                 auto& spatial = entityManager.getComponent<SpatialComponent>(entity);
 
-                updateEntitySpatialData(entity, transform, spatial);
+                updateEntitySpatialData(entity, transform, spatial, deltaTime);
             }
         }
 
@@ -133,13 +133,14 @@ public:
     }
 
 private:
-    void updateEntitySpatialData(EntityID entity, const Transform& transform, SpatialComponent& spatial) {
+    void updateEntitySpatialData(EntityID entity, const Transform& transform, SpatialComponent& spatial, float deltaTime) {
         if (spatial.needsSpatialUpdate) {
             // Check if this is the first time we're seeing this entity
-            if (spatial.homePosition == glm::vec3(0.0f)) {
+            if (!spatial.isInitialized) {
                 // First time - add the entity to spatial manager
                 spatialManager_->addEntity(entity, transform.position, spatial.spatialLayers);
                 spatial.setHomePosition(transform.position);
+                spatial.isInitialized = true;
                 frameStats_.entitiesAdded++;
             } else {
                 // Entity exists - update its position and layers
@@ -152,7 +153,7 @@ private:
         }
 
         // Update query throttling timer
-        spatial.timeSinceLastQuery += 0.016f; // Assume ~60 FPS for now
+        spatial.timeSinceLastQuery += deltaTime;
     }
 
     void logPerformanceStats() {

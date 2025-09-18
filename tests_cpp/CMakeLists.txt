@@ -6,21 +6,8 @@ project(VulkanMonTests VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Simple coverage support - following "Simple is Powerful" philosophy
+# Coverage option (configuration applied after target creation)
 option(ENABLE_COVERAGE "Enable test coverage reporting" OFF)
-if(ENABLE_COVERAGE)
-    if(MSVC)
-        # MSVC coverage requires Visual Studio Enterprise or Professional
-        # For now, just enable debug info for analysis
-        message(STATUS "Coverage build enabled - use Visual Studio coverage tools")
-        target_compile_options(vulkanmon_tests PRIVATE /Zi)
-        target_link_options(vulkanmon_tests PRIVATE /DEBUG)
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        message(STATUS "Coverage enabled for GCC/Clang")
-        target_compile_options(vulkanmon_tests PRIVATE --coverage)
-        target_link_options(vulkanmon_tests PRIVATE --coverage)
-    endif()
-endif()
 
 # Find packages
 find_package(Vulkan REQUIRED)
@@ -121,6 +108,22 @@ target_include_directories(vulkanmon_tests PRIVATE
 # Enable debug info for tests
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(vulkanmon_tests PRIVATE DEBUG)
+endif()
+
+# Simple coverage support - following "Simple is Powerful" philosophy
+# NOTE: Applied after target creation to avoid CMake configuration errors
+if(ENABLE_COVERAGE)
+    if(MSVC)
+        # MSVC coverage requires Visual Studio Enterprise or Professional
+        # For now, just enable debug info for analysis
+        message(STATUS "Coverage build enabled - use Visual Studio coverage tools")
+        target_compile_options(vulkanmon_tests PRIVATE /Zi)
+        target_link_options(vulkanmon_tests PRIVATE /DEBUG)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(STATUS "Coverage enabled for GCC/Clang")
+        target_compile_options(vulkanmon_tests PRIVATE --coverage)
+        target_link_options(vulkanmon_tests PRIVATE --coverage)
+    endif()
 endif()
 
 # Custom target for easy test running

@@ -24,6 +24,7 @@ struct SpatialComponent {
     // Spatial optimization flags
     bool needsSpatialUpdate = true;      // Entity moved, needs octree update
     bool isVisible = true;               // Last frame visibility result
+    bool isInitialized = false;          // Has been added to spatial manager
     float lastCullingDistance = 0.0f;    // Distance when last culled
 
     // Layer-based filtering for spatial queries

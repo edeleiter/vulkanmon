@@ -100,15 +100,18 @@ bool PredictiveSpatialCache::tryGetRadiusQuery(const glm::vec3& center, float ra
     auto it = cache_.find(hash);
 
     if (it != cache_.end() && isEntryValid(it->second)) {
-        // Validate parameters match
-        if (it->second.type == SpatialCacheEntry::QueryType::RADIUS &&
-            it->second.layerMask == layerMask &&
-            glm::distance(it->second.params.radius.center, center) < 0.01f &&
-            std::abs(it->second.params.radius.radius - radius) < 0.01f) {
+        // Validate parameters match (type-safe with std::variant)
+        if (std::holds_alternative<SpatialCacheEntry::RadiusQuery>(it->second.params) &&
+            it->second.layerMask == layerMask) {
 
-            results = it->second.results;
-            hitCount_++;
-            return true;
+            const auto& radiusQuery = std::get<SpatialCacheEntry::RadiusQuery>(it->second.params);
+            if (glm::distance(radiusQuery.center, center) < 0.01f &&
+                std::abs(radiusQuery.radius - radius) < 0.01f) {
+
+                results = it->second.results;
+                hitCount_++;
+                return true;
+            }
         }
     }
 
@@ -128,9 +131,7 @@ void PredictiveSpatialCache::cacheRadiusQuery(const glm::vec3& center, float rad
     entry.results = results;
     entry.timestamp = getCurrentTime();
     entry.layerMask = layerMask;
-    entry.type = SpatialCacheEntry::QueryType::RADIUS;
-    entry.params.radius.center = center;
-    entry.params.radius.radius = radius;
+    entry.params = SpatialCacheEntry::RadiusQuery(center, radius);
 
     cache_[hash] = std::move(entry);
 }
@@ -140,11 +141,12 @@ bool PredictiveSpatialCache::tryGetRegionQuery(const BoundingBox& region, uint32
     auto it = cache_.find(hash);
 
     if (it != cache_.end() && isEntryValid(it->second)) {
-        if (it->second.type == SpatialCacheEntry::QueryType::REGION &&
+        if (std::holds_alternative<SpatialCacheEntry::RegionQuery>(it->second.params) &&
             it->second.layerMask == layerMask) {
 
-            const auto& cachedMin = it->second.params.region.min;
-            const auto& cachedMax = it->second.params.region.max;
+            const auto& regionQuery = std::get<SpatialCacheEntry::RegionQuery>(it->second.params);
+            const auto& cachedMin = regionQuery.min;
+            const auto& cachedMax = regionQuery.max;
 
             // Check if bounding boxes match
             if (glm::distance(cachedMin, region.min) < 0.01f &&
@@ -172,9 +174,7 @@ void PredictiveSpatialCache::cacheRegionQuery(const BoundingBox& region, uint32_
     entry.results = results;
     entry.timestamp = getCurrentTime();
     entry.layerMask = layerMask;
-    entry.type = SpatialCacheEntry::QueryType::REGION;
-    entry.params.region.min = region.min;
-    entry.params.region.max = region.max;
+    entry.params = SpatialCacheEntry::RegionQuery(region.min, region.max);
 
     cache_[hash] = std::move(entry);
 }
@@ -184,13 +184,16 @@ bool PredictiveSpatialCache::tryGetFrustumQuery(const Frustum& frustum, uint32_t
     auto it = cache_.find(hash);
 
     if (it != cache_.end() && isEntryValid(it->second)) {
-        if (it->second.type == SpatialCacheEntry::QueryType::FRUSTUM &&
-            it->second.layerMask == layerMask &&
-            it->second.params.frustumHash == hash) {
+        if (std::holds_alternative<SpatialCacheEntry::FrustumQuery>(it->second.params) &&
+            it->second.layerMask == layerMask) {
 
-            results = it->second.results;
-            hitCount_++;
-            return true;
+            const auto& frustumQuery = std::get<SpatialCacheEntry::FrustumQuery>(it->second.params);
+            if (frustumQuery.frustumHash == hash) {
+
+                results = it->second.results;
+                hitCount_++;
+                return true;
+            }
         }
     }
 
@@ -209,8 +212,7 @@ void PredictiveSpatialCache::cacheFrustumQuery(const Frustum& frustum, uint32_t 
     entry.results = results;
     entry.timestamp = getCurrentTime();
     entry.layerMask = layerMask;
-    entry.type = SpatialCacheEntry::QueryType::FRUSTUM;
-    entry.params.frustumHash = hash;
+    entry.params = SpatialCacheEntry::FrustumQuery(hash);
 
     cache_[hash] = std::move(entry);
 }
