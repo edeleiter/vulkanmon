@@ -530,6 +530,7 @@ private:
     // GPU Instancing helper methods (Phase 7.1)
     void createInstanceBuffer();
     void updateInstanceData(const std::vector<VulkanMon::InstanceData>& instances);
+    void updateInstanceDataDirect(const InstanceData* instances, uint32_t instanceCount);
     void cleanupInstanceBuffer();
     std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();
     std::vector<VkVertexInputAttributeDescription> getInstancedAttributeDescriptions();

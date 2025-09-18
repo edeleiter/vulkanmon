@@ -434,14 +434,25 @@ void VulkanRenderer::renderInstanced(const std::string& meshPath,
         return; // Nothing to render
     }
 
+    // Validate instance data pointer and size alignment
+    if (!instanceData) {
+        VKMON_ERROR("GPU Instancing: instanceData is null");
+        return;
+    }
+
+    // Verify alignment - InstanceData must be 16-byte aligned for GPU
+    if (reinterpret_cast<uintptr_t>(instanceData) % 16 != 0) {
+        VKMON_ERROR("GPU Instancing: instanceData is not properly aligned (must be 16-byte aligned)");
+        return;
+    }
+
     VKMON_DEBUG("GPU Instancing: Rendering " + std::to_string(instanceCount) + " instances of " + meshPath);
 
-    // Convert instance data to proper format
+    // Direct cast after validation - avoid unnecessary copy
     const auto* instances = static_cast<const InstanceData*>(instanceData);
-    std::vector<VulkanMon::InstanceData> instanceVector(instances, instances + instanceCount);
 
-    // Update instance buffer with current data
-    updateInstanceData(instanceVector);
+    // Update instance buffer directly from validated pointer - no vector copy
+    updateInstanceDataDirect(instances, instanceCount);
 
     // Ensure mesh is loaded
     ensureMeshLoaded(meshPath);
@@ -1113,8 +1124,8 @@ void VulkanRenderer::createInstancedGraphicsPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisampling (same as regular pipeline)
@@ -2502,6 +2513,29 @@ void VulkanRenderer::updateInstanceData(const std::vector<VulkanMon::InstanceDat
     // Fast memcpy to GPU-visible memory
     size_t dataSize = instances.size() * sizeof(VulkanMon::InstanceData);
     memcpy(instanceBufferMapped_, instances.data(), dataSize);
+
+    // No need to flush due to HOST_COHERENT_BIT
+}
+
+void VulkanRenderer::updateInstanceDataDirect(const InstanceData* instances, uint32_t instanceCount) {
+    if (instanceCount > maxInstances_) {
+        throw std::runtime_error("Too many instances: " + std::to_string(instanceCount) +
+                                " (max: " + std::to_string(maxInstances_) + ")");
+    }
+
+    if (instanceBufferMapped_ == nullptr) {
+        VKMON_ERROR("Instance buffer not mapped!");
+        return;
+    }
+
+    if (!instances) {
+        VKMON_ERROR("Null instance data pointer!");
+        return;
+    }
+
+    // Direct memcpy from validated pointer to GPU-visible memory - no intermediate copy
+    size_t dataSize = instanceCount * sizeof(VulkanMon::InstanceData);
+    memcpy(instanceBufferMapped_, instances, dataSize);
 
     // No need to flush due to HOST_COHERENT_BIT
 }

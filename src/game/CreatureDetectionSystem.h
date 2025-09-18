@@ -162,25 +162,25 @@ private:
         EntityID closestPlayer = INVALID_ENTITY;
         float closestPlayerDistance = creature.detectionRadius;
 
-        // Find the closest player
+        // Find the closest player - O(n) instead of O(n²)
         for (EntityID nearbyEntity : nearbyEntities) {
             if (nearbyEntity == entity) continue; // Skip self
 
-            // For now, treat any entity with Player layer as a player
-            // Since we already have nearbyEntities from spatial query, just check if it's a player
-            auto playersInRadius = spatialSystem_->queryRadius(transform.position, creature.detectionRadius, LayerMask::Player);
-            for (EntityID playerEntity : playersInRadius) {
-                if (playerEntity == nearbyEntity) {
-                    // Get player's actual Transform component for distance calculation
-                    if (entityManager.hasComponent<Transform>(playerEntity)) {
-                        auto& playerTransform = entityManager.getComponent<Transform>(playerEntity);
+            // Check if this entity is a player by examining its SpatialComponent layer mask
+            if (entityManager.hasComponent<SpatialComponent>(nearbyEntity)) {
+                auto& nearbyEntitySpatial = entityManager.getComponent<SpatialComponent>(nearbyEntity);
+
+                // Check if this entity is in the Player layer
+                if ((nearbyEntitySpatial.spatialLayers & LayerMask::Player) != LayerMask::None) {
+                    // Get player's Transform component for distance calculation
+                    if (entityManager.hasComponent<Transform>(nearbyEntity)) {
+                        auto& playerTransform = entityManager.getComponent<Transform>(nearbyEntity);
                         float distance = glm::distance(transform.position, playerTransform.position);
                         if (distance < closestPlayerDistance) {
                             closestPlayer = nearbyEntity;
                             closestPlayerDistance = distance;
                         }
                     }
-                    break; // Found the player match
                 }
             }
         }
@@ -241,18 +241,26 @@ private:
 
         switch (creature.state) {
             case CreatureState::IDLE:
-                // Occasionally switch to wandering
-                if (randomDistribution_(randomGenerator_) < 0.01f) { // 1% chance per frame
-                    creature.state = CreatureState::WANDERING;
-                    frameStats_.stateChanges++;
+                // Target: ~10% chance per second to start wandering
+                {
+                    float wanderChancePerSecond = 0.1f;
+                    float wanderChanceThisFrame = 1.0f - std::pow(1.0f - wanderChancePerSecond, deltaTime);
+                    if (randomDistribution_(randomGenerator_) < wanderChanceThisFrame) {
+                        creature.state = CreatureState::WANDERING;
+                        frameStats_.stateChanges++;
+                    }
                 }
                 break;
 
             case CreatureState::WANDERING:
-                // Wander for a while, then return to idle
-                if (randomDistribution_(randomGenerator_) < 0.005f) { // 0.5% chance per frame
-                    creature.state = CreatureState::IDLE;
-                    frameStats_.stateChanges++;
+                // Target: ~5% chance per second to return to idle
+                {
+                    float idleChancePerSecond = 0.05f;
+                    float idleChanceThisFrame = 1.0f - std::pow(1.0f - idleChancePerSecond, deltaTime);
+                    if (randomDistribution_(randomGenerator_) < idleChanceThisFrame) {
+                        creature.state = CreatureState::IDLE;
+                        frameStats_.stateChanges++;
+                    }
                 }
                 break;
 

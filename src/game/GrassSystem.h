@@ -26,6 +26,8 @@ struct GrassComponent {
     float lastSpawnTime = 0.0f;         // Time since last spawn
     float minSpawnInterval = 5.0f;      // Minimum time between spawns
     bool canSpawn = true;               // Whether this grass patch can spawn creatures
+    float spawnCooldownTimer = 0.0f;    // Timer for temporary spawn cooldown
+    float spawnCooldownDuration = 10.0f; // How long to disable spawning after a spawn
 
     // Visual effects
     glm::vec3 rustleDirection = glm::vec3(0.0f); // Direction of movement causing rustle
@@ -139,6 +141,14 @@ private:
         // Update timers
         grass.lastSpawnTime += deltaTime;
 
+        // Update spawn cooldown timer and re-enable spawning when cooldown expires
+        if (grass.spawnCooldownTimer > 0.0f) {
+            grass.spawnCooldownTimer -= deltaTime;
+            if (grass.spawnCooldownTimer <= 0.0f) {
+                grass.canSpawn = true; // Re-enable spawning after cooldown
+            }
+        }
+
         // Check for entities moving through grass
         auto nearbyEntities = spatialSystem_->queryRadius(
             transform.position,
@@ -154,10 +164,13 @@ private:
         for (EntityID nearbyEntity : nearbyEntities) {
             if (nearbyEntity == entity) continue; // Skip self
 
-            // Calculate rustle intensity based on distance
-            // Note: In a real implementation, you'd get the actual entity position
-            // For now, we simulate based on detection
-            float distance = grass.rustleRadius * 0.5f; // Simulate distance
+            // Calculate rustle intensity based on actual distance from Transform positions
+            if (!entityManager.hasComponent<Transform>(nearbyEntity)) {
+                continue; // Skip entities without Transform component
+            }
+
+            auto& nearbyTransform = entityManager.getComponent<Transform>(nearbyEntity);
+            float distance = glm::distance(transform.position, nearbyTransform.position);
             float intensity = 1.0f - (distance / grass.rustleRadius);
             intensity = glm::max(0.0f, intensity);
 
@@ -166,10 +179,11 @@ private:
             }
 
             // Simulate movement direction (in real implementation, use velocity)
+            std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
             glm::vec3 direction = glm::normalize(glm::vec3(
-                (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 2.0f,
+                dirDist(rng_),
                 0.0f,
-                (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 2.0f
+                dirDist(rng_)
             ));
             averageDirection += direction;
             movingEntities++;
@@ -228,13 +242,15 @@ private:
         // Reset spawn timer
         grass.lastSpawnTime = 0.0f;
 
-        // Temporarily disable spawning for this patch
+        // Start spawn cooldown timer to temporarily disable spawning
         grass.canSpawn = false;
+        std::uniform_real_distribution<float> cooldownDist(grass.spawnCooldownDuration * 0.8f,
+                                                          grass.spawnCooldownDuration * 1.2f);
+        grass.spawnCooldownTimer = cooldownDist(rng_); // Random cooldown duration
 
-        // Re-enable spawning after some time (would be handled by a timer system)
-        // For now, just immediately re-enable for demonstration
-        std::uniform_real_distribution<float> dist(5.0f, 15.0f);
-        grass.minSpawnInterval = dist(rng_); // Random interval between spawns
+        // Set random interval for next spawn opportunity
+        std::uniform_real_distribution<float> intervalDist(5.0f, 15.0f);
+        grass.minSpawnInterval = intervalDist(rng_); // Random interval between spawns
 
         return true;
     }
