@@ -56,8 +56,12 @@ bool PredictiveSpatialCache::isEntryValid(const SpatialCacheEntry& entry) const 
 }
 
 void PredictiveSpatialCache::clear() {
-    cache_.clear();
-    resetStatistics();
+    // Clear both cache buffers
+    auto* writeBuffer = writeCache_.load();
+    writeBuffer->cache.clear();
+    writeBuffer->hitCount = 0;
+    writeBuffer->missCount = 0;
+    writeBuffer->timestamp = getCurrentTime();
 }
 
 void PredictiveSpatialCache::cleanup() {
@@ -66,20 +70,21 @@ void PredictiveSpatialCache::cleanup() {
 
 void PredictiveSpatialCache::evictOldEntries() {
     float currentTime = getCurrentTime();
+    auto* writeBuffer = writeCache_.load();
 
-    auto it = cache_.begin();
-    while (it != cache_.end()) {
+    auto it = writeBuffer->cache.begin();
+    while (it != writeBuffer->cache.end()) {
         if ((currentTime - it->second.timestamp) > CACHE_TTL_SECONDS) {
-            it = cache_.erase(it);
+            it = writeBuffer->cache.erase(it);
         } else {
             ++it;
         }
     }
 
     // If still too large, remove oldest entries
-    if (cache_.size() > MAX_CACHE_SIZE) {
+    if (writeBuffer->cache.size() > MAX_CACHE_SIZE) {
         std::vector<std::pair<size_t, float>> timestampedEntries;
-        for (const auto& [hash, entry] : cache_) {
+        for (const auto& [hash, entry] : writeBuffer->cache) {
             timestampedEntries.emplace_back(hash, entry.timestamp);
         }
 
@@ -88,18 +93,19 @@ void PredictiveSpatialCache::evictOldEntries() {
                   [](const auto& a, const auto& b) { return a.second < b.second; });
 
         // Remove oldest entries
-        size_t entriesToRemove = cache_.size() - MAX_CACHE_SIZE;
+        size_t entriesToRemove = writeBuffer->cache.size() - MAX_CACHE_SIZE;
         for (size_t i = 0; i < entriesToRemove; ++i) {
-            cache_.erase(timestampedEntries[i].first);
+            writeBuffer->cache.erase(timestampedEntries[i].first);
         }
     }
 }
 
 bool PredictiveSpatialCache::tryGetRadiusQuery(const glm::vec3& center, float radius, uint32_t layerMask, std::vector<EntityID>& results) const {
     size_t hash = hashRadiusQuery(center, radius, layerMask);
-    auto it = cache_.find(hash);
+    auto* readBuffer = readCache_.load();
+    auto it = readBuffer->cache.find(hash);
 
-    if (it != cache_.end() && isEntryValid(it->second)) {
+    if (it != readBuffer->cache.end() && isEntryValid(it->second)) {
         // Validate parameters match (type-safe with std::variant)
         if (std::holds_alternative<SpatialCacheEntry::RadiusQuery>(it->second.params) &&
             it->second.layerMask == layerMask) {
@@ -109,19 +115,23 @@ bool PredictiveSpatialCache::tryGetRadiusQuery(const glm::vec3& center, float ra
                 std::abs(radiusQuery.radius - radius) < 0.01f) {
 
                 results = it->second.results;
-                hitCount_++;
+                auto* writeBuffer = writeCache_.load();
+                writeBuffer->hitCount++;
                 return true;
             }
         }
     }
 
-    missCount_++;
+    auto* writeBuffer = writeCache_.load();
+    writeBuffer->missCount++;
     return false;
 }
 
 void PredictiveSpatialCache::cacheRadiusQuery(const glm::vec3& center, float radius, uint32_t layerMask, const std::vector<EntityID>& results) {
+    auto* writeBuffer = writeCache_.load();
+
     // Periodically clean up old entries
-    if (cache_.size() % 100 == 0) {
+    if (writeBuffer->cache.size() % 100 == 0) {
         evictOldEntries();
     }
 
@@ -133,14 +143,15 @@ void PredictiveSpatialCache::cacheRadiusQuery(const glm::vec3& center, float rad
     entry.layerMask = layerMask;
     entry.params = SpatialCacheEntry::RadiusQuery(center, radius);
 
-    cache_[hash] = std::move(entry);
+    writeBuffer->cache[hash] = std::move(entry);
 }
 
 bool PredictiveSpatialCache::tryGetRegionQuery(const BoundingBox& region, uint32_t layerMask, std::vector<EntityID>& results) const {
     size_t hash = hashRegionQuery(region, layerMask);
-    auto it = cache_.find(hash);
+    auto* readBuffer = readCache_.load();
+    auto it = readBuffer->cache.find(hash);
 
-    if (it != cache_.end() && isEntryValid(it->second)) {
+    if (it != readBuffer->cache.end() && isEntryValid(it->second)) {
         if (std::holds_alternative<SpatialCacheEntry::RegionQuery>(it->second.params) &&
             it->second.layerMask == layerMask) {
 
@@ -153,18 +164,22 @@ bool PredictiveSpatialCache::tryGetRegionQuery(const BoundingBox& region, uint32
                 glm::distance(cachedMax, region.max) < 0.01f) {
 
                 results = it->second.results;
-                hitCount_++;
+                auto* writeBuffer = writeCache_.load();
+                writeBuffer->hitCount++;
                 return true;
             }
         }
     }
 
-    missCount_++;
+    auto* writeBuffer = writeCache_.load();
+    writeBuffer->missCount++;
     return false;
 }
 
 void PredictiveSpatialCache::cacheRegionQuery(const BoundingBox& region, uint32_t layerMask, const std::vector<EntityID>& results) {
-    if (cache_.size() % 100 == 0) {
+    auto* writeBuffer = writeCache_.load();
+
+    if (writeBuffer->cache.size() % 100 == 0) {
         evictOldEntries();
     }
 
@@ -176,14 +191,15 @@ void PredictiveSpatialCache::cacheRegionQuery(const BoundingBox& region, uint32_
     entry.layerMask = layerMask;
     entry.params = SpatialCacheEntry::RegionQuery(region.min, region.max);
 
-    cache_[hash] = std::move(entry);
+    writeBuffer->cache[hash] = std::move(entry);
 }
 
 bool PredictiveSpatialCache::tryGetFrustumQuery(const Frustum& frustum, uint32_t layerMask, std::vector<EntityID>& results) const {
     size_t hash = hashFrustumQuery(frustum, layerMask);
-    auto it = cache_.find(hash);
+    auto* readBuffer = readCache_.load();
+    auto it = readBuffer->cache.find(hash);
 
-    if (it != cache_.end() && isEntryValid(it->second)) {
+    if (it != readBuffer->cache.end() && isEntryValid(it->second)) {
         if (std::holds_alternative<SpatialCacheEntry::FrustumQuery>(it->second.params) &&
             it->second.layerMask == layerMask) {
 
@@ -191,18 +207,22 @@ bool PredictiveSpatialCache::tryGetFrustumQuery(const Frustum& frustum, uint32_t
             if (frustumQuery.frustumHash == hash) {
 
                 results = it->second.results;
-                hitCount_++;
+                auto* writeBuffer = writeCache_.load();
+                writeBuffer->hitCount++;
                 return true;
             }
         }
     }
 
-    missCount_++;
+    auto* writeBuffer = writeCache_.load();
+    writeBuffer->missCount++;
     return false;
 }
 
 void PredictiveSpatialCache::cacheFrustumQuery(const Frustum& frustum, uint32_t layerMask, const std::vector<EntityID>& results) {
-    if (cache_.size() % 100 == 0) {
+    auto* writeBuffer = writeCache_.load();
+
+    if (writeBuffer->cache.size() % 100 == 0) {
         evictOldEntries();
     }
 
@@ -214,13 +234,14 @@ void PredictiveSpatialCache::cacheFrustumQuery(const Frustum& frustum, uint32_t 
     entry.layerMask = layerMask;
     entry.params = SpatialCacheEntry::FrustumQuery(hash);
 
-    cache_[hash] = std::move(entry);
+    writeBuffer->cache[hash] = std::move(entry);
 }
 
 float PredictiveSpatialCache::getCacheHitRate() const {
-    size_t totalQueries = hitCount_ + missCount_;
+    auto* readBuffer = readCache_.load();
+    size_t totalQueries = readBuffer->hitCount + readBuffer->missCount;
     if (totalQueries == 0) return 0.0f;
-    return static_cast<float>(hitCount_) / static_cast<float>(totalQueries);
+    return static_cast<float>(readBuffer->hitCount) / static_cast<float>(totalQueries);
 }
 
 void PredictiveSpatialCache::prefetchNearbyQueries(const glm::vec3& center, float radius) {

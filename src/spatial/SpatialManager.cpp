@@ -492,15 +492,8 @@ std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint3
 }
 
 std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float radius, uint32_t layerMask) const {
-    // Try cache first
-    std::vector<EntityID> cachedResults;
-    {
-        std::shared_lock<std::shared_mutex> lock(cacheMutex_);
-        if (cache_.tryGetRadiusQuery(center, radius, layerMask, cachedResults)) {
-            updateStatistics(0.0f, cachedResults.size()); // Cache hit, near-zero time
-            return cachedResults;
-        }
-    }
+    // LOCK-FREE OPTIMIZATION: Skip cache entirely to eliminate mutex contention
+    // Direct octree query is faster than mutex overhead for massive creature counts
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -523,12 +516,7 @@ std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float
     float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
     updateStatistics(queryTime, filteredResults.size());
 
-    // Cache the result
-    {
-        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
-        cache_.cacheRadiusQuery(center, radius, layerMask, filteredResults);
-    }
-
+    // LOCK-FREE: No caching - direct octree access is faster than mutex overhead
     return filteredResults;
 }
 

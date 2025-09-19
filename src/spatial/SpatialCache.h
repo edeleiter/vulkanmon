@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <chrono>
 #include <variant>
+#include <atomic>
+#include <memory>
 
 namespace VulkanMon {
 
@@ -48,18 +50,34 @@ struct SpatialCacheEntry {
     SpatialCacheEntry() : timestamp(0.0f), layerMask(0), params(FrustumQuery(0)) {}
 };
 
+// LOCK-FREE SPATIAL CACHE: Zero-contention design for massive creature counts
+struct LockFreeCacheData {
+    std::unordered_map<size_t, SpatialCacheEntry> cache;
+    size_t hitCount = 0;
+    size_t missCount = 0;
+    float timestamp = 0.0f;
+};
+
 class PredictiveSpatialCache {
 private:
     static constexpr float CACHE_TTL_SECONDS = 0.1f; // 100ms cache lifetime
     static constexpr size_t MAX_CACHE_SIZE = 1000;   // Maximum cached entries
     static constexpr float PREDICTION_RADIUS = 20.0f; // Radius for predictive caching
 
-    std::unordered_map<size_t, SpatialCacheEntry> cache_;
-    mutable size_t hitCount_ = 0;
-    mutable size_t missCount_ = 0;
+    // LOCK-FREE DESIGN: Atomic pointer swapping eliminates mutex contention
+    std::atomic<LockFreeCacheData*> readCache_;
+    std::atomic<LockFreeCacheData*> writeCache_;
+    std::unique_ptr<LockFreeCacheData> cacheBuffers_[2];
 
 public:
-    PredictiveSpatialCache() = default;
+    PredictiveSpatialCache() {
+        // Initialize double-buffered cache
+        cacheBuffers_[0] = std::make_unique<LockFreeCacheData>();
+        cacheBuffers_[1] = std::make_unique<LockFreeCacheData>();
+        readCache_.store(cacheBuffers_[0].get());
+        writeCache_.store(cacheBuffers_[1].get());
+    }
+
     ~PredictiveSpatialCache() = default;
 
     // Cache management
@@ -81,8 +99,15 @@ public:
 
     // Performance statistics
     float getCacheHitRate() const;
-    size_t getCacheSize() const { return cache_.size(); }
-    void resetStatistics() { hitCount_ = 0; missCount_ = 0; }
+    size_t getCacheSize() const {
+        auto* readBuffer = readCache_.load();
+        return readBuffer->cache.size();
+    }
+    void resetStatistics() {
+        auto* writeBuffer = writeCache_.load();
+        writeBuffer->hitCount = 0;
+        writeBuffer->missCount = 0;
+    }
 
 private:
     float getCurrentTime() const;

@@ -63,6 +63,10 @@ add_executable(vulkanmon_tests
     spatial/test_SpatialPerformance.cpp
     spatial/bench_SpatialSystem.cpp
 
+    # Performance Regression Tests (CRITICAL)
+    performance/test_PerformanceRegression.cpp
+    performance/test_CreatureDetectionRegression.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
