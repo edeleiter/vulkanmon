@@ -532,6 +532,81 @@ std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float
     return filteredResults;
 }
 
+// PERFORMANCE OPTIMIZATION: Batched radius queries for massive creature counts
+std::vector<SpatialManager::BatchedQueryResult> SpatialManager::queryRadiusBatch(const std::vector<BatchedRadiusQuery>& queries) const {
+    if (queries.empty()) {
+        return {};
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::vector<BatchedQueryResult> results;
+    results.reserve(queries.size());
+
+    // Single mutex lock for all queries instead of per-query locking
+    std::shared_lock<std::shared_mutex> cacheLock(cacheMutex_);
+
+    // Track cache statistics
+    size_t cacheHits = 0;
+    size_t totalEntitiesReturned = 0;
+
+    for (const auto& query : queries) {
+        BatchedQueryResult result;
+        result.sourceEntity = query.sourceEntity;
+
+        // Try cache first (already have lock)
+        if (cache_.tryGetRadiusQuery(query.center, query.radius, query.layerMask, result.nearbyEntities)) {
+            cacheHits++;
+            totalEntitiesReturned += result.nearbyEntities.size();
+            results.push_back(std::move(result));
+            continue;
+        }
+
+        // Cache miss - perform octree query
+        std::vector<EntityID> octreeResults;
+        octree_->queryRadius(query.center, query.radius, octreeResults);
+
+        // Filter results by actual distance and layers
+        for (EntityID entity : octreeResults) {
+            // Skip self-queries
+            if (entity == query.sourceEntity) continue;
+
+            auto it = entityPositions_.find(entity);
+            if (it != entityPositions_.end()) {
+                float distance = glm::distance(query.center, it->second);
+                if (distance <= query.radius && passesLayerFilter(entity, query.layerMask)) {
+                    result.nearbyEntities.push_back(entity);
+                }
+            }
+        }
+
+        totalEntitiesReturned += result.nearbyEntities.size();
+        results.push_back(std::move(result));
+    }
+
+    // Release cache lock before expensive cache update operations
+    cacheLock.unlock();
+
+    // Update cache with new results (separate lock to minimize contention)
+    {
+        std::unique_lock<std::shared_mutex> cacheUpdateLock(cacheMutex_);
+        for (size_t i = cacheHits; i < queries.size(); ++i) {
+            const auto& query = queries[i];
+            const auto& result = results[i];
+            cache_.cacheRadiusQuery(query.center, query.radius, query.layerMask, result.nearbyEntities);
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    float batchTime = std::chrono::duration<float, std::milli>(end - start).count();
+
+    // Update statistics for the entire batch
+    updateStatistics(batchTime, totalEntitiesReturned);
+
+
+    return results;
+}
+
 std::vector<EntityID> SpatialManager::findCreaturesInRadius(const glm::vec3& center, float radius) const {
     return queryRadius(center, radius, LayerMask::Creatures);
 }

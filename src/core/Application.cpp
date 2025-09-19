@@ -123,6 +123,15 @@ void Application::updateFrameTiming() {
 
     if (frameCount >= 60) {
         fps_ = 60000.0f / fpsAccumulator;  // 60 frames * 1000ms per second / accumulated time
+
+        // Log actual FPS every 5 seconds instead of every second
+        static int logCounter = 0;
+        if (++logCounter >= 5) {
+            VKMON_INFO("Application Performance: " + std::to_string(static_cast<int>(fps_)) + " FPS, " +
+                       std::to_string(frameTime_) + "ms frame time");
+            logCounter = 0;
+        }
+
         frameCount = 0;
         fpsAccumulator = 0.0f;
     }

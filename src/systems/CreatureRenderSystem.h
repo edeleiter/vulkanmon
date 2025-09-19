@@ -115,8 +115,8 @@ private:
 
     // Frame-based performance logging - the engine heartbeat
     size_t renderFrameCount_ = 0;
-    static constexpr size_t LOG_EVERY_N_RENDERS = 300;     // ~5 seconds at 60 FPS
-    static constexpr float LOG_INTERVAL_SECONDS = 5.0f;    // Documentation
+    static constexpr size_t LOG_EVERY_N_RENDERS = 1800;    // ~10 seconds at 180 FPS
+    static constexpr float LOG_INTERVAL_SECONDS = 10.0f;   // Documentation
 
 public:
     explicit CreatureRenderSystem(CameraSystem* cameraSystem = nullptr, SpatialSystem* spatialSystem = nullptr);

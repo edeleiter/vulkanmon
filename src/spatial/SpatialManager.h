@@ -137,6 +137,23 @@ public:
     std::vector<EntityID> queryFrustum(const Frustum& frustum, uint32_t layerMask = LayerMask::All) const;
     std::vector<EntityID> queryRadius(const glm::vec3& center, float radius, uint32_t layerMask = LayerMask::All) const;
 
+    // PERFORMANCE OPTIMIZATION: Batched spatial queries for massive creature counts
+    struct BatchedRadiusQuery {
+        EntityID sourceEntity;
+        glm::vec3 center;
+        float radius;
+        uint32_t layerMask;
+    };
+
+    struct BatchedQueryResult {
+        EntityID sourceEntity;
+        std::vector<EntityID> nearbyEntities;
+    };
+
+    // Execute multiple radius queries in a single optimized batch operation
+    // Eliminates per-query mutex overhead and enables spatial optimizations
+    std::vector<BatchedQueryResult> queryRadiusBatch(const std::vector<BatchedRadiusQuery>& queries) const;
+
     // Pokemon-specific queries
     std::vector<EntityID> findCreaturesInRadius(const glm::vec3& center, float radius) const;
     std::vector<EntityID> findVisibleCreatures(const Frustum& cameraFrustum) const;

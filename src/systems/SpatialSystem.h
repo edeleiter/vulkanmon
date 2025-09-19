@@ -108,6 +108,11 @@ public:
         return spatialManager_->findNearestEntity(position, maxDistance, layerMask);
     }
 
+    // PERFORMANCE OPTIMIZATION: Direct access to SpatialManager for batched operations
+    const SpatialManager* getSpatialManager() const {
+        return spatialManager_.get();
+    }
+
     // Entity lifecycle management
     void addEntity(EntityID entity, const glm::vec3& position, uint32_t layers = LayerMask::None) {
         spatialManager_->addEntity(entity, position, layers);

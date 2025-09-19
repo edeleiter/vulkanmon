@@ -169,14 +169,14 @@ void Application::createTestScene() {
         return;
     }
 
-    VKMON_INFO("Creating Spatial System Stress Test Scene...");
-    VKMON_INFO("Target: 200+ creatures for thread-safe spatial system validation");
+    VKMON_INFO("Creating Pokemon Legends Arceus Scale Test Scene...");
+    VKMON_INFO("Target: 1024 creatures - massive open world scale validation");
 
     // =========================================================================
     // SPATIAL STRESS TEST - Thread-Safe Cache System Validation
     // =========================================================================
 
-    const int CREATURE_GRID_SIZE = 16;  // 16x16 = 256 creatures
+    const int CREATURE_GRID_SIZE = 32;  // 32x32 = 1024 creatures - POKEMON LEGENDS SCALE!
     const float CREATURE_SPACING = 3.0f;  // Proper spacing to prevent overlaps
     const float GRID_OFFSET = -(CREATURE_GRID_SIZE - 1) * CREATURE_SPACING * 0.5f;
 
@@ -240,11 +240,11 @@ void Application::createTestScene() {
     VKMON_INFO("Expected Spatial Queries: ~" + std::to_string(totalCreatures / 10) + " per frame");
     VKMON_INFO("Performance Target: <2ms spatial system overhead per frame");
 
-    // Create camera positioned to see all 256 creatures (grid spans -22.5 to +22.5 = 45 units)
+    // Create camera positioned to see 1024 creatures (grid spans -46.5 to +46.5 = 93 units)
     EntityID cameraEntity = world_->createEntity();
     Transform cameraTransform;
-    cameraTransform.position = glm::vec3(0.0f, 35.0f, 50.0f);  // Closer to see 45-unit grid clearly
-    cameraTransform.setRotationEuler(-30.0f, 0.0f, 0.0f); // Look down at the grid
+    cameraTransform.position = glm::vec3(0.0f, 25.0f, 40.0f);  // Higher to see massive 1024 creature field
+    cameraTransform.setRotationEuler(-25.0f, 0.0f, 0.0f); // Look down at the massive creature field
     cameraTransform.scale = glm::vec3(1.0f);
     world_->addComponent(cameraEntity, cameraTransform);
 

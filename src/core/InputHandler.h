@@ -178,7 +178,11 @@ private:
     
     // Camera movement configuration
     float cameraSpeed_ = 2.5f;
-    
+
+    // GIMBAL LOCK FIX: Track yaw and pitch directly to avoid quaternion conversion issues
+    float cameraYaw_ = 0.0f;   // Y-axis rotation (left/right)
+    float cameraPitch_ = -15.0f; // X-axis rotation (up/down) - matches initial camera setup
+
     // Callbacks for actions we cannot perform directly
     ShaderReloadCallback shaderReloadCallback_;
     LightingControlCallback lightingControlCallback_;

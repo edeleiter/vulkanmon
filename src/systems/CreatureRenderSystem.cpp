@@ -248,26 +248,19 @@ std::string CreatureRenderSystem::generateBatchKey(const std::string& meshPath, 
 }
 
 void CreatureRenderSystem::logPerformanceStats() {
-    // Calculate estimated FPS from frame time
-    float estimatedFPS = frameStats_.totalFrameTimeMs > 0.0f ?
-                        (1000.0f / frameStats_.totalFrameTimeMs) : 0.0f;
-
+    // Clean, meaningful performance report - removed misleading FPS estimate
     std::ostringstream stats;
-    stats << "CreatureRenderSystem Performance Report (Frame " << renderFrameCount_ << "):\n"
+    stats << "GPU Render Performance (Frame " << renderFrameCount_ << "):\n"
           << "  Creatures: " << frameStats_.renderedCreatures << "/" << frameStats_.totalCreatures
-          << " (" << (frameStats_.cullingEfficiency() * 100.0f) << "% culled)\n"
-          << "  Batches: " << frameStats_.instanceBatches << " (efficiency: "
-          << frameStats_.instancingEfficiency() << " creatures/draw)\n"
-          << "  Timing: Culling=" << frameStats_.frustumCullingTimeMs
-          << "ms, Batching=" << frameStats_.batchingTimeMs
-          << "ms, Rendering=" << frameStats_.renderingTimeMs
-          << "ms, Total=" << frameStats_.totalFrameTimeMs << "ms\n"
-          << "  Draw Calls: " << frameStats_.totalDrawCalls
-          << " | Est. FPS: ~" << static_cast<int>(estimatedFPS);
+          << " (" << static_cast<int>(frameStats_.cullingEfficiency() * 100.0f) << "% culled)\n"
+          << "  GPU Efficiency: " << frameStats_.instanceBatches << " batches, "
+          << static_cast<int>(frameStats_.instancingEfficiency()) << " creatures/draw\n"
+          << "  Render Time: " << frameStats_.totalFrameTimeMs << "ms"
+          << " (Cull:" << frameStats_.frustumCullingTimeMs
+          << "ms + Batch:" << frameStats_.batchingTimeMs
+          << "ms + GPU:" << frameStats_.renderingTimeMs << "ms)";
 
     VKMON_INFO(stats.str());
-
-    // No timer reset needed - frame counter handles periodicity automatically
 }
 
 std::vector<std::string> CreatureRenderSystem::getBatchMeshPaths() const {

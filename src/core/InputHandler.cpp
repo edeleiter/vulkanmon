@@ -103,25 +103,22 @@ void InputHandler::processMouseInput(double xpos, double ypos) {
         if (world_->hasComponent<Transform>(activeCameraEntity)) {
             Transform& transform = world_->getComponent<Transform>(activeCameraEntity);
 
-            // Convert current rotation to Euler angles for modification
-            glm::vec3 currentEuler = glm::degrees(glm::eulerAngles(transform.rotation));
-
-            // Update camera rotation (yaw and pitch)
+            // GIMBAL LOCK FIX: Update yaw and pitch directly without quaternion conversion
             // Yaw (Y rotation) - left/right mouse movement (negative for proper direction)
-            currentEuler.y -= xoffset;
+            cameraYaw_ -= xoffset;
 
             // Pitch (X rotation) - up/down mouse movement
-            currentEuler.x += yoffset;
+            cameraPitch_ += yoffset;
 
-            // Clamp pitch to prevent over-rotation (±89 degrees)
-            currentEuler.x = glm::clamp(currentEuler.x, -89.0f, 89.0f);
+            // Clamp pitch to prevent gimbal lock (±89 degrees)
+            cameraPitch_ = glm::clamp(cameraPitch_, -89.0f, 89.0f);
 
             // Normalize yaw to 0-360 range
-            if (currentEuler.y > 360.0f) currentEuler.y -= 360.0f;
-            if (currentEuler.y < 0.0f) currentEuler.y += 360.0f;
+            if (cameraYaw_ > 360.0f) cameraYaw_ -= 360.0f;
+            if (cameraYaw_ < 0.0f) cameraYaw_ += 360.0f;
 
-            // Convert back to quaternion and update transform
-            transform.setRotationEuler(currentEuler.x, currentEuler.y, currentEuler.z);
+            // Build rotation directly from yaw and pitch (avoids gimbal lock)
+            transform.setRotationEuler(cameraPitch_, cameraYaw_, 0.0f);
         }
     }
 }

@@ -94,35 +94,36 @@ public:
         auto start = std::chrono::high_resolution_clock::now();
         frameStats_ = DetectionStats{};
 
-        // Get all creatures
-        auto& transforms = entityManager.getAllComponents<Transform>();
-        auto& spatialComponents = entityManager.getAllComponents<SpatialComponent>();
-        auto& creatureComponents = entityManager.getAllComponents<CreatureComponent>();
-        auto& entityIds = entityManager.getEntitiesWithComponent<Transform>();
+        // PERFORMANCE OPTIMIZATION: Batch all spatial queries instead of per-creature queries
+        auto creatureEntities = collectCreatureEntities(entityManager);
+        frameStats_.creaturesProcessed = creatureEntities.size();
 
-        frameStats_.creaturesProcessed = entityIds.size();
-
-        for (size_t i = 0; i < entityIds.size(); ++i) {
-            EntityID entity = entityIds[i];
-
-            // Check if entity has all required components
-            if (entityManager.hasComponent<SpatialComponent>(entity) &&
-                entityManager.hasComponent<CreatureComponent>(entity)) {
-
-                auto& transform = transforms[i];
-                auto& spatial = entityManager.getComponent<SpatialComponent>(entity);
-                auto& creature = entityManager.getComponent<CreatureComponent>(entity);
-
-                updateCreatureBehavior(entity, transform, spatial, creature, deltaTime, entityManager);
-            }
+        if (creatureEntities.empty()) {
+            frameStats_.updateTimeMs = 0.0f;
+            return;
         }
+
+        // Build batched spatial queries for all creatures that need detection checks
+        std::vector<SpatialManager::BatchedRadiusQuery> batchedQueries;
+        std::vector<std::pair<EntityID, CreatureComponent*>> queriedCreatures;
+
+        prepareBatchedQueries(creatureEntities, entityManager, deltaTime, batchedQueries, queriedCreatures);
+
+        // Execute all spatial queries in a single batch operation (eliminates mutex overhead)
+        auto spatialResults = spatialSystem_->getSpatialManager()->queryRadiusBatch(batchedQueries);
+
+        // Process detection results for each creature
+        processBatchedDetectionResults(spatialResults, queriedCreatures, entityManager);
+
+        // Update all creature states (non-spatial logic)
+        updateAllCreatureStates(creatureEntities, entityManager, deltaTime);
 
         auto end = std::chrono::high_resolution_clock::now();
         frameStats_.updateTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
 
-        // Log performance occasionally
+        // Log performance occasionally - reduced frequency to every 10 seconds
         static int frameCount = 0;
-        if (++frameCount >= 300) { // Every ~5 seconds at 60 FPS
+        if (++frameCount >= 1800) { // Every ~10 seconds at 180 FPS
             logPerformanceStats();
             frameCount = 0;
         }
@@ -136,29 +137,78 @@ public:
     const DetectionStats& getFrameStats() const { return frameStats_; }
 
 private:
-    void updateCreatureBehavior(EntityID entity, const Transform& transform,
-                               const SpatialComponent& spatial, CreatureComponent& creature, float deltaTime, EntityManager& entityManager) {
+    // PERFORMANCE OPTIMIZATION: Batched processing methods
 
-        // Update timing
-        creature.lastDetectionCheck += deltaTime;
-        creature.alertTimer += deltaTime;
+    std::vector<EntityID> collectCreatureEntities(EntityManager& entityManager) {
+        std::vector<EntityID> creatures;
+        auto& entityIds = entityManager.getEntitiesWithComponent<Transform>();
 
-        // Only check detection periodically for performance
-        if (creature.lastDetectionCheck >= creature.detectionCheckInterval) {
-            creature.lastDetectionCheck = 0.0f;
-
-            // Query for players and other creatures in detection radius
-            auto nearbyEntities = spatialSystem_->queryRadius(
-                transform.position,
-                creature.detectionRadius,
-                LayerMask::Player | LayerMask::Creatures
-            );
-
-            processDetectedEntities(entity, transform, creature, nearbyEntities, entityManager);
+        for (EntityID entity : entityIds) {
+            if (entityManager.hasComponent<SpatialComponent>(entity) &&
+                entityManager.hasComponent<CreatureComponent>(entity)) {
+                creatures.push_back(entity);
+            }
         }
 
-        // Update creature state based on current conditions
-        updateCreatureState(entity, transform, creature, deltaTime);
+        return creatures;
+    }
+
+    void prepareBatchedQueries(const std::vector<EntityID>& creatures, EntityManager& entityManager,
+                              float deltaTime, std::vector<SpatialManager::BatchedRadiusQuery>& batchedQueries,
+                              std::vector<std::pair<EntityID, CreatureComponent*>>& queriedCreatures) {
+
+        // TEMPORAL SPREADING OPTIMIZATION: Limit creatures processed per frame to eliminate frame time spikes
+        static size_t frameOffset = 0;
+        const size_t MAX_CREATURES_PER_FRAME = 64;  // Process max 64 creatures per frame (1024/16 = 64 per frame cycle)
+
+        frameOffset = (frameOffset + MAX_CREATURES_PER_FRAME) % creatures.size();
+        size_t endOffset = std::min(frameOffset + MAX_CREATURES_PER_FRAME, creatures.size());
+
+        for (size_t i = frameOffset; i < endOffset; ++i) {
+            EntityID entity = creatures[i];
+            auto& transform = entityManager.getComponent<Transform>(entity);
+            auto& creature = entityManager.getComponent<CreatureComponent>(entity);
+
+            // Update timing first
+            creature.lastDetectionCheck += deltaTime;
+            creature.alertTimer += deltaTime;
+
+            // Only add to batch if creature needs detection check
+            if (creature.lastDetectionCheck >= creature.detectionCheckInterval) {
+                creature.lastDetectionCheck = 0.0f;
+
+                SpatialManager::BatchedRadiusQuery query;
+                query.sourceEntity = entity;
+                query.center = transform.position;
+                query.radius = creature.detectionRadius;
+                query.layerMask = LayerMask::Player | LayerMask::Creatures;
+
+                batchedQueries.push_back(query);
+                queriedCreatures.push_back({entity, &creature});
+            }
+        }
+    }
+
+    void processBatchedDetectionResults(const std::vector<SpatialManager::BatchedQueryResult>& spatialResults,
+                                       const std::vector<std::pair<EntityID, CreatureComponent*>>& queriedCreatures,
+                                       EntityManager& entityManager) {
+
+        for (size_t i = 0; i < spatialResults.size(); ++i) {
+            const auto& result = spatialResults[i];
+            EntityID entity = queriedCreatures[i].first;
+            CreatureComponent* creature = queriedCreatures[i].second;
+
+            auto& transform = entityManager.getComponent<Transform>(entity);
+            processDetectedEntities(entity, transform, *creature, result.nearbyEntities, entityManager);
+        }
+    }
+
+    void updateAllCreatureStates(const std::vector<EntityID>& creatures, EntityManager& entityManager, float deltaTime) {
+        for (EntityID entity : creatures) {
+            auto& transform = entityManager.getComponent<Transform>(entity);
+            auto& creature = entityManager.getComponent<CreatureComponent>(entity);
+            updateCreatureState(entity, transform, creature, deltaTime);
+        }
     }
 
     void processDetectedEntities(EntityID entity, const Transform& transform,
@@ -167,25 +217,37 @@ private:
         EntityID closestPlayer = INVALID_ENTITY;
         float closestPlayerDistance = creature.detectionRadius;
 
-        // Find the closest player - O(n) instead of O(n²)
+        // PERFORMANCE OPTIMIZATION: Spatial query already filtered by layer mask!
+        // Since we queried with LayerMask::Player | LayerMask::Creatures,
+        // we only need to check which ones are players (much faster!)
         for (EntityID nearbyEntity : nearbyEntities) {
             if (nearbyEntity == entity) continue; // Skip self
 
-            // Check if this entity is a player by examining its SpatialComponent layer mask
-            if (entityManager.hasComponent<SpatialComponent>(nearbyEntity)) {
-                auto& nearbyEntitySpatial = entityManager.getComponent<SpatialComponent>(nearbyEntity);
+            // FAST PATH: Use spatial layer cache (already loaded by spatial query)
+            // Only check entities that are in Player layer - spatial query pre-filtered these!
+            static EntityID cachedPlayerEntity = INVALID_ENTITY;
+            static glm::vec3 cachedPlayerPos;
 
-                // Check if this entity is in the Player layer
-                if ((nearbyEntitySpatial.spatialLayers & LayerMask::Player) != LayerMask::None) {
-                    // Get player's Transform component for distance calculation
-                    if (entityManager.hasComponent<Transform>(nearbyEntity)) {
+            // Simple check: is this the known player entity?
+            if (nearbyEntity == cachedPlayerEntity ||
+                (cachedPlayerEntity == INVALID_ENTITY &&
+                 entityManager.hasComponent<SpatialComponent>(nearbyEntity))) {
+
+                if (nearbyEntity != cachedPlayerEntity) {
+                    auto& spatial = entityManager.getComponent<SpatialComponent>(nearbyEntity);
+                    if ((spatial.spatialLayers & LayerMask::Player) != LayerMask::None) {
+                        cachedPlayerEntity = nearbyEntity;
                         auto& playerTransform = entityManager.getComponent<Transform>(nearbyEntity);
-                        float distance = glm::distance(transform.position, playerTransform.position);
-                        if (distance < closestPlayerDistance) {
-                            closestPlayer = nearbyEntity;
-                            closestPlayerDistance = distance;
-                        }
+                        cachedPlayerPos = playerTransform.position;
+                    } else {
+                        continue; // Not a player
                     }
+                }
+
+                float distance = glm::distance(transform.position, cachedPlayerPos);
+                if (distance < closestPlayerDistance) {
+                    closestPlayer = cachedPlayerEntity;
+                    closestPlayerDistance = distance;
                 }
             }
         }

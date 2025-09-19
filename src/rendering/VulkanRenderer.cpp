@@ -784,7 +784,7 @@ void VulkanRenderer::createSwapChain() {
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createInfo.preTransform = capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR; // V-Sync
+    createInfo.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // No V-Sync for development - see true performance
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
