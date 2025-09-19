@@ -1,0 +1,128 @@
+[20:38:02.953] [INFO ] VulkanMon starting up...
+[20:38:02.954] [INFO ] Initializing GLFW window system...
+[20:38:02.976] [INFO ] GLFW window initialized successfully
+[20:38:02.980] [INFO ] Legacy camera initialization removed - ECS camera system active
+[20:38:02.980] [INFO ] VulkanRenderer created
+[20:38:02.980] [INFO ] Initializing Vulkan renderer...
+[20:38:03.067] [INFO ] Creating Vulkan surface for window...
+[20:38:03.067] [INFO ] Vulkan surface created successfully
+[20:38:03.067] [INFO ] Selecting physical device and creating logical device...
+[20:38:03.070] [INFO ] Selected GPU: NVIDIA GeForce RTX 5070 Ti
+[20:38:03.235] [INFO ] Swap chain created successfully with 3 images
+[20:38:03.235] [INFO ] Creating render pass...
+[20:38:03.235] [INFO ] Creating global descriptor set layout (UBO, texture, lighting)...
+[20:38:03.235] [INFO ] Global descriptor set layout created successfully
+[20:38:03.235] [INFO ] Creating material descriptor set layout (per-material data)...
+[20:38:03.235] [INFO ] Material descriptor set layout created successfully
+[20:38:03.235] [INFO ] Creating legacy descriptor set layout...
+[20:38:03.235] [INFO ] Legacy descriptor set layout created successfully
+[20:38:03.235] [INFO ] Shaders loaded successfully
+[20:38:03.235] [INFO ] Creating graphics pipeline...
+[20:38:03.237] [INFO ] Creating depth resources...
+[20:38:03.237] [INFO ] Depth buffer created successfully
+[20:38:03.237] [INFO ] Command pool created successfully
+[20:38:03.237] [INFO ] Initializing core engine systems...
+[RESOURCE MANAGER] Initialized for device
+[20:38:03.237] [INFO ] Found assets directory: D:\ws\vulkanmon\assets
+[RESOURCE MANAGER] Initialized for device
+[20:38:03.237] [INFO ] AssetManager initialized with root path: D:\ws\vulkanmon\assets/
+[20:38:03.238] [INFO ] ModelLoader initialized with Assimp support
+[20:38:03.238] [INFO ] Initializing LightingSystem
+[20:38:03.238] [INFO ] Creating lighting uniform buffers
+[20:38:03.238] [INFO ] LightingSystem buffers created successfully
+[20:38:03.238] [INFO ] MaterialSystem: Created material 0
+[20:38:03.238] [INFO ] Core engine systems initialized successfully!
+[20:38:03.238] [INFO ] Creating GPU instance buffer for 1000 creatures
+[20:38:03.238] [INFO ] GPU instance buffer created: 93 KB
+[20:38:03.240] [INFO ] Texture sampler created successfully
+[20:38:03.240] [INFO ] Creating descriptor pool...
+[20:38:03.240] [INFO ] Descriptor pool created successfully
+[20:38:03.240] [INFO ] Creating descriptor set...
+[20:38:03.240] [INFO ] Descriptor set created successfully
+[20:38:03.240] [INFO ] Creating global descriptor pool (UBO, texture, lighting)...
+[20:38:03.240] [INFO ] Global descriptor pool created successfully
+[20:38:03.240] [INFO ] Creating global descriptor set (UBO, texture, lighting)...
+[20:38:03.240] [INFO ] Global descriptor set created successfully
+[20:38:03.240] [INFO ] Creating command buffers...
+[20:38:03.240] [INFO ] Command buffers allocated successfully
+[20:38:03.240] [INFO ] Recording command buffers...
+[20:38:03.240] [INFO ] Drawing commands recorded successfully
+[20:38:03.240] [INFO ] Creating synchronization objects...
+[20:38:03.240] [INFO ] Sync objects created successfully
+[20:38:03.240] [INFO ] Vulkan initialization completed
+[20:38:03.240] [INFO ] VulkanRenderer initialization completed successfully
+[20:38:03.240] [INFO ] Initializing ImGui debug interface...
+[20:38:03.244] [INFO ] ImGui debug interface initialized successfully
+[20:38:03.244] [INFO ] ImGui initialization completed successfully
+[20:38:03.244] [INFO ] CreatureRenderSystem initialized - GPU instancing enabled
+[20:38:03.244] [INFO ] Target performance: 200+ creatures at 60+ FPS
+[20:38:03.244] [INFO ] Using world config: Test World bounds (-10.000000,-5.000000,-10.000000) to (10.000000,10.000000,10.000000)
+[20:38:03.244] [INFO ] SpatialManager initialized with world bounds
+[20:38:03.244] [INFO ] SpatialSystem initialized with world bounds
+[20:38:03.244] [INFO ] CreatureDetectionSystem initialized
+[20:38:03.244] [INFO ] RenderSystem: CameraSystem reference updated
+[20:38:03.244] [INFO ] RenderSystem: SpatialSystem reference updated
+[20:38:03.244] [INFO ] CreatureRenderSystem: CameraSystem reference updated
+[20:38:03.244] [INFO ] CreatureRenderSystem: SpatialSystem reference updated
+[20:38:03.244] [INFO ] CreatureDetectionSystem: SpatialSystem reference updated
+[20:38:03.244] [INFO ] World: All system dependencies connected successfully
+[20:38:03.244] [INFO ] System dependency connection completed via World::connectSystems()
+[20:38:03.244] [INFO ] ECS Inspector initialized successfully
+[20:38:03.244] [INFO ] ECS systems initialized successfully
+[20:38:03.244] [INFO ] InputHandler initialized with ECS camera system
+[20:38:03.244] [INFO ] InputHandler initialized with ECS camera system
+[20:38:03.244] [INFO ] System callbacks connected
+[20:38:03.244] [INFO ] Input system initialized
+[20:38:03.244] [INFO ] Creating Spatial System Stress Test Scene...
+[20:38:03.244] [INFO ] Target: 200+ creatures for thread-safe spatial system validation
+[20:38:03.244] [INFO ] Starting creature creation: 16x16 grid
+[20:38:03.245] [INFO ] Creating creature 0 at grid (0,0)
+[20:38:03.245] [INFO ] Creature 0 at grid(0,0) -> world(-75.000000, 0.000000, -75.000000)
+[20:38:03.245] [INFO ] Creature 1 at grid(0,1) -> world(-75.000000, 0.000000, -65.000000)
+[20:38:03.245] [INFO ] Creature 2 at grid(0,2) -> world(-75.000000, 0.000000, -55.000000)
+[20:38:03.245] [INFO ] Creature 3 at grid(0,3) -> world(-75.000000, 0.000000, -45.000000)
+[20:38:03.245] [INFO ] Creature 4 at grid(0,4) -> world(-75.000000, 0.000000, -35.000000)
+[20:38:03.245] [INFO ] Creating creature 64 at grid (4,0)
+[20:38:03.245] [INFO ] Creating creature 128 at grid (8,0)
+[20:38:03.246] [INFO ] Creating creature 192 at grid (12,0)
+[20:38:03.246] [INFO ] Spatial Stress Test: Created 256 creatures
+[20:38:03.246] [INFO ] Thread-Safe Validation: 256 entities with varied detection radii
+[20:38:03.246] [INFO ] Expected Spatial Queries: ~25 per frame
+[20:38:03.246] [INFO ] Performance Target: <2ms spatial system overhead per frame
+[20:38:03.246] [INFO ] Test player entity created at center for creature detection testing
+[20:38:03.246] [INFO ] Spatial Stress Test Scene Complete!
+[20:38:03.246] [INFO ] Thread-Safe System Test: 256 creatures with active AI
+[20:38:03.246] [INFO ] Spatial Query Load: ~25 radius queries per frame
+[20:38:03.246] [INFO ] Ready to validate thread-safe spatial cache performance!
+[20:38:03.246] [INFO ] VulkanMon ready!
+[20:38:08.656] [INFO ] CreatureDetectionSystem Performance:
+[20:38:08.656] [INFO ]   Creatures processed: 258
+[20:38:08.656] [INFO ]   Detections triggered: 8
+[20:38:08.656] [INFO ]   State changes: 169
+[20:38:08.656] [INFO ]   Update time: 0.541800ms
+[20:38:08.672] [INFO ] CreatureRenderSystem Performance Report (Frame 300):
+  Creatures: 0/256 (100% culled)
+  Batches: 0 (efficiency: 1 creatures/draw)
+  Timing: Culling=0.0095ms, Batching=0.0036ms, Rendering=0.0003ms, Total=0.0148ms
+  Draw Calls: 0 | Est. FPS: ~67567
+[20:38:13.356] [INFO ] Switched to UI mode - cursor enabled for ImGui interaction
+[20:38:13.657] [INFO ] CreatureDetectionSystem Performance:
+[20:38:13.657] [INFO ]   Creatures processed: 258
+[20:38:13.657] [INFO ]   Detections triggered: 8
+[20:38:13.657] [INFO ]   State changes: 165
+[20:38:13.657] [INFO ]   Update time: 0.794400ms
+[20:38:13.672] [INFO ] CreatureRenderSystem Performance Report (Frame 600):
+  Creatures: 0/256 (100% culled)
+  Batches: 0 (efficiency: 1 creatures/draw)
+  Timing: Culling=0.0097ms, Batching=0.0039ms, Rendering=0.0003ms, Total=0.0153ms
+  Draw Calls: 0 | Est. FPS: ~65359
+[20:38:19.173] [INFO ] CreatureDetectionSystem Performance:
+[20:38:19.173] [INFO ]   Creatures processed: 258
+[20:38:19.173] [INFO ]   Detections triggered: 8
+[20:38:19.173] [INFO ]   State changes: 179
+[20:38:19.173] [INFO ]   Update time: 0.760500ms
+[20:38:19.189] [INFO ] CreatureRenderSystem Performance Report (Frame 900):
+  Creatures: 0/256 (100% culled)
+  Batches: 0 (efficiency: 1 creatures/draw)
+  Timing: Culling=0.0099ms, Batching=0.0043ms, Rendering=0.0003ms, Total=0.0158ms
+  Draw Calls: 0 | Est. FPS: ~63291

@@ -169,22 +169,25 @@ void Application::createTestScene() {
         return;
     }
 
-    VKMON_INFO("Creating GPU Instancing Stress Test Scene...");
-    VKMON_INFO("Target: 64+ creatures with multiple mesh types for batching validation");
+    VKMON_INFO("Creating Spatial System Stress Test Scene...");
+    VKMON_INFO("Target: 200+ creatures for thread-safe spatial system validation");
 
     // =========================================================================
-    // GPU INSTANCING STRESS TEST - Pokemon Legends: Arceus Scale Testing
+    // SPATIAL STRESS TEST - Thread-Safe Cache System Validation
     // =========================================================================
 
-    const int CREATURE_GRID_SIZE = 8;  // 8x8 = 64 creatures
-    const float CREATURE_SPACING = 3.0f;
+    const int CREATURE_GRID_SIZE = 16;  // 16x16 = 256 creatures
+    const float CREATURE_SPACING = 3.0f;  // Proper spacing to prevent overlaps
     const float GRID_OFFSET = -(CREATURE_GRID_SIZE - 1) * CREATURE_SPACING * 0.5f;
 
-    // Create 4 different creature types for batching efficiency testing
-    const std::vector<std::string> creatureMeshes = {"cube.obj", "sphere.obj", "pyramid.obj", "plane.obj"};
-    const std::vector<uint32_t> creatureMaterials = {0, 1, 2, 3};  // Different materials per type
+    // Use only cubes for maximum stress testing and consistency
+    const std::string creatureMesh = "cube.obj";  // All creatures use cubes
+    const std::vector<uint32_t> creatureMaterials = {0, 1, 2, 3};  // Different materials for visual variety
 
     size_t totalCreatures = 0;
+
+    VKMON_INFO("Starting creature creation: " + std::to_string(CREATURE_GRID_SIZE) + "x" + std::to_string(CREATURE_GRID_SIZE) + " grid");
+    VKMON_INFO("Grid spans: " + std::to_string(GRID_OFFSET) + " to " + std::to_string(-GRID_OFFSET) + " units");
 
     for (int x = 0; x < CREATURE_GRID_SIZE; x++) {
         for (int z = 0; z < CREATURE_GRID_SIZE; z++) {
@@ -197,60 +200,61 @@ void Application::createTestScene() {
                 0.0f,                                // Y: ground level
                 GRID_OFFSET + z * CREATURE_SPACING   // Z: grid spread
             );
-            // Add some variation to rotations and scales
-            creatureTransform.setRotationEuler(0.0f, (x + z) * 30.0f, 0.0f);
-            creatureTransform.scale = glm::vec3(0.6f + (x + z) * 0.05f);
+            // Uniform scale and rotation for consistency
+            creatureTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+            creatureTransform.scale = glm::vec3(1.0f);  // Standard 1-unit cubes
             world_->addComponent(creature, creatureTransform);
 
-            // Creature type based on position (creates natural batching)
-            int creatureType = (x + z) % creatureMeshes.size();
+            // Material variety for visual distinction while using single mesh
+            int materialType = (x + z) % creatureMaterials.size();
 
             Renderable creatureRenderable;
-            creatureRenderable.meshPath = creatureMeshes[creatureType];
+            creatureRenderable.meshPath = creatureMesh;  // All cubes for consistency
             creatureRenderable.texturePath = "default";
-            creatureRenderable.materialId = creatureMaterials[creatureType];
+            creatureRenderable.materialId = creatureMaterials[materialType];
             creatureRenderable.isVisible = true;
             creatureRenderable.renderLayer = 0;
+            creatureRenderable.lodDistance = 1000.0f;  // Ensure all creatures are always visible for stress test
             world_->addComponent(creature, creatureRenderable);
 
-            // CreatureComponent for GPU instancing system
+            // CreatureComponent for spatial detection testing
             CreatureComponent creatureComp;
-            creatureComp.state = CreatureState::IDLE;
-            creatureComp.detectionRadius = 5.0f;
-            creatureComp.type = CreatureComponent::CreatureType::PEACEFUL;
+            creatureComp.state = CreatureState::WANDERING;  // Active behavior for spatial queries
+            creatureComp.detectionRadius = 8.0f + (x + z) * 0.5f;  // Varied detection radii
+            creatureComp.type = static_cast<CreatureComponent::CreatureType>((x + z) % 3);  // Mix of types
             world_->addComponent(creature, creatureComp);
 
-            // SpatialComponent for culling
+            // SpatialComponent for thread-safe spatial system testing
             SpatialComponent creatureSpatial;
             creatureSpatial.spatialLayers = LayerMask::Creatures;
-            creatureSpatial.boundingRadius = 0.8f;
-            creatureSpatial.behavior = SpatialBehavior::STATIC;  // Static for stress test
+            creatureSpatial.boundingRadius = 1.0f + (x + z) * 0.1f;  // Varied sizes
+            creatureSpatial.behavior = SpatialBehavior::DYNAMIC;  // Dynamic for spatial update testing
             world_->addComponent(creature, creatureSpatial);
 
             totalCreatures++;
         }
     }
 
-    VKMON_INFO("GPU Instancing Stress Test: Created " + std::to_string(totalCreatures) + " creatures");
-    VKMON_INFO("Creature Types: " + std::to_string(creatureMeshes.size()) + " different meshes");
-    VKMON_INFO("Expected Batches: " + std::to_string(creatureMeshes.size()) + " (one per mesh type)");
-    VKMON_INFO("Expected Efficiency: " + std::to_string(totalCreatures / creatureMeshes.size()) + " creatures per draw call");
+    VKMON_INFO("Spatial Stress Test: Created " + std::to_string(totalCreatures) + " creatures");
+    VKMON_INFO("Thread-Safe Validation: " + std::to_string(totalCreatures) + " entities with varied detection radii");
+    VKMON_INFO("Expected Spatial Queries: ~" + std::to_string(totalCreatures / 10) + " per frame");
+    VKMON_INFO("Performance Target: <2ms spatial system overhead per frame");
 
-    // Create a simple camera for navigation (optional reference object)
+    // Create camera positioned to see all 256 creatures (grid spans -22.5 to +22.5 = 45 units)
     EntityID cameraEntity = world_->createEntity();
     Transform cameraTransform;
-    cameraTransform.position = glm::vec3(0.0f, 8.0f, 15.0f);  // Elevated view of the grid center
-    cameraTransform.setRotationEuler(-25.0f, 0.0f, 0.0f); // Look down at the grid
+    cameraTransform.position = glm::vec3(0.0f, 35.0f, 50.0f);  // Closer to see 45-unit grid clearly
+    cameraTransform.setRotationEuler(-30.0f, 0.0f, 0.0f); // Look down at the grid
     cameraTransform.scale = glm::vec3(1.0f);
     world_->addComponent(cameraEntity, cameraTransform);
 
     Camera cameraComponent;
-    cameraComponent.fov = Config::Camera::DEFAULT_FOV;              // Using unified config
-    cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE; // Using unified config
-    cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;   // Using unified config
-    cameraComponent.aspectRatio = 16.0f / 9.0f;                     // Set initial aspect ratio for resize testing
+    cameraComponent.fov = 75.0f;  // Standard FOV should work for closer camera
+    cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE;
+    cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;
+    cameraComponent.aspectRatio = 16.0f / 9.0f;
     cameraComponent.isActive = true;
-    cameraComponent.updateProjectionMatrix();                       // Generate initial projection matrix
+    cameraComponent.updateProjectionMatrix();
     world_->addComponent(cameraEntity, cameraComponent);
 
     SpatialComponent cameraSpatial;
@@ -275,8 +279,8 @@ void Application::createTestScene() {
 
     VKMON_INFO("Test player entity created at center for creature detection testing");
 
-    VKMON_INFO("GPU Instancing Stress Test Scene Complete!");
-    VKMON_INFO("Performance Target: 60+ FPS with " + std::to_string(totalCreatures) + " creatures");
-    VKMON_INFO("Batch Efficiency Target: 16 creatures per draw call");
-    VKMON_INFO("Ready for Pokemon Legends: Arceus scale testing!");
+    VKMON_INFO("Spatial Stress Test Scene Complete!");
+    VKMON_INFO("Thread-Safe System Test: " + std::to_string(totalCreatures) + " creatures with active AI");
+    VKMON_INFO("Spatial Query Load: ~" + std::to_string(totalCreatures / 10) + " radius queries per frame");
+    VKMON_INFO("Ready to validate thread-safe spatial cache performance!");
 }

@@ -318,6 +318,7 @@ void Application::cleanup() {
     VKMON_INFO("Application cleanup completed");
 }
 
+
 // Include the separated implementation files
 #include "ApplicationSetup.cpp"
 #include "ApplicationInputs.cpp"

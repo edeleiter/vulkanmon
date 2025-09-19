@@ -24,9 +24,11 @@ void RenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager
     culledObjectCount = 0;
 
     // Get camera position for distance calculations (fallback)
-    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+    glm::vec3 cameraPos(0.0f, 80.0f, 120.0f);  // Updated fallback to match actual camera position
     if (cameraSystem) {
         cameraPos = cameraSystem->getActiveCameraPosition(entityManager);
+    } else {
+        VKMON_WARNING("RenderSystem: No CameraSystem available - using fallback position");
     }
 
     // Collect potentially visible entities using spatial culling

@@ -65,8 +65,8 @@ struct WorldConfig {
 
     static WorldConfig createTestWorld() {
         return WorldConfig(
-            glm::vec3(-10.0f, -5.0f, -10.0f),
-            glm::vec3(10.0f, 10.0f, 10.0f),
+            glm::vec3(-30.0f, -5.0f, -30.0f),  // Expanded to cover 16x16 grid at 3.0f spacing
+            glm::vec3(30.0f, 10.0f, 30.0f),   // Grid spans -22.5 to +22.5, so -30 to +30 provides buffer
             "Test World"
         );
     }

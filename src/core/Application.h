@@ -140,6 +140,7 @@ public:
      */
     void handleWindowResize(int width, int height);
 
+
 private:
     // Application state
     bool initialized_ = false;
