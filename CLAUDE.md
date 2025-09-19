@@ -58,6 +58,20 @@ Debug\vulkanmon_tests.exe         # Windows
 
 ## Architecture
 
+### ECS Architecture & Ownership Model
+VulkanMon uses a **single World ownership pattern** designed for game engine simplicity and performance:
+
+- **Single World Instance**: Application owns exactly one World instance
+- **Single System Instances**: Each ECS system (RenderSystem, SpatialSystem, CreatureDetectionSystem) exists once per World
+- **No Multi-Threading**: ECS systems run on main thread for predictable performance
+- **Static Cache Safety**: Static variables in systems are safe due to single-instance guarantee
+
+This design enables:
+- **Zero System Overhead**: No memory/performance cost for "multi-instance" support
+- **Simple State Management**: Static caches persist across frames for optimization
+- **Predictable Performance**: Single-threaded ECS eliminates synchronization overhead
+- **Clean Architecture**: One-to-one system relationships match game engine patterns
+
 ### Core Systems
 - **ResourceManager** (`src/ResourceManager.h/.cpp`): RAII wrappers for Vulkan resources (buffers, images, memory)
 - **Logger** (`src/Logger.h/.cpp`): Thread-safe logging system with multiple outputs and performance tracking

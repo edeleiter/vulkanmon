@@ -111,6 +111,13 @@ Frustum CameraSystem::getActiveCameraFrustum(EntityManager& entityManager) {
 }
 
 void CameraSystem::handleWindowResize(int width, int height, EntityManager& entityManager) {
+    // Validate dimensions to prevent division by zero
+    if (width <= 0 || height <= 0) {
+        VKMON_WARNING("CameraSystem: Invalid window dimensions for resize: " +
+                      std::to_string(width) + "x" + std::to_string(height));
+        return;
+    }
+
     if (activeCameraEntity == INVALID_ENTITY) {
         VKMON_WARNING("CameraSystem: No active camera entity for resize handling");
         return; // No active camera to update

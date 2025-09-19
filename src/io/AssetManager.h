@@ -8,6 +8,7 @@
 #include <memory>
 #include <functional>
 #include <shared_mutex>
+#include <atomic>
 
 /**
  * VulkanMon Asset Loading Pipeline
@@ -70,7 +71,7 @@ struct LoadedTexture {
     VkSampler sampler = VK_NULL_HANDLE;
     uint32_t width, height;
     std::string filename;
-    size_t referenceCount = 0;
+    std::atomic<size_t> referenceCount = 0;
     
     LoadedTexture(std::unique_ptr<ManagedImage> img, VkSampler samp, 
                   uint32_t w, uint32_t h, const std::string& file)

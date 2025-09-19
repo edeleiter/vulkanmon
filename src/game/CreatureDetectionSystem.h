@@ -157,6 +157,11 @@ private:
                               float deltaTime, std::vector<SpatialManager::BatchedRadiusQuery>& batchedQueries,
                               std::vector<std::pair<EntityID, CreatureComponent*>>& queriedCreatures) {
 
+        // Safety check: prevent division by zero in temporal spreading
+        if (creatures.empty()) {
+            return;
+        }
+
         // TEMPORAL SPREADING OPTIMIZATION: Limit creatures processed per frame to eliminate frame time spikes
         static size_t frameOffset = 0;
         const size_t MAX_CREATURES_PER_FRAME = 64;  // Process max 64 creatures per frame (1024/16 = 64 per frame cycle)

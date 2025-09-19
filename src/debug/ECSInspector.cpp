@@ -452,7 +452,7 @@ bool ECSInspector::renderSpatialEditor(SpatialComponent& spatial) {
 
     // Home position editor
     glm::vec3 homePosition = spatial.homePosition;
-    if (ImGui::DragFloat3("Home Position", &homePosition.x, 0.1f)) {
+    if (ImGui::DragFloat3("Home Position", glm::value_ptr(homePosition), 0.1f)) {
         spatial.setHomePosition(homePosition);
         modified = true;
     }
