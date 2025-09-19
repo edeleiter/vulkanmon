@@ -2,7 +2,6 @@
 
 #include "../core/Entity.h"
 #include "LayerMask.h"
-#include "SpatialCache.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <unordered_map>
@@ -11,7 +10,6 @@
 #include <functional>
 #include <limits>
 #include <mutex>
-#include <shared_mutex>
 
 namespace VulkanMon {
 
@@ -102,8 +100,6 @@ public:
         size_t totalEntitiesReturned = 0;
         float lastQueryTimeMs = 0.0f;
         float averageQueryTimeMs = 0.0f;
-        float cacheHitRate = 0.0f;
-        size_t cacheSize = 0;
     };
 
 private:
@@ -118,9 +114,6 @@ private:
     mutable SpatialStats stats_;
     mutable std::mutex statsMutex_;
 
-    // Query caching system
-    mutable PredictiveSpatialCache cache_;
-    mutable std::shared_mutex cacheMutex_;  // Protects cache_ from race conditions
 
 public:
     SpatialManager(const BoundingBox& worldBounds);
@@ -170,15 +163,6 @@ public:
     }
     void clear();
 
-    // Cache management
-    void clearCache() {
-        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
-        cache_.clear();
-    }
-    void cleanupCache() {
-        std::unique_lock<std::shared_mutex> lock(cacheMutex_);
-        cache_.cleanup();
-    }
 
     const BoundingBox& getWorldBounds() const { return worldBounds_; }
 

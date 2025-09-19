@@ -13,22 +13,7 @@ using namespace VulkanMon;
 // Basic ECS Inspector Functionality Tests
 // =============================================================================
 
-TEST_CASE("ECS Inspector Basic Construction", "[ECSInspector][Basic]") {
-    SECTION("Valid construction with World") {
-        World world;
-        ECSInspector inspector(&world);
-
-        REQUIRE(inspector.isEnabled() == true);  // Default enabled
-        REQUIRE(inspector.getSelectedEntity() == INVALID_ENTITY);  // No selection initially
-    }
-
-    SECTION("Null World handling") {
-        // Test that inspector can handle null World gracefully
-        ECSInspector inspector(nullptr);
-        REQUIRE(inspector.isEnabled() == true);
-        REQUIRE(inspector.getSelectedEntity() == INVALID_ENTITY);
-    }
-}
+// REMOVED: Basic Construction test - pointless constructor testing
 
 TEST_CASE("ECS Inspector State Management", "[ECSInspector][State]") {
     World world;

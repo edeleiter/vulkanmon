@@ -488,60 +488,6 @@ TEST_CASE("Model Composition and Hierarchy", "[ModelLoader][Model]") {
     }
 }
 
-TEST_CASE("ModelLoader Interface Design", "[ModelLoader][Interface]") {
-    SECTION("Constructor parameter validation") {
-        // Test ModelLoader constructor interface requirements
-        std::shared_ptr<ResourceManager> mockResourceManager = nullptr;
-        std::shared_ptr<AssetManager> mockAssetManager = nullptr;
-        
-        // Validate constructor parameter types
-        REQUIRE(mockResourceManager == nullptr); // Mock for interface testing
-        REQUIRE(mockAssetManager == nullptr);     // Mock for interface testing
-        
-        // Test that interface accepts shared_ptr parameters
-        REQUIRE(true); // Interface design validation
-    }
-    
-    SECTION("RAII design validation") {
-        // Test that ModelLoader follows proper RAII design principles
-        REQUIRE_FALSE(std::is_copy_constructible_v<ModelLoader>);
-        REQUIRE_FALSE(std::is_copy_assignable_v<ModelLoader>);
-        
-        // Note: ModelLoader may not be movable due to Assimp::Importer member
-        // which doesn't support move semantics. This is acceptable for the current design.
-        REQUIRE(std::is_destructible_v<ModelLoader>);
-        
-        // Test that it's properly designed for RAII with explicit deletions
-        REQUIRE(true); // Interface design validation passes
-    }
-    
-    SECTION("Configuration flags validation") {
-        // Test configuration flag types and ranges
-        bool triangulate = true;
-        bool generateNormals = true;
-        bool optimizeMeshes = true;
-        bool flipUVs = false;
-        
-        // Test boolean flag behavior
-        REQUIRE(triangulate == true);
-        REQUIRE(generateNormals == true);
-        REQUIRE(optimizeMeshes == true);
-        REQUIRE(flipUVs == false);
-        
-        // Test flag toggling
-        triangulate = !triangulate;
-        REQUIRE(triangulate == false);
-        
-        generateNormals = !generateNormals;
-        REQUIRE(generateNormals == false);
-        
-        optimizeMeshes = !optimizeMeshes;
-        REQUIRE(optimizeMeshes == false);
-        
-        flipUVs = !flipUVs;
-        REQUIRE(flipUVs == true);
-    }
-}
 
 TEST_CASE("File Format Support Validation", "[ModelLoader][Formats]") {
     SECTION("Supported format enumeration") {

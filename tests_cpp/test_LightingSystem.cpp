@@ -275,43 +275,7 @@ TEST_CASE("LightingSystem Memory Layout Validation", "[LightingSystem][Memory]")
     }
 }
 
-TEST_CASE("LightingSystem Interface Design", "[LightingSystem][Interface]") {
-    SECTION("LightingSystem RAII design validation") {
-        // Test that LightingSystem follows proper RAII principles
-        // Note: Cannot test actual construction without ResourceManager
-        
-        // Test that LightingSystem requires ResourceManager
-        using LightingSystemType = LightingSystem;
-        
-        // Verify constructor signature exists
-        REQUIRE(std::is_constructible_v<LightingSystemType, std::shared_ptr<VulkanMon::ResourceManager>>);
-        
-        // Verify destructor exists (automatic cleanup)
-        REQUIRE(std::is_destructible_v<LightingSystemType>);
-        
-        // Interface validation passes
-        REQUIRE(true);
-    }
-    
-    SECTION("Method interface validation") {
-        // Test that expected public methods exist (compile-time check)
-        // This validates the complete public API
-        
-        // Mock parameters for interface validation
-        LightingData mockData;
-        glm::vec3 mockDirection(0.0f, -1.0f, 0.0f);
-        float mockIntensity = 1.0f;
-        glm::vec3 mockColor(1.0f, 1.0f, 1.0f);
-        
-        // Validate parameter types
-        REQUIRE(mockIntensity > 0.0f);
-        REQUIRE(!std::isnan(mockDirection.x));
-        REQUIRE(mockColor.r >= 0.0f);
-        
-        // Interface design validation passes
-        REQUIRE(true);
-    }
-}
+// REMOVED: LightingSystem Interface Design test - silly validation of method existence
 
 TEST_CASE("LightingSystem Calculations Validation", "[LightingSystem][Calculations]") {
     SECTION("Light vector calculations") {

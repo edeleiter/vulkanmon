@@ -97,86 +97,9 @@ TEST_CASE("MaterialData Structure Validation", "[MaterialSystem][MaterialData]")
     }
 }
 
-TEST_CASE("MaterialSystem Interface Design", "[MaterialSystem][Interface]") {
-    SECTION("Constructor requirements") {
-        // Test that MaterialSystem requires ResourceManager
-        // Note: We can't create actual MaterialSystem without Vulkan context
-        // so we test interface design and requirements
-        
-        // Mock ResourceManager pointer (null for interface testing)
-        std::shared_ptr<VulkanMon::ResourceManager> nullResourceManager = nullptr;
-        
-        // Interface validation - constructor signature exists
-        REQUIRE(nullResourceManager == nullptr); // Validates the interface
-        
-        // The constructor should accept ResourceManager shared_ptr
-        REQUIRE(true); // Interface design validation
-    }
-    
-    SECTION("RAII design validation") {
-        // Test MaterialSystem class characteristics
-        // Note: Current MaterialSystem implementation uses default copy/move semantics
-        // This tests the actual implementation rather than ideal RAII design
-        
-        // MaterialSystem is copyable (default generated)
-        REQUIRE(std::is_copy_constructible_v<MaterialSystem>);
-        REQUIRE(std::is_copy_assignable_v<MaterialSystem>);
-        
-        // MaterialSystem is movable (default generated)
-        REQUIRE(std::is_move_constructible_v<MaterialSystem>);
-        REQUIRE(std::is_move_assignable_v<MaterialSystem>);
-        
-        // Test destructor characteristics
-        REQUIRE(std::is_destructible_v<MaterialSystem>);
-        
-        // Test constructor requirements
-        REQUIRE(std::is_constructible_v<MaterialSystem, std::shared_ptr<VulkanMon::ResourceManager>>);
-    }
-}
+// REMOVED: Interface Design test - silly validation of method existence
 
-TEST_CASE("MaterialSystem Method Interface Validation", "[MaterialSystem][Methods]") {
-    SECTION("Material creation methods") {
-        // Test that required methods exist (compile-time interface check)
-        
-        // Material creation from MaterialData
-        MaterialData testMaterial(
-            glm::vec3(0.1f, 0.1f, 0.1f),  // ambient
-            glm::vec3(0.5f, 0.5f, 0.5f),  // diffuse  
-            glm::vec3(1.0f, 1.0f, 1.0f),  // specular
-            32.0f                          // shininess
-        );
-        
-        // Validate test material properties
-        REQUIRE(testMaterial.ambient.r == Approx(0.1f));
-        REQUIRE(testMaterial.diffuse.r == Approx(0.5f));
-        REQUIRE(testMaterial.specular.r == Approx(1.0f));
-        REQUIRE(testMaterial.shininess == Approx(32.0f));
-        
-        // Interface validation passes
-        REQUIRE(true);
-    }
-    
-    SECTION("Material management methods") {
-        // Test that material management interface exists
-        
-        // Material ID type validation
-        uint32_t mockMaterialId = 0;
-        REQUIRE(mockMaterialId == 0);
-        
-        // Buffer management interface validation
-        VkBuffer mockBuffer = VK_NULL_HANDLE;
-        REQUIRE(mockBuffer == VK_NULL_HANDLE);
-        
-        // Descriptor interface validation  
-        VkDescriptorSetLayout mockLayout = VK_NULL_HANDLE;
-        VkDescriptorSet mockDescriptorSet = VK_NULL_HANDLE;
-        REQUIRE(mockLayout == VK_NULL_HANDLE);
-        REQUIRE(mockDescriptorSet == VK_NULL_HANDLE);
-        
-        // Interface validation passes
-        REQUIRE(true);
-    }
-}
+// REMOVED: Method Interface Validation test - silly validation of method existence
 
 TEST_CASE("MaterialSystem Property Ranges", "[MaterialSystem][Properties]") {
     SECTION("Valid material property ranges") {

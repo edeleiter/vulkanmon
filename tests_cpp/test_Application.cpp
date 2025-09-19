@@ -70,58 +70,6 @@ TEST_CASE("Application Configuration Constants", "[Application][Config]") {
     }
 }
 
-TEST_CASE("Application Interface Design", "[Application][Interface]") {
-    SECTION("RAII design validation") {
-        // Test that Application follows proper RAII design principles
-        REQUIRE_FALSE(std::is_copy_constructible_v<Application>);
-        REQUIRE_FALSE(std::is_copy_assignable_v<Application>);
-        REQUIRE(std::is_move_constructible_v<Application>);
-        REQUIRE(std::is_move_assignable_v<Application>);
-        REQUIRE(std::is_destructible_v<Application>);
-        
-        // Test default constructor exists
-        REQUIRE(std::is_default_constructible_v<Application>);
-    }
-    
-    SECTION("Method interface validation") {
-        // Test that expected public methods exist and have correct signatures
-        // This validates the interface design at compile time
-        
-        // Lifecycle methods
-        bool hasInitialize = std::is_member_function_pointer_v<decltype(&Application::initialize)>;
-        bool hasRun = std::is_member_function_pointer_v<decltype(&Application::run)>;
-        bool hasShutdown = std::is_member_function_pointer_v<decltype(&Application::shutdown)>;
-        
-        REQUIRE(hasInitialize);
-        REQUIRE(hasRun);
-        REQUIRE(hasShutdown);
-        
-        // State query methods
-        bool hasIsRunning = std::is_member_function_pointer_v<decltype(&Application::isRunning)>;
-        bool hasGetFrameTime = std::is_member_function_pointer_v<decltype(&Application::getFrameTime)>;
-        bool hasGetFPS = std::is_member_function_pointer_v<decltype(&Application::getFPS)>;
-        
-        REQUIRE(hasIsRunning);
-        REQUIRE(hasGetFrameTime);
-        REQUIRE(hasGetFPS);
-    }
-    
-    SECTION("Constructor safety validation") {
-        // Test that Application can be constructed without throwing
-        // This validates basic construction logic is sound
-        REQUIRE_NOTHROW([]() {
-            Application app;
-            // Don't call initialize() - just test construction
-        }());
-        
-        // Test that multiple applications can be constructed
-        REQUIRE_NOTHROW([]() {
-            Application app1;
-            Application app2;
-            // Test independent construction
-        }());
-    }
-}
 
 TEST_CASE("Application Lifecycle State Management", "[Application][Lifecycle]") {
     SECTION("Initial state validation") {

@@ -233,9 +233,9 @@ void SpatialStressTest::updatePerformanceMetrics() {
 
     // Get spatial manager statistics
     if (spatialManager_) {
-        auto stats = spatialManager_->getQueryStatistics();
-        currentMetrics_.cacheHitRate = stats.cacheHitRate;
-        currentMetrics_.cacheSize = stats.cacheSize;
+        auto stats = spatialManager_->getPerformanceStats();
+        currentMetrics_.avgQueryTimeMs = stats.averageQueryTimeMs;
+        currentMetrics_.totalQueries = stats.totalQueries;
     }
 
     // Update peak metrics
@@ -292,9 +292,9 @@ void SpatialStressTest::printPerformanceReport() const {
     VKMON_INFO("  Total Frame Time: " + std::to_string(currentMetrics_.totalFrameTimeMs) + "ms");
     VKMON_INFO("  Spatial System Time: " + std::to_string(currentMetrics_.spatialSystemTimeMs) + "ms");
     VKMON_INFO("");
-    VKMON_INFO("Cache Performance:");
-    VKMON_INFO("  Hit Rate: " + std::to_string(currentMetrics_.cacheHitRate * 100.0f) + "%");
-    VKMON_INFO("  Cache Size: " + std::to_string(currentMetrics_.cacheSize));
+    VKMON_INFO("Query Performance:");
+    VKMON_INFO("  Total Queries: " + std::to_string(currentMetrics_.totalQueries));
+    VKMON_INFO("  Average Query Time: " + std::to_string(currentMetrics_.avgQueryTimeMs) + "ms");
     VKMON_INFO("");
     VKMON_INFO("Performance Acceptable: " + std::string(isPerformanceAcceptable() ? "YES" : "NO"));
     VKMON_INFO("==============================================");
@@ -326,8 +326,8 @@ void SpatialStressTest::printDetailedAnalysis() const {
         VKMON_INFO("  - Query time high: Consider spatial optimizations");
     }
 
-    if (currentMetrics_.cacheHitRate < 0.3f) {
-        VKMON_INFO("  - Low cache hit rate: Queries may be too diverse");
+    if (currentMetrics_.totalQueries > 1000 && currentMetrics_.avgQueryTimeMs > 0.5f) {
+        VKMON_INFO("  - High query frequency with slow queries: Consider spatial optimizations");
     }
 
     if (currentMetrics_.spatialSystemTimeMs > 5.0f) {

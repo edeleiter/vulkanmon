@@ -173,7 +173,7 @@ void Application::createTestScene() {
     VKMON_INFO("Target: 1024 creatures - massive open world scale validation");
 
     // =========================================================================
-    // SPATIAL STRESS TEST - Thread-Safe Cache System Validation
+    // SPATIAL STRESS TEST - Pokemon Legends Scale Validation
     // =========================================================================
 
     const int CREATURE_GRID_SIZE = 32;  // 32x32 = 1024 creatures - POKEMON LEGENDS SCALE!
@@ -282,5 +282,5 @@ void Application::createTestScene() {
     VKMON_INFO("Spatial Stress Test Scene Complete!");
     VKMON_INFO("Thread-Safe System Test: " + std::to_string(totalCreatures) + " creatures with active AI");
     VKMON_INFO("Spatial Query Load: ~" + std::to_string(totalCreatures / 10) + " radius queries per frame");
-    VKMON_INFO("Ready to validate thread-safe spatial cache performance!");
+    VKMON_INFO("Ready to validate Pokemon Legends scale spatial performance!");
 }

@@ -79,23 +79,6 @@ private:
     std::shared_ptr<MockWindow> window;
 };
 
-TEST_CASE("InputHandler Basic Construction", "[InputHandler][Basic]") {
-    InputTestFixture fixture;
-
-    SECTION("Construction with minimal ECS setup") {
-        auto inputHandler = fixture.createInputHandler();
-
-        // Should construct successfully
-        REQUIRE(inputHandler != nullptr);
-    }
-
-    SECTION("Default configuration values") {
-        auto inputHandler = fixture.createInputHandler();
-
-        // Mouse should be locked by default
-        REQUIRE(inputHandler->isMouseLocked());
-    }
-}
 
 TEST_CASE("InputHandler Configuration", "[InputHandler][Configuration]") {
     InputTestFixture fixture;

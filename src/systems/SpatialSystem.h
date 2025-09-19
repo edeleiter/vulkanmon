@@ -178,8 +178,7 @@ private:
         VKMON_INFO("Spatial Manager:");
         VKMON_INFO("  Total queries: " + std::to_string(spatialStats.totalQueries));
         VKMON_INFO("  Average query time: " + std::to_string(spatialStats.averageQueryTimeMs) + "ms");
-        VKMON_INFO("  Cache hit rate: " + std::to_string(spatialStats.cacheHitRate * 100.0f) + "%");
-        VKMON_INFO("  Cache size: " + std::to_string(spatialStats.cacheSize) + " entries");
+        VKMON_INFO("  Total entities returned: " + std::to_string(spatialStats.totalEntitiesReturned));
         VKMON_INFO("Octree Structure:");
         VKMON_INFO("  Nodes: " + std::to_string(nodeCount));
         VKMON_INFO("  Max depth: " + std::to_string(maxDepth));

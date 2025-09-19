@@ -22,34 +22,11 @@
 using namespace VulkanMon;
 using namespace VulkanMon::Testing;
 
-TEST_CASE("VulkanRenderer Basic Construction", "[VulkanRenderer][Basic]") {
-    SECTION("VulkanRenderer header inclusion") {
-        // Test that VulkanRenderer header includes properly
-        // This is a minimal test to verify the class exists
-        REQUIRE(true); // If we can include the header, this passes
-    }
+// REMOVED: Basic Construction test - pointless constructor testing
 
-    SECTION("VulkanRenderer constants") {
-        // Test any public constants if they exist
-        REQUIRE(true); // Placeholder for future constant tests
-    }
-}
+// REMOVED: State Management test - redundant with integration tests
 
-TEST_CASE("VulkanRenderer State Management", "[VulkanRenderer][State]") {
-    SECTION("VulkanRenderer interface testing") {
-        // Test interface concepts without full construction
-        // VulkanRenderer should have methods for frame timing, initialization, etc.
-        REQUIRE(true); // Placeholder - detailed testing requires integration tests
-    }
-}
-
-TEST_CASE("VulkanRenderer RAII Behavior", "[VulkanRenderer][RAII]") {
-    SECTION("RAII principles") {
-        // VulkanRenderer follows RAII principles
-        // Full testing requires integration tests with actual Vulkan setup
-        REQUIRE(true); // Placeholder
-    }
-}
+// REMOVED: RAII Behavior test - pointless RAII testing
 
 TEST_CASE("VulkanRenderer Interface Contracts", "[VulkanRenderer][Interface]") {
     SECTION("Interface expectations") {
