@@ -6,6 +6,9 @@ project(VulkanMonTests VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Coverage option (configuration applied after target creation)
+option(ENABLE_COVERAGE "Enable test coverage reporting" OFF)
+
 # Find packages
 find_package(Vulkan REQUIRED)
 find_package(glm CONFIG REQUIRED)
@@ -24,13 +27,13 @@ add_executable(vulkanmon_tests
     
     # Core System Tests (working implementations)
     test_Logger.cpp
-    test_Camera.cpp
+    # test_Camera.cpp  # Removed - old Camera class deleted
     test_Window.cpp
-    test_InputHandler.cpp
+    test_InputHandler.cpp  # Re-enabled - simple integration approach
     
     # TODO: Application and VulkanRenderer require integration tests
-    # test_Application.cpp
-    # test_VulkanRenderer.cpp
+    test_Application.cpp    # Re-enabled - fixed Config namespace references
+    test_VulkanRenderer.cpp
     
     # Simple unit tests that work in isolation
     test_Utils.cpp
@@ -46,7 +49,7 @@ add_executable(vulkanmon_tests
 
     # Phase 6: ECS Framework tests
     test_ecs.cpp
-    # test_ecs_integration.cpp  # Temporarily disabled for compilation fix
+    test_ecs_integration.cpp  # Re-enabled - fixed compilation issues
 
     # Phase 6.3: ECS Inspector tests (NEW)
     test_ECSInspector.cpp
@@ -54,13 +57,25 @@ add_executable(vulkanmon_tests
     # Phase 6.4: Window Resize tests (NEW)
     test_WindowResize.cpp
 
+    # Spatial System tests (NEW)
+    test_WorldConfig.cpp
+    spatial/test_SpatialSystem.cpp
+    spatial/test_SpatialPerformance.cpp
+    spatial/bench_SpatialSystem.cpp
+
+    # Performance Regression Tests (CRITICAL)
+    performance/test_PerformanceRegression.cpp
+    performance/test_CreatureDetectionRegression.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
     # Source files under test (individual components only)
     ../src/core/Window.cpp
-    ../src/core/InputHandler.cpp
-    ../src/core/Camera.cpp
+    ../src/core/InputHandler.cpp  # Re-enabled with ECS integration
+    ../src/core/Application.cpp  # Re-enabled for Application tests
+    ../src/core/World.cpp  # Added for World::connectSystems() support
+    # ../src/core/Camera.cpp  # Removed - old Camera class deleted
     ../src/utils/Utils.cpp
     ../src/stb_image_impl.cpp
     ../src/rendering/ResourceManager.cpp
@@ -68,7 +83,12 @@ add_executable(vulkanmon_tests
     ../src/systems/LightingSystem.cpp
     ../src/systems/MaterialSystem.cpp
     ../src/systems/RenderSystem.cpp
+    ../src/systems/CreatureRenderSystem.cpp  # Required by Application.cpp
     ../src/systems/CameraSystem.cpp
+    ../src/spatial/SpatialManager.cpp
+    ../src/spatial/WorldConfig.cpp
+    ../src/spatial/LayerMask.cpp
+    ../src/spatial/SpatialCache.cpp
     ../src/io/AssetManager.cpp
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp
@@ -95,6 +115,22 @@ target_include_directories(vulkanmon_tests PRIVATE
 # Enable debug info for tests
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(vulkanmon_tests PRIVATE DEBUG)
+endif()
+
+# Simple coverage support - following "Simple is Powerful" philosophy
+# NOTE: Applied after target creation to avoid CMake configuration errors
+if(ENABLE_COVERAGE)
+    if(MSVC)
+        # MSVC coverage requires Visual Studio Enterprise or Professional
+        # For now, just enable debug info for analysis
+        message(STATUS "Coverage build enabled - use Visual Studio coverage tools")
+        target_compile_options(vulkanmon_tests PRIVATE /Zi)
+        target_link_options(vulkanmon_tests PRIVATE /DEBUG)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(STATUS "Coverage enabled for GCC/Clang")
+        target_compile_options(vulkanmon_tests PRIVATE --coverage)
+        target_link_options(vulkanmon_tests PRIVATE --coverage)
+    endif()
 endif()
 
 # Custom target for easy test running

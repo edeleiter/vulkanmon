@@ -5,8 +5,9 @@
 #include <vulkan/vulkan.h>
 
 #include "../core/Window.h"
-#include "../core/Camera.h"
+// Old Camera.h dependency removed - using unified ECS camera system
 #include "ResourceManager.h"
+#include "MappedBuffer.h"
 #include "../io/AssetManager.h"
 #include "../io/ModelLoader.h"
 #include "../systems/LightingSystem.h"
@@ -17,6 +18,7 @@
 #include <vector>
 #include <chrono>
 #include <functional>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <glm/glm.hpp>
@@ -37,6 +39,23 @@ struct UniformBufferObject {
 struct PushConstants {
     glm::mat4 model;
 };
+
+// Forward declaration for instanced rendering (Phase 7.1)
+namespace VulkanMon {
+    // GPU instance data structure - matches shader layout
+    struct InstanceData {
+        glm::mat4 modelMatrix;     // 64 bytes - transformation matrix
+        glm::vec4 materialParams;  // 16 bytes - material ID + custom params
+        glm::vec4 lodParams;       // 16 bytes - LOD level + distance + custom
+
+        InstanceData() = default;
+        InstanceData(const glm::mat4& model, uint32_t materialId, float lodLevel = 0.0f)
+            : modelMatrix(model)
+            , materialParams(static_cast<float>(materialId), 0.0f, 0.0f, 0.0f)
+            , lodParams(lodLevel, 0.0f, 0.0f, 0.0f) {}
+    };
+    static_assert(sizeof(InstanceData) == 96, "InstanceData must be 96 bytes for GPU alignment");
+}
 
 /**
  * VulkanMon Vulkan Rendering System
@@ -85,7 +104,6 @@ public:
      */
     VulkanRenderer(
         std::shared_ptr<Window> window,
-        std::shared_ptr<Camera> camera,
         std::shared_ptr<ResourceManager> resourceManager,
         std::shared_ptr<AssetManager> assetManager,
         std::shared_ptr<ModelLoader> modelLoader,
@@ -160,7 +178,20 @@ public:
      * @param callback Function to call for ECS rendering
      */
     void setECSRenderCallback(ECSRenderCallback callback);
-    
+
+    // =========================================================================
+    // UNIFIED CAMERA INTERFACE - Matrix setters for external camera data
+    // =========================================================================
+
+    /// Set view matrix from external camera system
+    void setViewMatrix(const glm::mat4& viewMatrix);
+
+    /// Set projection matrix from external camera system
+    void setProjectionMatrix(const glm::mat4& projectionMatrix);
+
+    /// Set camera position from external camera system (for lighting calculations)
+    void setCameraPosition(const glm::vec3& cameraPosition);
+
     /**
      * Check if renderer is ready for rendering
      *
@@ -250,6 +281,38 @@ public:
      */
     void endECSFrame();
 
+    // ===== INSTANCED RENDERING (Phase 7.1) =====
+    // GPU instancing for massive creature rendering
+
+    /**
+     * Instance buffer management for multi-batch rendering
+     */
+    void resetInstanceOffset() { currentInstanceOffset_ = 0; }
+    uint32_t getCurrentInstanceOffset() const { return currentInstanceOffset_; }
+    void clearInstanceBuffer();  // Clear buffer and reset state for new frame
+
+    /**
+     * Render multiple instances of the same mesh with different transforms
+     * This is the high-performance path for rendering hundreds of identical objects
+     *
+     * @param meshPath Path to mesh file (will be loaded if needed)
+     * @param instanceData Array of instance data (transforms + material params)
+     * @param instanceCount Number of instances to render
+     * @param baseMaterialId Base material ID for all instances
+     */
+    void renderInstanced(const std::string& meshPath,
+                        const void* instanceData,
+                        uint32_t instanceCount,
+                        uint32_t baseMaterialId);
+
+    /**
+     * Convenience method for rendering instanced creatures using InstanceData struct
+     * This is the preferred method for CreatureRenderSystem
+     */
+    void renderInstancedCreatures(const std::string& meshPath,
+                                 const std::vector<VulkanMon::InstanceData>& instances,
+                                 uint32_t baseMaterialId);
+
     // ===== IMGUI DEBUG INTERFACE =====
     // Phase 6.3: ECS Inspector integration
 
@@ -292,7 +355,7 @@ public:
 private:
     // System references (shared ownership - systems created by renderer)
     std::shared_ptr<Window> window_;
-    std::shared_ptr<Camera> camera_;
+    // Old camera_ member removed - using external matrices from ECS camera system
     std::shared_ptr<ResourceManager> resourceManager_;
     std::shared_ptr<AssetManager> assetManager_;
     std::shared_ptr<ModelLoader> modelLoader_;
@@ -304,7 +367,24 @@ private:
 
     // Model cache for multi-object ECS rendering
     std::unordered_map<std::string, std::shared_ptr<Model>> modelCache_;
-    
+    mutable std::shared_mutex modelCacheMutex_;  // Protects modelCache_
+
+    // =========================================================================
+    // UNIFIED CAMERA INTERFACE - External matrix storage
+    // =========================================================================
+
+    /// Cached view matrix from external camera system
+    glm::mat4 externalViewMatrix_ = glm::mat4(1.0f);
+
+    /// Cached projection matrix from external camera system
+    glm::mat4 externalProjectionMatrix_ = glm::mat4(1.0f);
+
+    /// Cached camera position from external camera system
+    glm::vec3 externalCameraPosition_ = glm::vec3(0.0f, 8.0f, 15.0f);
+
+    /// Flag to use external camera data (matrices + position) instead of fallback
+    bool useExternalCamera_ = false;
+
     // Callbacks
     FrameUpdateCallback frameUpdateCallback_;
     ECSRenderCallback ecsRenderCallback_;
@@ -336,6 +416,11 @@ private:
     VkShaderModule fragShaderModule_ = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline_ = VK_NULL_HANDLE;
+
+    // Instanced graphics pipeline (Phase 7.1)
+    VkShaderModule instancedVertShaderModule_ = VK_NULL_HANDLE;
+    VkShaderModule instancedFragShaderModule_ = VK_NULL_HANDLE;
+    VkPipeline instancedGraphicsPipeline_ = VK_NULL_HANDLE;
     
     // Command processing
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -393,6 +478,18 @@ private:
     bool imguiEnabled_ = true;
     VkDescriptorPool imguiDescriptorPool_ = VK_NULL_HANDLE;
     bool imguiInitialized_ = false;
+
+    // GPU Instancing members (Phase 7.1)
+    VkBuffer instanceBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory instanceBufferMemory_ = VK_NULL_HANDLE;
+    MappedBuffer instanceBufferMapped_;  // RAII protected
+    size_t instanceBufferSize_ = 0;
+    static constexpr size_t maxInstances_ = 1000;  // Target: 200+ creatures + headroom
+
+    // Instance buffer offset tracking for multi-batch rendering
+    uint32_t currentInstanceOffset_ = 0;
+    uint32_t totalInstancesThisFrame_ = 0;
+    static constexpr uint32_t MAX_INSTANCES_PER_FRAME = 1000;
     
     // Vulkan initialization methods
     void initVulkan();
@@ -404,6 +501,8 @@ private:
     void createRenderPass();
     void createShaderModules();
     void createGraphicsPipeline();
+    void createInstancedShaderModules();
+    void createInstancedGraphicsPipeline();
     
     // Shader helper methods
     VkShaderModule createShaderModule(const std::vector<char>& code);
@@ -442,6 +541,14 @@ private:
     // ECS Integration helper methods
     void recordECSCommandBuffer(uint32_t imageIndex);
     void ensureMeshLoaded(const std::string& meshPath);
+
+    // GPU Instancing helper methods (Phase 7.1)
+    void createInstanceBuffer();
+    void updateInstanceData(const std::vector<VulkanMon::InstanceData>& instances);
+    void updateInstanceDataDirect(const InstanceData* instances, uint32_t instanceCount);
+    void cleanupInstanceBuffer();
+    std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();
+    std::vector<VkVertexInputAttributeDescription> getInstancedAttributeDescriptions();
     
     // Helper methods
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -449,6 +556,12 @@ private:
     VkFormat findDepthFormat();
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     bool hasStencilComponent(VkFormat format);
+
+    // Image transfer helper methods
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
     
     // Cleanup methods
     void cleanup();

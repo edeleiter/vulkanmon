@@ -98,4 +98,97 @@ glm::vec3 CameraSystem::getActiveCameraPosition(EntityManager& entityManager) {
     return glm::vec3(0.0f);
 }
 
+Frustum CameraSystem::getActiveCameraFrustum(EntityManager& entityManager) {
+    Frustum frustum;
+
+    // Get view-projection matrix from active camera
+    glm::mat4 viewProjectionMatrix = getActiveViewProjectionMatrix(entityManager);
+
+    // Generate frustum planes from matrix
+    frustum.updateFromMatrix(viewProjectionMatrix);
+
+    return frustum;
+}
+
+void CameraSystem::handleWindowResize(int width, int height, EntityManager& entityManager) {
+    // Validate dimensions to prevent division by zero
+    if (width <= 0 || height <= 0) {
+        VKMON_WARNING("CameraSystem: Invalid window dimensions for resize: " +
+                      std::to_string(width) + "x" + std::to_string(height));
+        return;
+    }
+
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera entity for resize handling");
+        return; // No active camera to update
+    }
+
+    Camera* camera = getActiveCamera(entityManager);
+    if (!camera) {
+        VKMON_WARNING("CameraSystem: Active camera component not found for entity " + std::to_string(static_cast<uint32_t>(activeCameraEntity)));
+        return; // Camera component not found
+    }
+
+    // Calculate new aspect ratio
+    float newAspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    float oldAspectRatio = camera->aspectRatio;
+
+    // Update camera aspect ratio and regenerate projection matrix
+    if (camera->type == Camera::Type::PERSPECTIVE) {
+        camera->setPerspective(camera->fov, newAspectRatio, camera->nearPlane, camera->farPlane);
+
+        VKMON_INFO("Camera aspect ratio updated from " + std::to_string(oldAspectRatio) +
+                   " to " + std::to_string(newAspectRatio) +
+                   " for window size " + std::to_string(width) + "x" + std::to_string(height));
+    }
+    // Note: Orthographic cameras don't use aspect ratio in the same way,
+    // they would need different handling if needed in the future
+}
+
+// =============================================================================
+// UNIFIED CAMERA INTERFACE - Clean matrix providers
+// =============================================================================
+
+glm::mat4 CameraSystem::getActiveViewMatrix(EntityManager& entityManager) {
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera for view matrix");
+        // Return default view matrix (camera at Z=25 looking at origin)
+        return glm::lookAt(glm::vec3(0.0f, 15.0f, 25.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+
+    Camera* camera = getActiveCamera(entityManager);
+    if (camera) {
+        // Pure getter - matrices are updated in the update() method
+        return camera->viewMatrix;
+    }
+
+    // Fallback
+    VKMON_WARNING("CameraSystem: Active camera component not found");
+    return glm::lookAt(glm::vec3(0.0f, 15.0f, 25.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+glm::mat4 CameraSystem::getActiveProjectionMatrix(EntityManager& entityManager) {
+    if (activeCameraEntity == INVALID_ENTITY) {
+        VKMON_WARNING("CameraSystem: No active camera for projection matrix");
+        // Return default projection matrix using unified config
+        return glm::perspective(glm::radians(75.0f), 16.0f / 9.0f, 0.1f, 200.0f);
+    }
+
+    Camera* camera = getActiveCamera(entityManager);
+    if (camera) {
+        // Pure getter - projection matrix should be updated elsewhere when needed
+        return camera->projectionMatrix;
+    }
+
+    // Fallback
+    VKMON_WARNING("CameraSystem: Active camera component not found");
+    return glm::perspective(glm::radians(75.0f), 16.0f / 9.0f, 0.1f, 200.0f);
+}
+
+bool CameraSystem::hasActiveCamera(EntityManager& entityManager) {
+    return activeCameraEntity != INVALID_ENTITY &&
+           entityManager.hasComponent<Camera>(activeCameraEntity);
+}
+
+
 } // namespace VulkanMon

@@ -136,9 +136,7 @@ void Window::glfwResizeCallback(GLFWwindow* window, int width, int height) {
         windowObj->width_ = static_cast<uint32_t>(width);
         windowObj->height_ = static_cast<uint32_t>(height);
         windowObj->resized_ = true;
-        
-        VKMON_DEBUG("Window resized to " + std::to_string(width) + "x" + std::to_string(height));
-        
+
         // Notify callback if registered
         if (windowObj->resizeCallback_) {
             windowObj->resizeCallback_(width, height);

@@ -1,5 +1,11 @@
 #include "Application.h"
 #include "../utils/Logger.h"
+#include "../systems/SpatialSystem.h"
+#include "../systems/CreatureRenderSystem.h"
+#include "../components/SpatialComponent.h"
+#include "../components/Camera.h"
+#include "../spatial/WorldConfig.h"
+#include "../config/CameraConfig.h"
 #include <stdexcept>
 
 using namespace VulkanMon;
@@ -14,14 +20,15 @@ void Application::initializeLogger() {
 }
 
 void Application::initializeWindow() {
-    window_ = std::make_unique<Window>(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, "VulkanMon");
+    window_ = std::make_unique<Window>(Config::Camera::DEFAULT_WINDOW_WIDTH, Config::Camera::DEFAULT_WINDOW_HEIGHT, "VulkanMon");
     window_->initialize();
     // Window logs its own initialization success
 }
 
 void Application::initializeCamera() {
-    camera_ = std::make_shared<::Camera>();
-    VKMON_INFO("Camera system initialized");
+    // Old Camera class removed - ECS camera entities now handle camera positioning
+    // Camera is created as ECS entity in createTestScene() method
+    VKMON_INFO("Legacy camera initialization removed - ECS camera system active");
 }
 
 void Application::initializeCoreEngineSystems() {
@@ -39,7 +46,6 @@ void Application::initializeRenderer() {
     // Create VulkanRenderer with shared dependencies
     renderer_ = std::make_shared<VulkanRenderer>(
         window_,
-        camera_,
         resourceManager_,
         assetManager_,
         modelLoader_,
@@ -56,21 +62,16 @@ void Application::initializeRenderer() {
 }
 
 void Application::initializeInputSystem() {
-    // Create InputHandler with camera and window references
-    inputHandler_ = std::make_unique<InputHandler>(camera_, window_);
+    // Create InputHandler with ECS camera system
+    if (!cameraSystem_ || !world_) {
+        VKMON_ERROR("Cannot initialize InputHandler: ECS camera system not available");
+        return;
+    }
 
-    // Connect input callbacks to window system
-    window_->setKeyCallback([this](int key, int scancode, int action, int mods) {
-        inputHandler_->processKeyInput(key, scancode, action, mods);
-    });
+    inputHandler_ = std::make_shared<InputHandler>(window_, cameraSystem_, world_.get());
+    VKMON_INFO("InputHandler initialized with ECS camera system");
 
-    window_->setMouseCallback([this](double xpos, double ypos) {
-        inputHandler_->processMouseInput(xpos, ypos);
-    });
-
-    VKMON_INFO("Input callbacks registered with Window system");
-
-    // Set up system control callbacks
+    // System control callbacks
     inputHandler_->setShaderReloadCallback([this]() {
         handleShaderReload();
     });
@@ -85,6 +86,19 @@ void Application::initializeInputSystem() {
 
     inputHandler_->setInspectorToggleCallback([this]() {
         toggleInspector();
+    });
+
+    // Connect window input callbacks for WASD + mouse controls
+    window_->setKeyCallback([this](int key, int scancode, int action, int mods) {
+        if (inputHandler_) {
+            inputHandler_->processKeyInput(key, scancode, action, mods);
+        }
+    });
+
+    window_->setMouseCallback([this](double xpos, double ypos) {
+        if (inputHandler_) {
+            inputHandler_->processMouseInput(xpos, ypos);
+        }
     });
 
     // Connect window resize callback
@@ -108,6 +122,33 @@ void Application::initializeECS() {
 
     // Add render system to handle rendering ECS entities
     renderSystem_ = world_->addSystem<RenderSystem>(cameraSystem_);
+
+    // Add creature render system for massive creature rendering (Phase 7.1)
+    creatureRenderSystem_ = world_->addSystem<CreatureRenderSystem>(cameraSystem_);
+
+    // PERFORMANCE OPTIMIZATION: Disable frustum culling for stress test scenario
+    // In 10x10x10 cube test, all 1000 creatures are visible, so spatial queries add overhead without benefit
+    creatureRenderSystem_->setEnableFrustumCulling(false);
+    VKMON_INFO("CreatureRenderSystem: Frustum culling DISABLED for stress test performance");
+
+    // Add spatial system for Pokemon-style spatial queries and management
+    WorldConfig worldConfig = WorldConfig::createTestWorld();
+    VKMON_INFO("Using world config: " + worldConfig.name +
+               " bounds (" + std::to_string(worldConfig.minBounds.x) + "," +
+                           std::to_string(worldConfig.minBounds.y) + "," +
+                           std::to_string(worldConfig.minBounds.z) + ") to (" +
+                           std::to_string(worldConfig.maxBounds.x) + "," +
+                           std::to_string(worldConfig.maxBounds.y) + "," +
+                           std::to_string(worldConfig.maxBounds.z) + ")");
+    // Add spatial system for Pokemon-style spatial queries and octree partitioning
+    spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
+
+    // Add CreatureDetectionSystem for AI behavior and spatial detection
+    // creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
+
+    // Use centralized system connection with validation
+    world_->connectSystems();
+    VKMON_INFO("System dependency connection completed via World::connectSystems()");
 
     // Register ECS render callback with VulkanRenderer
     if (renderer_) {
@@ -134,109 +175,117 @@ void Application::createTestScene() {
         return;
     }
 
-    VKMON_DEBUG("Creating ECS multi-object test scene...");
+    VKMON_INFO("Creating Pokemon Legends Arceus Scale Test Scene...");
+    VKMON_INFO("Target: 125 creatures - 5x5x5 realistic Pokemon overworld test");
 
-    // Create multiple test objects to demonstrate ECS rendering
+    // =========================================================================
+    // REALISTIC POKEMON TEST - 3D Cube Formation (5x5x5 = 125 entities)
+    // =========================================================================
 
-    // Object 1: Center cube (original position)
-    EntityID cube1 = world_->createEntity();
-    Transform transform1;
-    transform1.position = glm::vec3(0.0f, 0.0f, 0.0f);
-    transform1.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
-    transform1.scale = glm::vec3(1.0f, 1.0f, 1.0f);
-    world_->addComponent(cube1, transform1);
+    const int GRID_SIZE = 5;  // 5x5x5 = 125 creatures - realistic Pokemon overworld scale
+    const float CREATURE_SPACING = 2.0f;  // 2.0f spacing for clear separation
 
-    Renderable renderable1;
-    renderable1.meshPath = "test_cube.obj";  // Original cube - ModelLoader adds assets/models/ prefix
-    renderable1.texturePath = "default";
-    renderable1.materialId = 0;  // Default material
-    renderable1.isVisible = true;
-    renderable1.renderLayer = 0;
-    world_->addComponent(cube1, renderable1);
+    // Use only cubes for consistency during debugging
+    const std::string creatureMesh = "cube.obj";
+    const std::vector<uint32_t> creatureMaterials = {0, 1, 2, 3};  // Different materials for visual variety
 
-    // Object 2: Left sphere with different material
-    EntityID cube2 = world_->createEntity();
-    Transform transform2;
-    transform2.position = glm::vec3(-3.0f, 0.0f, 0.0f);
-    transform2.rotation = glm::vec3(0.0f, 45.0f, 0.0f);
-    transform2.scale = glm::vec3(0.8f, 0.8f, 0.8f);
-    world_->addComponent(cube2, transform2);
+    size_t totalCreatures = 0;
 
-    Renderable renderable2;
-    renderable2.meshPath = "sphere.obj";  // Sphere shape
-    renderable2.texturePath = "default";
-    renderable2.materialId = 1;  // Gold material
-    renderable2.isVisible = true;
-    renderable2.renderLayer = 0;
-    world_->addComponent(cube2, renderable2);
+    VKMON_INFO("Creating " + std::to_string(GRID_SIZE * GRID_SIZE * GRID_SIZE) + " creatures in " + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + " cube formation");
 
-    // Object 3: Right pyramid with different material
-    EntityID cube3 = world_->createEntity();
-    Transform transform3;
-    transform3.position = glm::vec3(3.0f, 0.0f, 0.0f);
-    transform3.rotation = glm::vec3(0.0f, -45.0f, 0.0f);
-    transform3.scale = glm::vec3(1.2f, 1.2f, 1.2f);
-    world_->addComponent(cube3, transform3);
+    for (int x = 0; x < GRID_SIZE; x++) {
+        for (int y = 0; y < GRID_SIZE; y++) {
+            for (int z = 0; z < GRID_SIZE; z++) {
+                // Entity creation (clean, no per-entity spam)
 
-    Renderable renderable3;
-    renderable3.meshPath = "pyramid.obj";  // Pyramid shape
-    renderable3.texturePath = "default";
-    renderable3.materialId = 2;  // Ruby material
-    renderable3.isVisible = true;
-    renderable3.renderLayer = 0;
-    world_->addComponent(cube3, renderable3);
+                EntityID creature = world_->createEntity();
 
-    // Object 4: Above center cube
-    EntityID cube4 = world_->createEntity();
-    Transform transform4;
-    transform4.position = glm::vec3(0.0f, 2.5f, 0.0f);
-    transform4.rotation = glm::vec3(45.0f, 45.0f, 45.0f);
-    transform4.scale = glm::vec3(0.6f, 0.6f, 0.6f);
-    world_->addComponent(cube4, transform4);
+                // Position in 3D cube formation starting from (0,0,0)
+                Transform creatureTransform;
+                creatureTransform.position = glm::vec3(
+                    x * CREATURE_SPACING,  // X: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
+                    y * CREATURE_SPACING,  // Y: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18 (now 3D!)
+                    z * CREATURE_SPACING   // Z: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
+                );
 
-    Renderable renderable4;
-    renderable4.meshPath = "sphere.obj";  // Another sphere
-    renderable4.texturePath = "default";
-    renderable4.materialId = 3;  // Chrome material
-    renderable4.isVisible = true;
-    renderable4.renderLayer = 0;
-    world_->addComponent(cube4, renderable4);
+                // Varied rotations for visual interest - each cube gets unique rotation
+                float rotX = (x * 15.0f) + (y * 5.0f) + (z * 7.0f);   // X-axis rotation based on grid position
+                float rotY = (x + y + z) * 12.0f;                     // Y-axis rotation creates spiral pattern
+                float rotZ = (x - y + z) * 8.0f;                      // Z-axis rotation adds variety
+                creatureTransform.setRotationEuler(rotX, rotY, rotZ);
+                creatureTransform.scale = glm::vec3(0.5f);  // Scale down for clear separation
+                world_->addComponent(creature, creatureTransform);
 
-    // Object 5: Back cube
-    EntityID cube5 = world_->createEntity();
-    Transform transform5;
-    transform5.position = glm::vec3(0.0f, 0.0f, -4.0f);
-    transform5.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
-    transform5.scale = glm::vec3(1.5f, 0.5f, 1.5f);
-    world_->addComponent(cube5, transform5);
+                // Material variety for visual distinction - now using 3D coordinates
+                int materialType = (x + y + z) % creatureMaterials.size();
 
-    Renderable renderable5;
-    renderable5.meshPath = "plane.obj";  // Ground plane
-    renderable5.texturePath = "default";
-    renderable5.materialId = 4;  // Emerald material
-    renderable5.isVisible = true;
-    renderable5.renderLayer = 0;
-    world_->addComponent(cube5, renderable5);
+                Renderable creatureRenderable;
+                creatureRenderable.meshPath = creatureMesh;
+                creatureRenderable.texturePath = "default";
+                creatureRenderable.materialId = creatureMaterials[materialType];
+                creatureRenderable.isVisible = true;
+                creatureRenderable.renderLayer = 0;
+                creatureRenderable.lodDistance = 1000.0f;
+                world_->addComponent(creature, creatureRenderable);
 
-    VKMON_DEBUG("Created 5 ECS test entities with diverse shapes:");
-    VKMON_DEBUG("  Entity " + std::to_string(cube1) + ": Center cube (Default material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube2) + ": Left sphere (Gold material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube3) + ": Right pyramid (Ruby material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube4) + ": Top sphere (Chrome material)");
-    VKMON_DEBUG("  Entity " + std::to_string(cube5) + ": Ground plane (Emerald material)");
+                // CreatureComponent for spatial detection testing
+                CreatureComponent creatureComp;
+                creatureComp.state = CreatureState::IDLE;
+                creatureComp.detectionRadius = 8.0f + (x + y + z) * 0.1f;  // Varied detection radii using 3D coordinates
+                creatureComp.type = static_cast<CreatureComponent::CreatureType>((x + y + z) % 3);
+                world_->addComponent(creature, creatureComp);
 
-    // Future: Create camera entity to replace legacy Camera class
-    // EntityID cameraEntity = world_->createEntity();
-    // ... add Camera component
+                // SpatialComponent for spatial system testing
+                SpatialComponent creatureSpatial;
+                creatureSpatial.spatialLayers = LayerMask::Creatures;
+                creatureSpatial.boundingRadius = 1.0f + (x + y + z) * 0.05f;
+                creatureSpatial.behavior = SpatialBehavior::STATIC;
+                creatureSpatial.setHomePosition(creatureTransform.position);
+                world_->addComponent(creature, creatureSpatial);
 
-    VKMON_INFO("Test scene ready - 5 objects loaded");
-}
+                totalCreatures++;
+            }
+        }
+    }
 
-void Application::loadTestAssets() {
-    VKMON_INFO("Loading test assets...");
+    VKMON_INFO("Scene setup complete: " + std::to_string(totalCreatures) + " creatures with spatial AI");
 
-    // Future: Load additional textures, models, sounds, etc.
-    // For now, just placeholder
+    // Create camera positioned to see 1000 creatures in 3D cube (cube spans 0 to 18 units in X, Y, and Z)
+    EntityID cameraEntity = world_->createEntity();
+    Transform cameraTransform;
+    cameraTransform.position = glm::vec3(25.0f, 25.0f, 40.0f);  // Further back and elevated to see entire 3D cube
+    cameraTransform.setRotationEuler(-20.0f, -15.0f, 0.0f); // Angled to see the 3D structure clearly
+    cameraTransform.scale = glm::vec3(1.0f);
+    world_->addComponent(cameraEntity, cameraTransform);
 
-    VKMON_INFO("Test assets loaded");
+    Camera cameraComponent;
+    cameraComponent.fov = 45.0f;  // Much narrower FOV for less distortion - standard value
+    cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE;
+    cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;
+    cameraComponent.aspectRatio = 16.0f / 9.0f;
+    cameraComponent.isActive = true;
+    cameraComponent.updateProjectionMatrix();
+    world_->addComponent(cameraEntity, cameraComponent);
+
+    SpatialComponent cameraSpatial;
+    cameraSpatial.spatialLayers = LayerMask::Camera;
+    cameraSpatial.boundingRadius = 0.1f;
+    cameraSpatial.behavior = SpatialBehavior::DYNAMIC;
+    world_->addComponent(cameraEntity, cameraSpatial);
+
+    // Create test player entity for creature detection testing
+    EntityID playerEntity = world_->createEntity();
+
+    // Add Transform component positioned at center of creature grid
+    Transform playerTransform;
+    playerTransform.position = glm::vec3(0.0f, 1.0f, 0.0f); // Center of 6x6 grid, slightly elevated
+    playerTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+    playerTransform.scale = glm::vec3(1.0f);
+    world_->addComponent(playerEntity, playerTransform);
+
+    // Add SpatialComponent with Player layer
+    SpatialComponent playerSpatial(2.0f, SpatialBehavior::DYNAMIC, LayerMask::Player);
+    world_->addComponent(playerEntity, playerSpatial);
+
+    // Scene setup complete - main application will log ready message
 }

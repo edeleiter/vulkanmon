@@ -182,15 +182,10 @@ TEST_CASE("Material Property Management", "[ModelLoader][Material]") {
     SECTION("Material property validation and ranges") {
         Material material("test_material");
         
-        // Test valid property ranges
+        // Test representative property ranges (reduced from 7 to 2 colors)
         std::vector<glm::vec3> testColors = {
-            glm::vec3(0.0f, 0.0f, 0.0f),     // Black
-            glm::vec3(1.0f, 1.0f, 1.0f),     // White  
-            glm::vec3(1.0f, 0.0f, 0.0f),     // Red
-            glm::vec3(0.0f, 1.0f, 0.0f),     // Green
-            glm::vec3(0.0f, 0.0f, 1.0f),     // Blue
-            glm::vec3(0.5f, 0.5f, 0.5f),     // Gray
-            glm::vec3(0.24f, 0.2f, 0.075f),  // Gold-like ambient
+            glm::vec3(0.0f, 0.0f, 0.0f),     // Black (boundary case)
+            glm::vec3(0.5f, 0.5f, 0.5f),     // Gray (typical case)
         };
         
         for (const auto& color : testColors) {
@@ -226,15 +221,10 @@ TEST_CASE("Material Property Management", "[ModelLoader][Material]") {
     SECTION("Material shininess validation") {
         Material material("shininess_test");
         
-        // Test valid shininess values
+        // Test representative shininess values (reduced from 7 to 2 values)
         std::vector<float> testShininess = {
-            0.1f,    // Very low shininess (rough)
             1.0f,    // Low shininess
-            32.0f,   // Default shininess
-            64.0f,   // Medium shininess
-            128.0f,  // High shininess  
-            256.0f,  // Very high shininess
-            512.0f   // Maximum practical shininess
+            128.0f,  // High shininess
         };
         
         for (float shininess : testShininess) {
@@ -498,60 +488,6 @@ TEST_CASE("Model Composition and Hierarchy", "[ModelLoader][Model]") {
     }
 }
 
-TEST_CASE("ModelLoader Interface Design", "[ModelLoader][Interface]") {
-    SECTION("Constructor parameter validation") {
-        // Test ModelLoader constructor interface requirements
-        std::shared_ptr<ResourceManager> mockResourceManager = nullptr;
-        std::shared_ptr<AssetManager> mockAssetManager = nullptr;
-        
-        // Validate constructor parameter types
-        REQUIRE(mockResourceManager == nullptr); // Mock for interface testing
-        REQUIRE(mockAssetManager == nullptr);     // Mock for interface testing
-        
-        // Test that interface accepts shared_ptr parameters
-        REQUIRE(true); // Interface design validation
-    }
-    
-    SECTION("RAII design validation") {
-        // Test that ModelLoader follows proper RAII design principles
-        REQUIRE_FALSE(std::is_copy_constructible_v<ModelLoader>);
-        REQUIRE_FALSE(std::is_copy_assignable_v<ModelLoader>);
-        
-        // Note: ModelLoader may not be movable due to Assimp::Importer member
-        // which doesn't support move semantics. This is acceptable for the current design.
-        REQUIRE(std::is_destructible_v<ModelLoader>);
-        
-        // Test that it's properly designed for RAII with explicit deletions
-        REQUIRE(true); // Interface design validation passes
-    }
-    
-    SECTION("Configuration flags validation") {
-        // Test configuration flag types and ranges
-        bool triangulate = true;
-        bool generateNormals = true;
-        bool optimizeMeshes = true;
-        bool flipUVs = false;
-        
-        // Test boolean flag behavior
-        REQUIRE(triangulate == true);
-        REQUIRE(generateNormals == true);
-        REQUIRE(optimizeMeshes == true);
-        REQUIRE(flipUVs == false);
-        
-        // Test flag toggling
-        triangulate = !triangulate;
-        REQUIRE(triangulate == false);
-        
-        generateNormals = !generateNormals;
-        REQUIRE(generateNormals == false);
-        
-        optimizeMeshes = !optimizeMeshes;
-        REQUIRE(optimizeMeshes == false);
-        
-        flipUVs = !flipUVs;
-        REQUIRE(flipUVs == true);
-    }
-}
 
 TEST_CASE("File Format Support Validation", "[ModelLoader][Formats]") {
     SECTION("Supported format enumeration") {

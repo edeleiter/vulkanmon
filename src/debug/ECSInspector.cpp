@@ -1,5 +1,6 @@
 #include "ECSInspector.h"
 #include "../utils/Logger.h"
+#include "../systems/SpatialSystem.h"
 #include <glm/gtc/type_ptr.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/euler_angles.hpp>
@@ -211,6 +212,27 @@ void ECSInspector::renderComponentInspector() {
         }
     }
 
+    // SpatialComponent - spatial properties and optimization
+    if (entityManager.hasComponent<SpatialComponent>(selectedEntity_)) {
+        if (ImGui::CollapsingHeader("Spatial Component", spatialExpanded_ ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+            auto& spatial = entityManager.getComponent<SpatialComponent>(selectedEntity_);
+            if (renderSpatialEditor(spatial)) {
+                // Spatial component was modified - mark for spatial system update
+                spatial.markDirty();
+            }
+        }
+    }
+
+    // CreatureComponent - AI behavior and creature state
+    if (entityManager.hasComponent<CreatureComponent>(selectedEntity_)) {
+        if (ImGui::CollapsingHeader("Creature Component", creatureExpanded_ ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+            auto& creature = entityManager.getComponent<CreatureComponent>(selectedEntity_);
+            if (renderCreatureEditor(creature)) {
+                // Creature component was modified - potentially notify AI systems
+            }
+        }
+    }
+
     ImGui::Separator();
     renderComponentAddition();
 }
@@ -287,11 +309,14 @@ bool ECSInspector::renderRenderableEditor(Renderable& renderable) {
         renderHelpTooltip("3D model file to render. Changes take effect immediately.");
     }
 
-    // Material ID with preset names
+    // Material ID with preset names (bounds-checked)
     int currentMaterial = static_cast<int>(renderable.materialId);
-    if (ImGui::Combo("Material", &currentMaterial, materialNames_, 5)) {
-        renderable.materialId = static_cast<uint32_t>(currentMaterial);
-        modified = true;
+    if (ImGui::Combo("Material", &currentMaterial, materialNames_, MATERIAL_COUNT)) {
+        // Ensure the selected material is within valid bounds
+        if (currentMaterial >= 0 && currentMaterial < static_cast<int>(MATERIAL_COUNT)) {
+            renderable.materialId = static_cast<uint32_t>(currentMaterial);
+            modified = true;
+        }
     }
     if (showComponentHelp_ && ImGui::IsItemHovered()) {
         renderHelpTooltip("Material preset affecting color and lighting response");
@@ -381,6 +406,172 @@ bool ECSInspector::renderCameraEditor(Camera& camera) {
     return modified;
 }
 
+bool ECSInspector::renderSpatialEditor(SpatialComponent& spatial) {
+    bool modified = false;
+
+    // Bounding radius with live preview
+    float boundingRadius = spatial.boundingRadius;
+    if (ImGui::SliderFloat("Bounding Radius", &boundingRadius, 0.1f, 50.0f)) {
+        spatial.setBoundingRadius(boundingRadius);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Radius for collision detection and spatial queries. Larger = more inclusive spatial queries.");
+    }
+
+    // Detection radius for Pokemon encounters
+    float detectionRadius = spatial.detectionRadius;
+    if (ImGui::SliderFloat("Detection Radius", &detectionRadius, 1.0f, 100.0f)) {
+        spatial.detectionRadius = detectionRadius;
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("How far this entity can detect other entities. Used for entity interaction and AI systems.");
+    }
+
+    // Territory radius for entity behavior
+    float territoryRadius = spatial.territoryRadius;
+    if (ImGui::SliderFloat("Territory Radius", &territoryRadius, 5.0f, 200.0f)) {
+        spatial.territoryRadius = territoryRadius;
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Territory size for entities with area-based behavior. Defines movement bounds and interaction area.");
+    }
+
+    // Spatial behavior selection
+    const char* behaviors[] = { "Static", "Dynamic", "Occasional" };
+    int currentBehavior = static_cast<int>(spatial.behavior);
+    if (ImGui::Combo("Behavior", &currentBehavior, behaviors, 3)) {
+        spatial.behavior = static_cast<SpatialBehavior>(currentBehavior);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Static: Never moves (buildings, trees). Dynamic: Moves frequently (creatures). Occasional: Moves rarely (NPCs).");
+    }
+
+    // Home position editor
+    glm::vec3 homePosition = spatial.homePosition;
+    if (ImGui::DragFloat3("Home Position", glm::value_ptr(homePosition), 0.1f)) {
+        spatial.setHomePosition(homePosition);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Original spawn position. Used for territorial behavior and returning home.");
+    }
+
+    // Performance info (read-only)
+    ImGui::Separator();
+    ImGui::Text("Performance Info:");
+    ImGui::Text("Query Count: %u", spatial.spatialQueryCount);
+    ImGui::Text("Time Since Last Query: %.2fs", spatial.timeSinceLastQuery);
+
+    // Query throttling control
+    ImGui::Separator();
+    ImGui::Text("Query Throttling:");
+    bool needsUpdate = spatial.needsSpatialUpdate;
+    if (ImGui::Checkbox("Needs Spatial Update", &needsUpdate)) {
+        spatial.needsSpatialUpdate = needsUpdate;
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Forces spatial system update on next frame. Automatically set when entity moves.");
+    }
+
+    // Distance checks
+    ImGui::Separator();
+    ImGui::Text("Spatial Status:");
+    // Note: This would require current position to calculate, could be added as enhancement
+    ImGui::Text("Is Visible: %s", spatial.isVisible ? "Yes" : "No");
+    if (spatial.lastCullingDistance > 0.0f) {
+        ImGui::Text("Last Culling Distance: %.2f", spatial.lastCullingDistance);
+    }
+
+    return modified;
+}
+
+bool ECSInspector::renderCreatureEditor(CreatureComponent& creature) {
+    bool modified = false;
+
+    // AI State Control with visual indicators
+    ImGui::Text("AI State Management");
+    ImGui::Separator();
+
+    // Current state display with color coding
+    const char* stateNames[] = {"IDLE", "WANDERING", "ALERT", "FLEEING", "AGGRESSIVE"};
+    const ImVec4 stateColors[] = {
+        ImVec4(0.7f, 0.7f, 0.7f, 1.0f),  // IDLE - Gray
+        ImVec4(0.3f, 0.8f, 0.3f, 1.0f),  // WANDERING - Green
+        ImVec4(1.0f, 1.0f, 0.3f, 1.0f),  // ALERT - Yellow
+        ImVec4(1.0f, 0.6f, 0.3f, 1.0f),  // FLEEING - Orange
+        ImVec4(1.0f, 0.3f, 0.3f, 1.0f)   // AGGRESSIVE - Red
+    };
+
+    int currentState = static_cast<int>(creature.state);
+    ImGui::TextColored(stateColors[currentState], "Current State: %s", stateNames[currentState]);
+
+    // State override combo
+    if (ImGui::Combo("Override State", &currentState, stateNames, 5)) {
+        creature.state = static_cast<CreatureState>(currentState);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("Force creature into specific AI state for testing");
+    }
+
+    ImGui::Spacing();
+
+    // Creature Type Selection
+    ImGui::Text("Creature Behavior Type");
+    const char* typeNames[] = {"PEACEFUL", "NEUTRAL", "AGGRESSIVE"};
+    int currentType = static_cast<int>(creature.type);
+    if (ImGui::Combo("Behavior Type", &currentType, typeNames, 3)) {
+        creature.type = static_cast<CreatureComponent::CreatureType>(currentType);
+        modified = true;
+    }
+    if (showComponentHelp_ && ImGui::IsItemHovered()) {
+        renderHelpTooltip("PEACEFUL: Runs from player, NEUTRAL: Ignores player, AGGRESSIVE: Approaches player");
+    }
+
+    ImGui::Spacing();
+
+    // Detection Parameters with live preview
+    ImGui::Text("Detection & Behavior Radii");
+    if (ImGui::SliderFloat("Detection Radius", &creature.detectionRadius, 1.0f, 50.0f, "%.1f")) {
+        modified = true;
+    }
+    if (ImGui::SliderFloat("Alert Radius", &creature.alertRadius, 1.0f, 50.0f, "%.1f")) {
+        modified = true;
+    }
+    if (ImGui::SliderFloat("Flee Radius", &creature.fleeRadius, 1.0f, 25.0f, "%.1f")) {
+        modified = true;
+    }
+
+    ImGui::Spacing();
+
+    // Behavior Timing
+    ImGui::Text("Behavior Timing");
+    if (ImGui::SliderFloat("Wander Speed", &creature.wanderSpeed, 0.1f, 10.0f, "%.1f")) {
+        modified = true;
+    }
+    if (ImGui::SliderFloat("Alert Speed", &creature.alertSpeed, 0.1f, 15.0f, "%.1f")) {
+        modified = true;
+    }
+    if (ImGui::SliderFloat("Flee Speed", &creature.fleeSpeed, 0.1f, 20.0f, "%.1f")) {
+        modified = true;
+    }
+
+    ImGui::Spacing();
+
+    // Timing Debug Info
+    ImGui::Text("Timing Debug");
+    ImGui::Text("Last Detection: %.2fs ago", creature.lastDetectionCheck);
+    ImGui::Text("Alert Timer: %.2fs", creature.alertTimer);
+    ImGui::ProgressBar(creature.alertTimer / creature.alertDuration, ImVec2(-1, 0), "Alert Progress");
+
+    return modified;
+}
+
 EntityID ECSInspector::createEntityFromTemplate(EntityTemplate templateType, const glm::vec3& position) {
     EntityID newEntity = world_->createEntity();
 
@@ -393,7 +584,7 @@ EntityID ECSInspector::createEntityFromTemplate(EntityTemplate templateType, con
         case EntityTemplate::CUBE:
             {
                 Renderable renderable;
-                renderable.meshPath = "test_cube.obj";
+                renderable.meshPath = "cube.obj";
                 renderable.materialId = 0; // Default material
                 world_->addComponent<Renderable>(newEntity, renderable);
                 break;
@@ -428,6 +619,35 @@ EntityID ECSInspector::createEntityFromTemplate(EntityTemplate templateType, con
                 camera.setPerspective(45.0f, 16.0f/9.0f, 0.1f, 100.0f);
                 camera.isActive = false; // Don't immediately override main camera
                 world_->addComponent<Camera>(newEntity, camera);
+                break;
+            }
+        case EntityTemplate::CREATURE:
+            {
+                // Create complete creature entity with all necessary components
+
+                // Renderable with random creature model
+                const char* creatureModels[] = {"cube.obj", "sphere.obj", "pyramid.obj"};
+                int randomModel = rand() % 3;
+
+                Renderable renderable;
+                renderable.meshPath = creatureModels[randomModel];
+                renderable.materialId = rand() % MATERIAL_COUNT;  // Random material
+                renderable.isVisible = true;
+                world_->addComponent<Renderable>(newEntity, renderable);
+
+                // SpatialComponent for spatial system integration
+                SpatialComponent spatial(15.0f, SpatialBehavior::DYNAMIC, LayerMask::Creatures);
+                world_->addComponent<SpatialComponent>(newEntity, spatial);
+
+                // CreatureComponent with random behavior
+                CreatureComponent creature;
+                creature.type = static_cast<CreatureComponent::CreatureType>(rand() % 3);
+                creature.detectionRadius = 10.0f + (rand() % 20);  // 10-30 range
+                creature.alertRadius = creature.detectionRadius + 10.0f;
+                creature.fleeRadius = creature.detectionRadius * 0.5f;
+                world_->addComponent<CreatureComponent>(newEntity, creature);
+
+                VKMON_INFO("Created creature entity with full AI components");
                 break;
             }
         case EntityTemplate::EMPTY:
@@ -493,7 +713,7 @@ void ECSInspector::renderComponentAddition() {
     if (!entityManager.hasComponent<Renderable>(selectedEntity_)) {
         if (ImGui::Button("Add Renderable")) {
             Renderable renderable;
-            renderable.meshPath = "test_cube.obj";
+            renderable.meshPath = "cube.obj";
             renderable.materialId = 0;
             world_->addComponent<Renderable>(selectedEntity_, renderable);
             VKMON_INFO("Added Renderable component to Entity " + std::to_string(selectedEntity_));
@@ -509,6 +729,36 @@ void ECSInspector::renderComponentAddition() {
             camera.isActive = false;
             world_->addComponent<Camera>(selectedEntity_, camera);
             VKMON_INFO("Added Camera component to Entity " + std::to_string(selectedEntity_));
+        }
+        ImGui::SameLine();
+    }
+
+    // SpatialComponent
+    if (!entityManager.hasComponent<SpatialComponent>(selectedEntity_)) {
+        if (ImGui::Button("Add Spatial")) {
+            SpatialComponent spatial;
+            spatial.boundingRadius = 1.0f;
+            spatial.behavior = SpatialBehavior::DYNAMIC;
+            spatial.needsSpatialUpdate = true;
+            world_->addComponent<SpatialComponent>(selectedEntity_, spatial);
+            VKMON_INFO("Added SpatialComponent to Entity " + std::to_string(selectedEntity_));
+        }
+    }
+
+    // CreatureComponent
+    if (!entityManager.hasComponent<CreatureComponent>(selectedEntity_)) {
+        if (ImGui::Button("Add Creature Component")) {
+            CreatureComponent creature;
+            creature.type = CreatureComponent::CreatureType::PEACEFUL;  // Default to peaceful
+            creature.detectionRadius = 15.0f;
+            creature.alertRadius = 25.0f;
+            creature.fleeRadius = 8.0f;
+
+            world_->addComponent<CreatureComponent>(selectedEntity_, creature);
+            VKMON_INFO("Added CreatureComponent to entity " + std::to_string(static_cast<uint32_t>(selectedEntity_)));
+        }
+        if (showComponentHelp_ && ImGui::IsItemHovered()) {
+            renderHelpTooltip("Add AI behavior component for creature entities");
         }
     }
 }
@@ -564,6 +814,43 @@ void ECSInspector::renderPerformanceProfiler() {
             }
 
             ImGui::EndTable();
+        }
+
+        // Spatial System Performance (if available)
+        if (world_->hasSystem<SpatialSystem>()) {
+            ImGui::Separator();
+            ImGui::Text("Spatial System Debug:");
+            ImGui::Indent();
+
+            auto* spatialSystem = world_->getSystem<SpatialSystem>();
+            if (spatialSystem) {
+                // Get spatial statistics
+                int nodeCount = 0, maxDepth = 0, totalEntities = 0;
+                spatialSystem->getSpatialStatistics(nodeCount, maxDepth, totalEntities);
+
+                ImGui::Text("Octree Nodes: %d", nodeCount);
+                ImGui::Text("Max Depth: %d", maxDepth);
+                ImGui::Text("Spatial Entities: %d", totalEntities);
+
+                // Get performance stats
+                const auto& spatialStats = spatialSystem->getSpatialPerformanceStats();
+                ImGui::Text("Spatial Queries: %zu", spatialStats.totalQueries);
+                ImGui::Text("Avg Query Time: %.3f ms", spatialStats.averageQueryTimeMs);
+                ImGui::Text("Last Query Time: %.3f ms", spatialStats.lastQueryTimeMs);
+                ImGui::Text("Entities Returned: %zu", spatialStats.totalEntitiesReturned);
+
+                // Frame stats
+                const auto& frameStats = spatialSystem->getFrameStats();
+                ImGui::Text("Frame Entities Tracked: %zu", frameStats.entitiesTracked);
+                ImGui::Text("Frame Entities Updated: %zu", frameStats.entitiesUpdated);
+
+                // World bounds
+                const auto& worldBounds = spatialSystem->getWorldBounds();
+                ImGui::Text("World Bounds: (%.1f,%.1f,%.1f) to (%.1f,%.1f,%.1f)",
+                           worldBounds.min.x, worldBounds.min.y, worldBounds.min.z,
+                           worldBounds.max.x, worldBounds.max.y, worldBounds.max.z);
+            }
+            ImGui::Unindent();
         }
 
         // Memory usage estimate

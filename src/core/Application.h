@@ -2,7 +2,7 @@
 
 #include "Window.h"
 #include "InputHandler.h"
-#include "Camera.h"
+// Old Camera.h removed - using unified ECS camera system
 #include "../utils/Logger.h"
 #include "../rendering/ResourceManager.h"
 #include "../io/AssetManager.h"
@@ -12,10 +12,14 @@
 #include "../rendering/VulkanRenderer.h"
 #include "World.h"
 #include "../systems/RenderSystem.h"
+#include "../systems/CreatureRenderSystem.h"
 #include "../systems/CameraSystem.h"
+#include "../systems/SpatialSystem.h"
+#include "../game/CreatureDetectionSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
 #include "../debug/ECSInspector.h"
+#include "../config/CameraConfig.h"
 
 #include <memory>
 #include <chrono>
@@ -50,13 +54,7 @@ class Model;
 
 class Application {
 public:
-    // Configuration constants
-    static constexpr int DEFAULT_WINDOW_WIDTH = 800;
-    static constexpr int DEFAULT_WINDOW_HEIGHT = 600;
-    static constexpr float DEFAULT_CAMERA_SPEED = 2.5f;
-    static constexpr float DEFAULT_CAMERA_FOV = 45.0f;
-    static constexpr float DEFAULT_NEAR_PLANE = 0.1f;
-    static constexpr float DEFAULT_FAR_PLANE = 10.0f;
+    // Configuration constants moved to Config::Camera namespace for single source of truth
 
     /**
      * Create Application with default configuration
@@ -89,6 +87,17 @@ public:
      * @throws std::runtime_error if critical error occurs
      */
     void run();
+
+    /**
+     * Update camera data in VulkanRenderer from ECS CameraSystem
+     *
+     * Part of unified camera architecture - bridges ECS camera data to renderer.
+     * Updates view matrix, projection matrix, and camera position for consistent
+     * rendering, spatial culling, and lighting calculations.
+     *
+     * Called every frame to ensure VulkanRenderer uses current ECS camera state.
+     */
+    void updateCameraMatrices();
 
     /**
      * Request application shutdown
@@ -131,6 +140,7 @@ public:
      */
     void handleWindowResize(int width, int height);
 
+
 private:
     // Application state
     bool initialized_ = false;
@@ -144,8 +154,8 @@ private:
 
     // Core engine systems (owned)
     std::shared_ptr<Window> window_;
-    std::shared_ptr<::Camera> camera_;
     std::shared_ptr<InputHandler> inputHandler_;
+    // NOTE: Camera system now handled entirely through ECS - no dedicated camera member needed
     std::shared_ptr<ResourceManager> resourceManager_;
     std::shared_ptr<AssetManager> assetManager_;
     std::shared_ptr<ModelLoader> modelLoader_;
@@ -155,8 +165,11 @@ private:
 
     // ECS World and systems
     std::unique_ptr<World> world_;
-    RenderSystem* renderSystem_ = nullptr;  // Owned by World
-    CameraSystem* cameraSystem_ = nullptr;  // Owned by World
+    RenderSystem* renderSystem_ = nullptr;        // Owned by World
+    CreatureRenderSystem* creatureRenderSystem_ = nullptr;  // Owned by World
+    CameraSystem* cameraSystem_ = nullptr;        // Owned by World
+    SpatialSystem* spatialSystem_ = nullptr;  // Owned by World
+    CreatureDetectionSystem* creatureDetectionSystem_ = nullptr;  // Owned by World
 
     // Debug tools
     std::unique_ptr<Debug::ECSInspector> ecsInspector_;
@@ -185,7 +198,6 @@ private:
     void initializeInputSystem();
     void initializeECS();           // Initialize ECS World and systems
     void createTestScene();         // Create test entities for ECS
-    void loadTestAssets();
 
     // Main loop methods
     void processFrame();

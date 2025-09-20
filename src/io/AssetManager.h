@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <memory>
 #include <functional>
+#include <shared_mutex>
+#include <atomic>
 
 /**
  * VulkanMon Asset Loading Pipeline
@@ -69,7 +71,7 @@ struct LoadedTexture {
     VkSampler sampler = VK_NULL_HANDLE;
     uint32_t width, height;
     std::string filename;
-    size_t referenceCount = 0;
+    std::atomic<size_t> referenceCount = 0;
     
     LoadedTexture(std::unique_ptr<ManagedImage> img, VkSampler samp, 
                   uint32_t w, uint32_t h, const std::string& file)
@@ -115,7 +117,10 @@ public:
     
     // Cache management
     void clearTextureCache();
-    size_t getTextureCount() const { return textureCache_.size(); }
+    size_t getTextureCount() const {
+        std::shared_lock<std::shared_mutex> lock(textureCacheMutex_);
+        return textureCache_.size();
+    }
     size_t getTotalTextureMemory() const;
     
     // Performance and debugging
@@ -138,6 +143,7 @@ private:
     
     // Asset caches
     std::unordered_map<std::string, std::shared_ptr<LoadedTexture>> textureCache_;
+    mutable std::shared_mutex textureCacheMutex_;  // Protects textureCache_
     
     // Configuration
     bool performanceLogging_ = true;

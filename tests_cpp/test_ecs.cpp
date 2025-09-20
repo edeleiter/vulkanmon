@@ -274,7 +274,7 @@ TEST_CASE("[ECS] Multi-Object Rendering Support", "[ECS][MultiObject]") {
         EntityID planeEntity = world.createEntity();
 
         // Add diverse renderable components
-        Renderable cubeRenderable("test_cube.obj", "default", 0);  // Default material
+        Renderable cubeRenderable("cube.obj", "default", 0);  // Default material
         Renderable sphereRenderable("sphere.obj", "default", 1);    // Gold material
         Renderable pyramidRenderable("pyramid.obj", "default", 2);  // Ruby material
         Renderable planeRenderable("plane.obj", "default", 4);      // Emerald material
@@ -350,7 +350,7 @@ TEST_CASE("[ECS] Multi-Object Rendering Support", "[ECS][MultiObject]") {
         // Test the material system integration from Phase 6.1
         std::vector<uint32_t> materialIds = {0, 1, 2, 3, 4}; // Default, Gold, Ruby, Chrome, Emerald
         std::vector<std::string> meshPaths = {
-            "test_cube.obj",
+            "cube.obj",
             "sphere.obj",
             "pyramid.obj",
             "sphere.obj",   // Second sphere instance

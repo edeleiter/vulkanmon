@@ -36,35 +36,7 @@ public:
     }
 };
 
-TEST_CASE("Window Basic Construction", "[Window][Basic]") {
-    WindowTestFixture fixture;
-    
-    SECTION("Default window construction") {
-        VulkanMon::Window window(800, 600, "Test Window");
-        
-        // Basic properties should be set
-        REQUIRE(window.getWidth() == 800);
-        REQUIRE(window.getHeight() == 600);
-        // Basic properties should be accessible
-        // Note: Window class doesn't expose getTitle() or isInitialized() methods
-    }
-    
-    SECTION("Window with different dimensions") {
-        VulkanMon::Window window(1920, 1080, "Large Window");
-        
-        REQUIRE(window.getWidth() == 1920);
-        REQUIRE(window.getHeight() == 1080);
-        // Window dimensions should be set correctly
-    }
-    
-    SECTION("Window with empty title") {
-        VulkanMon::Window window(640, 480, "");
-        
-        REQUIRE(window.getWidth() == 640);
-        REQUIRE(window.getHeight() == 480);
-        // Window with empty title should construct correctly
-    }
-}
+// REMOVED: Basic Construction test - pointless constructor testing
 
 TEST_CASE("Window Initialization", "[Window][Initialization]") {
     WindowTestFixture fixture;

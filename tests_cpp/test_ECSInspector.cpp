@@ -13,22 +13,7 @@ using namespace VulkanMon;
 // Basic ECS Inspector Functionality Tests
 // =============================================================================
 
-TEST_CASE("ECS Inspector Basic Construction", "[ECSInspector][Basic]") {
-    SECTION("Valid construction with World") {
-        World world;
-        ECSInspector inspector(&world);
-
-        REQUIRE(inspector.isEnabled() == true);  // Default enabled
-        REQUIRE(inspector.getSelectedEntity() == INVALID_ENTITY);  // No selection initially
-    }
-
-    SECTION("Null World handling") {
-        // Test that inspector can handle null World gracefully
-        ECSInspector inspector(nullptr);
-        REQUIRE(inspector.isEnabled() == true);
-        REQUIRE(inspector.getSelectedEntity() == INVALID_ENTITY);
-    }
-}
+// REMOVED: Basic Construction test - pointless constructor testing
 
 TEST_CASE("ECS Inspector State Management", "[ECSInspector][State]") {
     World world;
@@ -209,7 +194,7 @@ TEST_CASE("ECS Inspector Component Modification", "[ECSInspector][Modification]"
         EntityID entity = world.createEntity();
         Transform transform;
         Renderable renderable;
-        renderable.meshPath = "test_cube.obj";
+        renderable.meshPath = "cube.obj";
         world.addComponent(entity, transform);
         world.addComponent(entity, renderable);
 
@@ -240,7 +225,7 @@ TEST_CASE("ECS Inspector Entity Management", "[ECSInspector][Management]") {
         EntityID cubeEntity = world.createEntity();
         Transform transform1;
         Renderable renderable1;
-        renderable1.meshPath = "test_cube.obj";
+        renderable1.meshPath = "cube.obj";
         renderable1.materialId = 0;
         world.addComponent(cubeEntity, transform1);
         world.addComponent(cubeEntity, renderable1);

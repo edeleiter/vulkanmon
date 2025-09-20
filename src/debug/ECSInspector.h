@@ -4,6 +4,8 @@
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
 #include "../components/Camera.h"
+#include "../components/SpatialComponent.h"
+#include "../game/CreatureDetectionSystem.h"  // For CreatureComponent
 #include <imgui.h>
 #include <string>
 #include <vector>
@@ -89,13 +91,16 @@ private:
         PYRAMID,
         PLANE,
         CAMERA,
-        EMPTY
+        EMPTY,
+        CREATURE  // New creature template
     };
 
     // Component editing state
     bool transformExpanded_ = true;
     bool renderableExpanded_ = true;
     bool cameraExpanded_ = true;
+    bool spatialExpanded_ = true;
+    bool creatureExpanded_ = false;  // Creature component expansion state
 
     // Performance tracking
     struct PerformanceData {
@@ -109,10 +114,12 @@ private:
 
     // Material and mesh asset lists
     std::vector<std::string> availableMeshes_ = {
-        "test_cube.obj", "sphere.obj", "pyramid.obj", "plane.obj"
+        "cube.obj", "sphere.obj", "pyramid.obj", "plane.obj"
     };
 
-    const char* materialNames_[5] = {
+    // Material names for ImGui combo (fixed size for safe access)
+    static constexpr size_t MATERIAL_COUNT = 5;
+    const char* materialNames_[MATERIAL_COUNT] = {
         "Default", "Gold", "Ruby", "Chrome", "Emerald"
     };
 
@@ -164,6 +171,20 @@ private:
      * @return true if component was modified
      */
     bool renderCameraEditor(Camera& camera);
+
+    /**
+     * Render SpatialComponent editor with spatial properties
+     * @param spatial SpatialComponent to edit
+     * @return true if component was modified
+     */
+    bool renderSpatialEditor(SpatialComponent& spatial);
+
+    /**
+     * Render CreatureComponent editor with AI state controls
+     * @param creature CreatureComponent to edit
+     * @return true if component was modified
+     */
+    bool renderCreatureEditor(CreatureComponent& creature);
 
     // =================================================================
     // Entity operations and templates

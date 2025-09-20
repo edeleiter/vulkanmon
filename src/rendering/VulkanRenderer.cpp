@@ -3,10 +3,13 @@
 #include "../io/ModelLoader.h"
 #include "../systems/MaterialSystem.h"
 #include "../utils/Logger.h"
+#include "../config/CameraConfig.h"
 #include <iostream>
 #include <stdexcept>
 #include <array>
 #include <filesystem>
+#include <algorithm>
+#include <glm/gtc/matrix_transform.hpp>  // For lookAt and perspective
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -16,17 +19,17 @@ using namespace VulkanMon;
 // Shader file constants
 constexpr const char* VERTEX_SHADER_COMPILED = "shaders/vert.spv";
 constexpr const char* FRAGMENT_SHADER_COMPILED = "shaders/frag.spv";
+constexpr const char* INSTANCED_VERTEX_SHADER_COMPILED = "shaders/instanced_vert.spv";
+constexpr const char* INSTANCED_FRAGMENT_SHADER_COMPILED = "shaders/instanced_frag.spv";
 
 VulkanRenderer::VulkanRenderer(
     std::shared_ptr<Window> window,
-    std::shared_ptr<Camera> camera,
     std::shared_ptr<ResourceManager> resourceManager,
     std::shared_ptr<AssetManager> assetManager,
     std::shared_ptr<ModelLoader> modelLoader,
     std::shared_ptr<LightingSystem> lightingSystem,
     std::shared_ptr<MaterialSystem> materialSystem
 ) : window_(window),
-    camera_(camera),
     resourceManager_(resourceManager),
     assetManager_(assetManager),
     modelLoader_(modelLoader),
@@ -178,6 +181,47 @@ void VulkanRenderer::setECSRenderCallback(ECSRenderCallback callback) {
 }
 
 // =============================================================================
+// UNIFIED CAMERA INTERFACE - ECS Camera Data Integration
+// =============================================================================
+//
+// These methods provide a clean interface for receiving camera data from the
+// ECS camera system. All camera data (matrices + position) is coordinated
+// through a single useExternalCamera_ flag to ensure consistency.
+//
+// Design Philosophy:
+// - Single source of truth: All camera data comes from ECS
+// - Consistent state: Matrices and position always updated together
+// - Clean fallback: Graceful degradation when ECS camera unavailable
+// =============================================================================
+
+void VulkanRenderer::setViewMatrix(const glm::mat4& viewMatrix) {
+    externalViewMatrix_ = viewMatrix;
+    useExternalCamera_ = true;
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("VulkanRenderer: External view matrix updated");
+    #endif
+}
+
+void VulkanRenderer::setProjectionMatrix(const glm::mat4& projectionMatrix) {
+    externalProjectionMatrix_ = projectionMatrix;
+    useExternalCamera_ = true;
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("VulkanRenderer: External projection matrix updated");
+    #endif
+}
+
+void VulkanRenderer::setCameraPosition(const glm::vec3& cameraPosition) {
+    externalCameraPosition_ = cameraPosition;
+    useExternalCamera_ = true;
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("VulkanRenderer: External camera position updated: (" +
+               std::to_string(cameraPosition.x) + ", " +
+               std::to_string(cameraPosition.y) + ", " +
+               std::to_string(cameraPosition.z) + ")");
+    #endif
+}
+
+// =============================================================================
 // ECS Integration Interface (Phase 6.2)
 // =============================================================================
 
@@ -228,7 +272,7 @@ void VulkanRenderer::beginECSFrame() {
     renderPassInfo.renderArea.extent = swapChainExtent_;
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearValues[0].color = {{0.2f, 0.3f, 0.6f, 1.0f}};  // Dark blue background to see objects
     clearValues[1].depthStencil = {1.0f, 0};
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -239,20 +283,24 @@ void VulkanRenderer::beginECSFrame() {
     // Bind graphics pipeline
     vkCmdBindPipeline(commandBuffers_[currentImageIndex_], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-    // Set viewport dynamically (essential for proper resize handling)
+    // Set viewport dynamically (now that pipeline supports dynamic state)
+    VkExtent2D currentWindowExtent = window_->getExtent();
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapChainExtent_.width);
-    viewport.height = static_cast<float>(swapChainExtent_.height);
+    viewport.width = static_cast<float>(currentWindowExtent.width);
+    viewport.height = static_cast<float>(currentWindowExtent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
+
+
     vkCmdSetViewport(commandBuffers_[currentImageIndex_], 0, 1, &viewport);
 
-    // Set scissor rectangle
+    // Set scissor rectangle (must match viewport for proper rendering)
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent_;
+    scissor.extent.width = currentWindowExtent.width;
+    scissor.extent.height = currentWindowExtent.height;
     vkCmdSetScissor(commandBuffers_[currentImageIndex_], 0, 1, &scissor);
 
     // Bind global descriptor set (set 0: UBO, texture, lighting)
@@ -261,8 +309,6 @@ void VulkanRenderer::beginECSFrame() {
 
     ecsFrameActive_ = true;
     frameLoadedMeshes_.clear();
-
-    VKMON_DEBUG("ECS frame begun, ready for object rendering");
 }
 
 void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
@@ -294,9 +340,16 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants);
 
     // Render the specific model for this meshPath
-    auto modelIt = modelCache_.find(meshPath);
-    if (modelIt != modelCache_.end() && modelIt->second && !modelIt->second->meshes.empty()) {
-        auto model = modelIt->second;
+    std::shared_ptr<Model> model;
+    {
+        std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+        auto modelIt = modelCache_.find(meshPath);
+        if (modelIt != modelCache_.end() && modelIt->second && !modelIt->second->meshes.empty()) {
+            model = modelIt->second;
+        }
+    }
+
+    if (model) {
         for (const auto& mesh : model->meshes) {
             if (mesh->vertexBuffer && mesh->indexBuffer) {
                 VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
@@ -307,7 +360,6 @@ void VulkanRenderer::renderECSObject(const glm::mat4& modelMatrix,
                 vkCmdDrawIndexed(commandBuffers_[currentImageIndex_], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
             }
         }
-        VKMON_DEBUG("Rendered ECS object with mesh: " + meshPath);
     } else {
         VKMON_WARNING("No model cached for meshPath: " + meshPath);
     }
@@ -373,14 +425,127 @@ void VulkanRenderer::endECSFrame() {
     }
 
     ecsFrameActive_ = false;
+}
 
-    VKMON_DEBUG("ECS frame completed and presented");
+// =============================================================================
+// PHASE 7.1: Instanced Rendering Implementation
+// GPU instancing for massive creature rendering
+// =============================================================================
+
+void VulkanRenderer::renderInstanced(const std::string& meshPath,
+                                    const void* instanceData,
+                                    uint32_t instanceCount,
+                                    uint32_t baseMaterialId) {
+    if (!ecsFrameActive_) {
+        VKMON_ERROR("ECS frame not active! Call beginECSFrame() first.");
+        return;
+    }
+
+    if (instanceCount == 0) {
+        return; // Nothing to render
+    }
+
+    // Validate instance data pointer and size alignment
+    if (!instanceData) {
+        VKMON_ERROR("GPU Instancing: instanceData is null");
+        return;
+    }
+
+    // Verify alignment - InstanceData must be 16-byte aligned for GPU
+    if (reinterpret_cast<uintptr_t>(instanceData) % 16 != 0) {
+        VKMON_ERROR("GPU Instancing: instanceData is not properly aligned (must be 16-byte aligned)");
+        return;
+    }
+
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("GPU Instancing: Rendering " + std::to_string(instanceCount) + " instances of " + meshPath);
+    #endif
+
+    // Direct cast after validation - avoid unnecessary copy
+    const auto* instances = static_cast<const InstanceData*>(instanceData);
+
+    // Update instance buffer directly from validated pointer - no vector copy
+    updateInstanceDataDirect(instances, instanceCount);
+
+    // Ensure mesh is loaded
+    ensureMeshLoaded(meshPath);
+
+    // Find cached model and render all instances with GPU instancing
+    std::shared_ptr<Model> model;
+    {
+        std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+        auto modelIt = modelCache_.find(meshPath);
+        if (modelIt != modelCache_.end()) {
+            model = modelIt->second;
+        }
+    }
+
+    if (model && !model->meshes.empty()) {
+        // Get current command buffer
+        VkCommandBuffer commandBuffer = commandBuffers_[currentImageIndex_];
+
+        // Bind instanced graphics pipeline
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedGraphicsPipeline_);
+
+        // Bind global descriptor set (set 0)
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
+                               0, 1, &globalDescriptorSet_, 0, nullptr);
+
+        // Bind material-specific descriptor set (set 1)
+        if (materialSystem_ && baseMaterialId < materialSystem_->getMaterialCount()) {
+            VkDescriptorSet materialDescriptorSet = materialSystem_->getDescriptorSet(baseMaterialId);
+            if (materialDescriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
+                                       1, 1, &materialDescriptorSet, 0, nullptr);
+            }
+        }
+
+        // Render each mesh with instancing
+        for (const auto& mesh : model->meshes) {
+            // Bind vertex buffers: [0] = vertex data, [1] = instance data
+            VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer(), instanceBuffer_};
+            VkDeviceSize offsets[] = {0, 0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 2, vertexBuffers, offsets);
+
+            // Bind index buffer
+            vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+            // CRITICAL: GPU Instanced draw call - this renders ALL instances in one draw call!
+            vkCmdDrawIndexed(commandBuffer,
+                            static_cast<uint32_t>(mesh->indices.size()),  // indexCount
+                            instanceCount,                                 // instanceCount - THE MAGIC!
+                            0,                                            // firstIndex
+                            0,                                            // vertexOffset
+                            currentInstanceOffset_);                      // firstInstance - USE OFFSET!
+        }
+        #ifdef DEBUG_VERBOSE
+        VKMON_DEBUG("GPU: Successfully submitted " + std::to_string(instanceCount) + " instances in 1 draw call");
+        #endif
+
+        // Update offset for next batch
+        currentInstanceOffset_ += instanceCount;
+    } else {
+        VKMON_WARNING("No model cached for instanced meshPath: " + meshPath);
+    }
+}
+
+void VulkanRenderer::renderInstancedCreatures(const std::string& meshPath,
+                                            const std::vector<VulkanMon::InstanceData>& instances,
+                                            uint32_t baseMaterialId) {
+    if (instances.empty()) {
+        return;
+    }
+
+    renderInstanced(meshPath, instances.data(), static_cast<uint32_t>(instances.size()), baseMaterialId);
 }
 
 void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
     // Check if model is already cached
-    if (modelCache_.find(meshPath) != modelCache_.end()) {
-        return; // Already loaded
+    {
+        std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+        if (modelCache_.find(meshPath) != modelCache_.end()) {
+            return; // Already loaded
+        }
     }
 
     // Load the model using ModelLoader
@@ -390,13 +555,19 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
             auto model = modelLoader_->loadModel(meshPath);
 
             if (model && !model->meshes.empty()) {
-                modelCache_[meshPath] = std::move(model);
+                {
+                    std::unique_lock<std::shared_mutex> lock(modelCacheMutex_);
+                    modelCache_[meshPath] = std::move(model);
+                }
                 VKMON_INFO("Model loaded and cached: " + meshPath);
             } else {
                 VKMON_WARNING("Failed to load model or model is empty: " + meshPath);
                 // Use fallback - add current model as cache for this path
                 if (currentModel_) {
-                    modelCache_[meshPath] = currentModel_;
+                    {
+                        std::unique_lock<std::shared_mutex> lock(modelCacheMutex_);
+                        modelCache_[meshPath] = currentModel_;
+                    }
                     VKMON_WARNING("Using fallback model for: " + meshPath);
                 }
             }
@@ -404,7 +575,10 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
             VKMON_ERROR("Exception loading model " + meshPath + ": " + std::string(e.what()));
             // Use fallback
             if (currentModel_) {
-                modelCache_[meshPath] = currentModel_;
+                {
+                    std::unique_lock<std::shared_mutex> lock(modelCacheMutex_);
+                    modelCache_[meshPath] = currentModel_;
+                }
                 VKMON_WARNING("Using fallback model due to exception: " + meshPath);
             }
         }
@@ -428,16 +602,22 @@ void VulkanRenderer::initVulkan() {
     createDescriptorSetLayout();
     createShaderModules();
     createGraphicsPipeline();
+
+    // Create instanced rendering pipeline (Phase 7.1)
+    createInstancedShaderModules();
+    createInstancedGraphicsPipeline();
     createDepthResources();
     createFramebuffers();
     createCommandPool();
-    
+
     // Initialize core systems (after command pool creation)
     // TODO: This is temporary - will be moved to VulkanContext
     initializeCoreSystemsTemporary();
+
+    // Create GPU instancing resources (Phase 7.1)
+    createInstanceBuffer();
     
-    // Load test model
-    loadTestModel();
+    // Legacy test model removed - ECS provides test scene
     
     createUniformBuffer();
     createMaterialBuffer();
@@ -569,8 +749,6 @@ int VulkanRenderer::findGraphicsQueueFamily() {
 }
 
 void VulkanRenderer::createSwapChain() {
-    VKMON_DEBUG("Creating swapchain...");
-    
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice_, surface_, &capabilities);
 
@@ -589,12 +767,11 @@ void VulkanRenderer::createSwapChain() {
     }
 
     // Choose extent based on window dimensions
-    if (capabilities.currentExtent.width != UINT32_MAX) {
-        swapChainExtent_ = capabilities.currentExtent;
-    } else {
-        // Get window extent from Window system
-        swapChainExtent_ = window_->getExtent();
-    }
+    VkExtent2D windowExtent = window_->getExtent();
+
+    // VIEWPORT FIX: Always use window extent to ensure viewport matches actual window size
+    // Surface capabilities can be stale during resize events, causing viewport scaling issues
+    swapChainExtent_ = windowExtent;
 
     uint32_t imageCount = capabilities.minImageCount + 1;
     if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
@@ -613,7 +790,7 @@ void VulkanRenderer::createSwapChain() {
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createInfo.preTransform = capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR; // V-Sync
+    createInfo.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // No V-Sync for development - see true performance
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
@@ -803,25 +980,24 @@ void VulkanRenderer::createGraphicsPipeline() {
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    // Viewport and scissor
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float) swapChainExtent_.width;
-    viewport.height = (float) swapChainExtent_.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent_;
-
+    // Viewport and scissor (use dynamic state so we can resize at runtime)
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
+    viewportState.pViewports = nullptr;  // Dynamic state - will be set with vkCmdSetViewport
     viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    viewportState.pScissors = nullptr;   // Dynamic state - will be set with vkCmdSetScissor
+
+    // VIEWPORT FIX: Enable dynamic viewport and scissor state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
 
     // Rasterizer
     VkPipelineRasterizationStateCreateInfo rasterizer{};
@@ -891,6 +1067,7 @@ void VulkanRenderer::createGraphicsPipeline() {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;  // VIEWPORT FIX: Enable dynamic state
     pipelineInfo.layout = pipelineLayout_;
     pipelineInfo.renderPass = renderPass_;
     pipelineInfo.subpass = 0;
@@ -901,6 +1078,136 @@ void VulkanRenderer::createGraphicsPipeline() {
     }
 
     VKMON_DEBUG("Graphics pipeline created successfully");
+}
+
+void VulkanRenderer::createInstancedShaderModules() {
+    VKMON_DEBUG("Creating instanced shader modules...");
+
+    // Load compiled instanced shaders
+    auto instancedVertShaderCode = Utils::readFile(INSTANCED_VERTEX_SHADER_COMPILED);
+    auto instancedFragShaderCode = Utils::readFile(INSTANCED_FRAGMENT_SHADER_COMPILED);
+
+    instancedVertShaderModule_ = createShaderModule(instancedVertShaderCode);
+    instancedFragShaderModule_ = createShaderModule(instancedFragShaderCode);
+
+    VKMON_DEBUG("Instanced shader modules created successfully");
+}
+
+void VulkanRenderer::createInstancedGraphicsPipeline() {
+    VKMON_DEBUG("Creating instanced graphics pipeline...");
+
+    // Shader stages
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = instancedVertShaderModule_;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = instancedFragShaderModule_;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    // Vertex input (using instanced binding descriptions)
+    auto bindingDescriptions = getInstancedBindingDescriptions();
+    auto attributeDescriptions = getInstancedAttributeDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+    // Input assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    // Viewport and scissor (use dynamic state like regular pipeline)
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = nullptr;  // Dynamic state - will be set with vkCmdSetViewport
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = nullptr;   // Dynamic state - will be set with vkCmdSetScissor
+
+    // INSTANCED PIPELINE FIX: Enable dynamic viewport and scissor state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    // Rasterizer (same as regular pipeline)
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    // Multisampling (same as regular pipeline)
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    // Depth stencil (same as regular pipeline)
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    // Color blending (same as regular pipeline)
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    // Graphics pipeline (reuse existing pipeline layout)
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;  // INSTANCED PIPELINE FIX: Enable dynamic state
+    pipelineInfo.layout = pipelineLayout_;  // Reuse existing layout
+    pipelineInfo.renderPass = renderPass_;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &instancedGraphicsPipeline_) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create instanced graphics pipeline!");
+    }
+
+    VKMON_DEBUG("Instanced graphics pipeline created successfully");
 }
 
 void VulkanRenderer::createFramebuffers() {
@@ -1228,28 +1535,34 @@ void VulkanRenderer::createTextureImage() {
     
     VkDeviceSize imageSize = texWidth * texHeight * texChannels;
 
-    // Create staging buffer
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-                stagingBuffer, stagingBufferMemory);
+    // Create staging buffer for efficient GPU transfer
+    auto stagingBuffer = resourceManager_->createBuffer(
+        imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        "texture_staging_checkered"
+    );
 
-    // Copy pixel data to staging buffer
-    void* data;
-    vkMapMemory(device_, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device_, stagingBufferMemory);
+    // Upload pixel data to staging buffer
+    stagingBuffer->updateData(pixels, imageSize);
 
-    // Create image - simplified for now, will add transitions later
-    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, 
-               VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+    // Create GPU-local image for optimal rendering performance
+    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+               VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_, textureImageMemory_);
 
-    // TODO: Add image transitions and buffer copy when we implement helper methods
-    // For now, cleanup staging buffer
-    vkDestroyBuffer(device_, stagingBuffer, nullptr);
-    vkFreeMemory(device_, stagingBufferMemory, nullptr);
+    // Transition image layout for transfer destination
+    transitionImageLayout(textureImage_, VK_FORMAT_R8G8B8A8_SRGB,
+                         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Copy data from staging buffer to GPU image
+    copyBufferToImage(stagingBuffer->getBuffer(), textureImage_, texWidth, texHeight);
+
+    // Transition image layout for shader access
+    transitionImageLayout(textureImage_, VK_FORMAT_R8G8B8A8_SRGB,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // Staging buffer automatically cleaned up after GPU copy completes
 
     VKMON_DEBUG("Texture image created successfully (basic version)");
 }
@@ -1626,7 +1939,7 @@ void VulkanRenderer::recordCommandBuffers() {
         renderPassInfo.renderArea.extent = swapChainExtent_;
 
         std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[0].color = {{0.2f, 0.3f, 0.6f, 1.0f}};  // Dark blue background to see objects
         clearValues[1].depthStencil = {1.0f, 0};
         
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -1646,19 +1959,7 @@ void VulkanRenderer::recordCommandBuffers() {
             }
         }
         
-        // Render loaded 3D model (if available)
-        if (currentModel_ && !currentModel_->meshes.empty()) {
-            for (const auto& mesh : currentModel_->meshes) {
-                if (mesh->vertexBuffer && mesh->indexBuffer) {
-                    VkBuffer vertexBuffers[] = {mesh->vertexBuffer->getBuffer()};
-                    VkDeviceSize offsets[] = {0};
-                    vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
-                    vkCmdBindIndexBuffer(commandBuffers_[i], mesh->indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-                    
-                    vkCmdDrawIndexed(commandBuffers_[i], static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
-                }
-            }
-        }
+        // Legacy 3D model rendering removed - ECS handles all object rendering
 
         // Render ImGui if enabled
         if (imguiEnabled_ && imguiInitialized_) {
@@ -1680,24 +1981,36 @@ void VulkanRenderer::updateUniformBuffer() {
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-    // Camera constants
-    constexpr float CAMERA_FOV = 45.0f;
-    constexpr float NEAR_PLANE = 0.1f;
-    constexpr float FAR_PLANE = 10.0f;
+    // Camera constants from unified configuration
+    using Config::Camera;
 
     UniformBufferObject ubo{};
 
-    // View matrix: use dynamic camera position from WASD input
-    ubo.view = camera_->getViewMatrix();
+    // UNIFIED CAMERA SYSTEM: Use ECS camera data if available, otherwise fallback
+    if (useExternalCamera_) {
+        // PRIMARY PATH: Use unified camera data from ECS camera system
+        // All data (view matrix, projection matrix, position) comes from same ECS camera entity
+        // This ensures consistency between rendering, spatial culling, and lighting calculations
+        ubo.view = externalViewMatrix_;
+        ubo.proj = externalProjectionMatrix_;
+        ubo.cameraPos = externalCameraPosition_;
 
-    // Projection matrix: perspective projection
-    ubo.proj = glm::perspective(glm::radians(CAMERA_FOV), swapChainExtent_.width / (float) swapChainExtent_.height, NEAR_PLANE, FAR_PLANE);
+    } else {
+        // FALLBACK PATH: When ECS camera system unavailable (should be rare)
+        VKMON_WARNING("VulkanRenderer: No ECS camera data available, using fallback camera");
+
+        // Use consistent fallback values that match ECS camera defaults
+        glm::vec3 fallbackPosition(0.0f, 8.0f, 15.0f);
+        ubo.view = glm::lookAt(fallbackPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj = glm::perspective(glm::radians(Config::Camera::DEFAULT_FOV),
+                                   swapChainExtent_.width / (float) swapChainExtent_.height,
+                                   Config::Camera::DEFAULT_NEAR_PLANE,
+                                   Config::Camera::DEFAULT_FAR_PLANE);
+        ubo.cameraPos = fallbackPosition;
+    }
 
     // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted
     ubo.proj[1][1] *= -1;
-
-    // Camera position for specular lighting calculations
-    ubo.cameraPos = camera_->position;
     ubo._padding = 0.0f;
 
     void* data;
@@ -1820,17 +2133,9 @@ void VulkanRenderer::initializeCoreSystemsTemporary() {
 }
 
 void VulkanRenderer::loadTestModel() {
-    VKMON_INFO("Loading test model...");
-    
-    // Load the test cube
-    currentModel_ = modelLoader_->loadModel("test_cube.obj");
-    VKMON_INFO("Test cube model loaded successfully!");
-    
-    // Create a default material for the model (simplified version)
-    currentMaterialData_.ambient = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
-    currentMaterialData_.diffuse = glm::vec4(0.8f, 0.8f, 0.8f, 0.0f);
-    currentMaterialData_.specular = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
-    currentMaterialData_.shininess = 32.0f;
+    // LEGACY METHOD - No longer used
+    // Test scene is now provided by ECS system in Application::createTestScene()
+    VKMON_INFO("Legacy test model loading skipped - ECS provides test scene");
 }
 
 void VulkanRenderer::cycleMaterialPreset() {
@@ -1842,11 +2147,14 @@ void VulkanRenderer::cycleMaterialPreset() {
     // Ensure we have the standard material presets in MaterialSystem
     ensureStandardMaterialsExist();
 
-    // Cycle to next material preset
-    currentMaterialPreset_ = (currentMaterialPreset_ + 1) % materialSystem_->getMaterialCount();
-
     const char* materialNames[] = {"Default", "Gold", "Ruby", "Chrome", "Emerald"};
-    const char* materialName = (currentMaterialPreset_ < 5) ? materialNames[currentMaterialPreset_] : "Unknown";
+    const size_t materialNamesCount = sizeof(materialNames) / sizeof(materialNames[0]);
+
+    // Cycle to next material preset, but ensure it doesn't exceed our known material names
+    currentMaterialPreset_ = (currentMaterialPreset_ + 1) % std::min(materialSystem_->getMaterialCount(), materialNamesCount);
+
+    // Safe bounds-checked access to material name
+    const char* materialName = (currentMaterialPreset_ < materialNamesCount) ? materialNames[currentMaterialPreset_] : "Unknown";
 
     VKMON_INFO("[MATERIAL] Cycled to preset: " + std::string(materialName) +
                " (" + std::to_string(currentMaterialPreset_ + 1) + "/" +
@@ -1894,7 +2202,10 @@ void VulkanRenderer::cleanup() {
     }
     
     cleanupSwapChain();
-    
+
+    // Cleanup GPU instancing resources (Phase 7.1)
+    cleanupInstanceBuffer();
+
     // Cleanup sync objects
     if (imageAvailableSemaphore_ != VK_NULL_HANDLE) {
         vkDestroySemaphore(device_, imageAvailableSemaphore_, nullptr);
@@ -2021,6 +2332,13 @@ void VulkanRenderer::cleanupSwapChain() {
         vkDestroyPipeline(device_, graphicsPipeline_, nullptr);
         graphicsPipeline_ = VK_NULL_HANDLE;
     }
+
+    // Cleanup instanced pipeline (Phase 7.1)
+    if (instancedGraphicsPipeline_ != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device_, instancedGraphicsPipeline_, nullptr);
+        instancedGraphicsPipeline_ = VK_NULL_HANDLE;
+    }
+
     if (pipelineLayout_ != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         pipelineLayout_ = VK_NULL_HANDLE;
@@ -2040,6 +2358,16 @@ void VulkanRenderer::cleanupSwapChain() {
     if (fragShaderModule_ != VK_NULL_HANDLE) {
         vkDestroyShaderModule(device_, fragShaderModule_, nullptr);
         fragShaderModule_ = VK_NULL_HANDLE;
+    }
+
+    // Cleanup instanced shader modules (Phase 7.1)
+    if (instancedVertShaderModule_ != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device_, instancedVertShaderModule_, nullptr);
+        instancedVertShaderModule_ = VK_NULL_HANDLE;
+    }
+    if (instancedFragShaderModule_ != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device_, instancedFragShaderModule_, nullptr);
+        instancedFragShaderModule_ = VK_NULL_HANDLE;
     }
     
     // Cleanup image views
@@ -2118,6 +2446,7 @@ void VulkanRenderer::initializeImGui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.IniFilename = nullptr;                                 // Disable imgui.ini file creation
 
     // Setup ImGui style (dark theme)
     ImGui::StyleColorsDark();
@@ -2188,4 +2517,321 @@ void VulkanRenderer::endImGuiFrame() {
     // The ImGui draw data will be recorded to the command buffer
     // in the existing command buffer recording (renderFrame method)
 }
+
+// =============================================================================
+// GPU Instancing Implementation (Phase 7.1)
+// =============================================================================
+
+void VulkanRenderer::createInstanceBuffer() {
+    VKMON_INFO("Creating GPU instance buffer for " + std::to_string(maxInstances_) + " creatures");
+
+    instanceBufferSize_ = maxInstances_ * sizeof(VulkanMon::InstanceData);
+
+    // Create persistently mapped buffer for dynamic updates
+    createBuffer(instanceBufferSize_,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                instanceBuffer_,
+                instanceBufferMemory_);
+
+    // Map the buffer persistently for efficient updates
+    void* mappedPtr = nullptr;
+    VkResult result = vkMapMemory(device_, instanceBufferMemory_, 0, instanceBufferSize_, 0, &mappedPtr);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to map instance buffer memory!");
+    }
+
+    // Create RAII wrapper for mapped memory
+    instanceBufferMapped_ = MappedBuffer(device_, instanceBufferMemory_, mappedPtr);
+
+    VKMON_INFO("GPU instance buffer created: " + std::to_string(instanceBufferSize_ / 1024) + " KB");
+}
+
+void VulkanRenderer::updateInstanceData(const std::vector<VulkanMon::InstanceData>& instances) {
+    // SAFETY FIX: Deprecated method - force single-batch mode only to prevent corruption
+    // WARNING: This method should not be used with multi-batch rendering systems
+    VKMON_WARNING("updateInstanceData() is deprecated - use clearInstanceBuffer() + updateInstanceDataDirect()");
+
+    if (instances.empty()) {
+        return;
+    }
+
+    // CRITICAL SAFETY: Force clean state to prevent any possibility of corruption
+    // This ensures we never mix single-batch and multi-batch rendering unsafely
+    clearInstanceBuffer();
+
+    // Use the robust, offset-aware implementation starting from clean state
+    updateInstanceDataDirect(instances.data(), static_cast<uint32_t>(instances.size()));
+
+    // Note: No offset restoration - this method now owns the entire buffer
+}
+
+void VulkanRenderer::updateInstanceDataDirect(const InstanceData* instances, uint32_t instanceCount) {
+    // ENHANCED PROTECTION: Multiple validation layers with corruption detection
+
+    // Layer 0: CRITICAL - Buffer state corruption detection
+    if (currentInstanceOffset_ > maxInstances_) {
+        VKMON_ERROR("CRITICAL: Buffer state corrupted - offset " + std::to_string(currentInstanceOffset_) +
+                   " > max " + std::to_string(maxInstances_));
+        VKMON_WARNING("Auto-recovering: Resetting buffer to safe state");
+        clearInstanceBuffer();
+    }
+
+    if (totalInstancesThisFrame_ > MAX_INSTANCES_PER_FRAME) {
+        VKMON_ERROR("CRITICAL: Frame state corrupted - total " + std::to_string(totalInstancesThisFrame_) +
+                   " > max " + std::to_string(MAX_INSTANCES_PER_FRAME));
+        VKMON_WARNING("Auto-recovering: Resetting frame state");
+        clearInstanceBuffer();
+    }
+
+    // Layer 1: Basic parameter validation
+    if (!instances) {
+        VKMON_ERROR("Instance buffer update failed: Null instance data pointer");
+        return;
+    }
+
+    if (instanceCount == 0) {
+        return; // Valid but no-op
+    }
+
+    // Layer 2: Buffer state validation
+    if (!instanceBufferMapped_.isValid()) {
+        VKMON_ERROR("Instance buffer update failed: Buffer not mapped");
+        return;
+    }
+
+    // Layer 3: Per-batch overflow protection with graceful degradation
+    if (currentInstanceOffset_ + instanceCount > maxInstances_) {
+        // Calculate how many instances we can still fit
+        uint32_t remainingSpace = maxInstances_ - currentInstanceOffset_;
+
+        if (remainingSpace == 0) {
+            VKMON_WARNING("Instance buffer full - skipping batch of " + std::to_string(instanceCount) + " instances");
+            return; // Graceful degradation: skip this batch
+        }
+
+        // Partial batch rendering: fit what we can
+        VKMON_WARNING("Instance buffer overflow - rendering partial batch: " +
+                     std::to_string(remainingSpace) + "/" + std::to_string(instanceCount) + " instances");
+        instanceCount = remainingSpace;
+    }
+
+    // Layer 4: Frame-level overflow protection with graceful degradation
+    if (totalInstancesThisFrame_ + instanceCount > MAX_INSTANCES_PER_FRAME) {
+        // Calculate how many instances we can still fit this frame
+        uint32_t remainingFrameSpace = MAX_INSTANCES_PER_FRAME - totalInstancesThisFrame_;
+
+        if (remainingFrameSpace == 0) {
+            VKMON_WARNING("Frame instance limit reached - skipping batch of " + std::to_string(instanceCount) + " instances");
+            return; // Graceful degradation: skip this batch
+        }
+
+        // Partial batch rendering: fit what we can in this frame
+        VKMON_WARNING("Frame instance overflow - rendering partial batch: " +
+                     std::to_string(remainingFrameSpace) + "/" + std::to_string(instanceCount) + " instances");
+        instanceCount = remainingFrameSpace;
+    }
+
+    // Calculate offset position in buffer
+    size_t dataSize = instanceCount * sizeof(VulkanMon::InstanceData);
+    size_t offsetBytes = currentInstanceOffset_ * sizeof(VulkanMon::InstanceData);
+    char* bufferStart = static_cast<char*>(instanceBufferMapped_.get());
+
+    // Copy to offset position - append instead of overwrite
+    memcpy(bufferStart + offsetBytes, instances, dataSize);
+
+    // Update frame tracking (after successful write)
+    totalInstancesThisFrame_ += instanceCount;
+
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("Instance buffer: Added " + std::to_string(instanceCount) +
+               " instances at offset " + std::to_string(currentInstanceOffset_) +
+               " (frame total: " + std::to_string(totalInstancesThisFrame_) + ")");
+    #endif
+
+    // No need to flush due to HOST_COHERENT_BIT
+}
+
+void VulkanRenderer::clearInstanceBuffer() {
+    // Reset frame state for clean multi-batch rendering
+    currentInstanceOffset_ = 0;
+    totalInstancesThisFrame_ = 0;
+
+    // Optional: Zero buffer memory for debugging (expensive, only in debug builds)
+    #ifdef DEBUG_CLEAR_INSTANCE_BUFFER
+    if (instanceBufferMapped_.isValid()) {
+        memset(instanceBufferMapped_.get(), 0, instanceBufferSize_);
+    }
+    #endif
+}
+
+void VulkanRenderer::cleanupInstanceBuffer() {
+    // MappedBuffer RAII wrapper handles automatic unmapping
+
+    if (instanceBuffer_ != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device_, instanceBuffer_, nullptr);
+        instanceBuffer_ = VK_NULL_HANDLE;
+    }
+
+    if (instanceBufferMemory_ != VK_NULL_HANDLE) {
+        vkFreeMemory(device_, instanceBufferMemory_, nullptr);
+        instanceBufferMemory_ = VK_NULL_HANDLE;
+    }
+
+    VKMON_INFO("GPU instance buffer cleanup complete");
+}
+
+std::vector<VkVertexInputBindingDescription> VulkanRenderer::getInstancedBindingDescriptions() {
+    std::vector<VkVertexInputBindingDescription> bindings(2);
+
+    // Binding 0: Per-vertex data (same as before)
+    bindings[0].binding = 0;
+    bindings[0].stride = sizeof(ModelVertex);
+    bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    // Binding 1: Per-instance data (NEW for GPU instancing)
+    bindings[1].binding = 1;
+    bindings[1].stride = sizeof(VulkanMon::InstanceData);
+    bindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+    return bindings;
+}
+
+std::vector<VkVertexInputAttributeDescription> VulkanRenderer::getInstancedAttributeDescriptions() {
+    std::vector<VkVertexInputAttributeDescription> attributes(12);
+
+    // Per-vertex attributes (locations 0-3) - unchanged
+    attributes[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ModelVertex, position)};
+    attributes[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ModelVertex, normal)};
+    attributes[2] = {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ModelVertex, texCoords)};
+    attributes[3] = {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ModelVertex, color)};
+
+    // Per-instance attributes (locations 4-11) - NEW for GPU instancing
+    // Instance model matrix (4 vec4s = locations 4,5,6,7)
+    for (uint32_t i = 0; i < 4; i++) {
+        attributes[4 + i] = {
+            4 + i,                                                    // location
+            1,                                                        // binding 1 (instance data)
+            VK_FORMAT_R32G32B32A32_SFLOAT,                           // vec4 format
+            static_cast<uint32_t>(offsetof(VulkanMon::InstanceData, modelMatrix) + sizeof(glm::vec4) * i)
+        };
+    }
+
+    // Instance material params (location 8) - vec4
+    attributes[8] = {8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(VulkanMon::InstanceData, materialParams))};
+
+    // Instance LOD params (location 9) - vec4
+    attributes[9] = {9, 1, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(VulkanMon::InstanceData, lodParams))};
+
+    // Reserve locations 10-11 for future expansion
+    attributes[10] = {10, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0}; // Unused
+    attributes[11] = {11, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0}; // Unused
+
+    // Return only the first 10 attributes (0-9) for now
+    attributes.resize(10);
+    return attributes;
+}
+
+// =============================================================================
+// Image Transfer Helper Methods
+// =============================================================================
+
+VkCommandBuffer VulkanRenderer::beginSingleTimeCommands() {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool_;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(device_, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    return commandBuffer;
+}
+
+void VulkanRenderer::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue_);
+
+    vkFreeCommandBuffers(device_, commandPool_, 1, &commandBuffer);
+}
+
+void VulkanRenderer::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else {
+        throw std::invalid_argument("Unsupported layout transition!");
+    }
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage, destinationStage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanRenderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {width, height, 1};
+
+    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    endSingleTimeCommands(commandBuffer);
+}
+
 

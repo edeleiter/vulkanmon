@@ -94,12 +94,15 @@ std::shared_ptr<LoadedTexture> AssetManager::loadTexture(const TextureLoadInfo& 
     auto startTime = std::chrono::high_resolution_clock::now();
     
     // Check cache first
-    auto it = textureCache_.find(loadInfo.filename);
-    if (it != textureCache_.end()) {
-        it->second->referenceCount++;
-        VKMON_DEBUG("Texture loaded from cache: " + loadInfo.filename + " (refs: " + 
-                   std::to_string(it->second->referenceCount) + ")");
-        return it->second;
+    {
+        std::shared_lock<std::shared_mutex> lock(textureCacheMutex_);
+        auto it = textureCache_.find(loadInfo.filename);
+        if (it != textureCache_.end()) {
+            it->second->referenceCount++;
+            VKMON_DEBUG("Texture loaded from cache: " + loadInfo.filename + " (refs: " +
+                       std::to_string(it->second->referenceCount) + ")");
+            return it->second;
+        }
     }
     
     try {
@@ -116,7 +119,10 @@ std::shared_ptr<LoadedTexture> AssetManager::loadTexture(const TextureLoadInfo& 
         loadedTexture->referenceCount = 1;
         
         // Add to cache
-        textureCache_[loadInfo.filename] = loadedTexture;
+        {
+            std::unique_lock<std::shared_mutex> lock(textureCacheMutex_);
+            textureCache_[loadInfo.filename] = loadedTexture;
+        }
         
         // Performance logging
         if (performanceLogging_) {
@@ -222,12 +228,13 @@ VkSampler AssetManager::createTextureSampler(const TextureLoadInfo& loadInfo) {
 }
 
 void AssetManager::unloadTexture(const std::string& filename) {
+    std::unique_lock<std::shared_mutex> lock(textureCacheMutex_);
     auto it = textureCache_.find(filename);
     if (it != textureCache_.end()) {
         it->second->referenceCount--;
-        VKMON_DEBUG("Texture reference decremented: " + filename + " (refs: " + 
+        VKMON_DEBUG("Texture reference decremented: " + filename + " (refs: " +
                    std::to_string(it->second->referenceCount) + ")");
-        
+
         if (it->second->referenceCount == 0) {
             VKMON_INFO("Texture unloaded: " + filename);
             if (it->second->sampler != VK_NULL_HANDLE) {
@@ -373,18 +380,20 @@ std::vector<std::string> AssetManager::discoverAssets(AssetType type, const std:
 }
 
 void AssetManager::clearTextureCache() {
+    std::unique_lock<std::shared_mutex> lock(textureCacheMutex_);
     VKMON_INFO("Clearing texture cache (" + std::to_string(textureCache_.size()) + " textures)");
-    
+
     for (auto& [filename, texture] : textureCache_) {
         if (texture->sampler != VK_NULL_HANDLE) {
             vkDestroySampler(device_, texture->sampler, nullptr);
         }
     }
-    
+
     textureCache_.clear();
 }
 
 size_t AssetManager::getTotalTextureMemory() const {
+    std::shared_lock<std::shared_mutex> lock(textureCacheMutex_);
     size_t total = 0;
     for (const auto& [filename, texture] : textureCache_) {
         total += texture->width * texture->height * 4; // RGBA
@@ -394,7 +403,14 @@ size_t AssetManager::getTotalTextureMemory() const {
 
 void AssetManager::printAssetSummary() const {
     VKMON_INFO("\n=== ASSET MANAGER SUMMARY ===");
-    VKMON_INFO("Loaded Textures: " + std::to_string(textureCache_.size()));
+
+    size_t textureCount;
+    {
+        std::shared_lock<std::shared_mutex> lock(textureCacheMutex_);
+        textureCount = textureCache_.size();
+    }
+
+    VKMON_INFO("Loaded Textures: " + std::to_string(textureCount));
     VKMON_INFO("Texture Memory: " + std::to_string(getTotalTextureMemory()) + " bytes");
     
     if (resourceManager_) {

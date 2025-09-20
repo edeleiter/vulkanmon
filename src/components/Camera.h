@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Entity.h"
+#include "../config/CameraConfig.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -9,11 +10,11 @@ namespace VulkanMon {
 struct Camera {
     VKMON_COMPONENT(Camera)
 
-    // Camera parameters
-    float fov = 45.0f;          // Field of view in degrees
-    float nearPlane = 0.1f;     // Near clipping plane
-    float farPlane = 1000.0f;   // Far clipping plane
-    float aspectRatio = 16.0f / 9.0f; // Aspect ratio
+    // Camera parameters - using unified configuration defaults
+    float fov = Config::Camera::DEFAULT_FOV;              // Field of view in degrees
+    float nearPlane = Config::Camera::DEFAULT_NEAR_PLANE; // Near clipping plane
+    float farPlane = Config::Camera::DEFAULT_FAR_PLANE;   // Far clipping plane
+    float aspectRatio = Config::Camera::DEFAULT_ASPECT_RATIO; // Aspect ratio
 
     // Camera state
     bool isActive = true;       // Whether this camera is currently active

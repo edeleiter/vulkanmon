@@ -19,30 +19,7 @@
 using namespace VulkanMon;
 using namespace VulkanMon::Testing;
 
-TEST_CASE("ResourceManager Interface Design", "[ResourceManager][Interface]") {
-    SECTION("ResourceManager header inclusion") {
-        // Test that ResourceManager header includes properly
-        // This verifies the class exists and includes are correct
-        REQUIRE(true); // If we can include the header, this passes
-    }
-    
-    SECTION("ManagedResource interface contracts") {
-        // Test that ManagedResource base class has proper interface design
-        // This validates the class hierarchy and move semantics are correctly declared
-        
-        // Test that we can construct with device and debug name
-        VkDevice mockDevice = reinterpret_cast<VkDevice>(0x12345678); // Mock device handle
-        std::string debugName = "TestResource";
-        
-        // ManagedResource is abstract, but we can test the interface exists
-        // by checking that its interface requirements are compilable
-        REQUIRE(true); // Interface design validation passes
-        
-        // Test debug name and device access would be available
-        REQUIRE(debugName == "TestResource");
-        REQUIRE(mockDevice != VK_NULL_HANDLE);
-    }
-}
+// REMOVED: Interface Design test - silly validation of method existence
 
 TEST_CASE("ResourceManager RAII Design", "[ResourceManager][RAII]") {
     SECTION("Move-only semantics validation") {
@@ -213,7 +190,7 @@ TEST_CASE("ResourceManager Memory Management", "[ResourceManager][Memory]") {
         // Test that ResourceManager provides proper device access
         // This validates the Vulkan device handling
         
-        VkDevice mockDevice = reinterpret_cast<VkDevice>(0x87654321);
+        VkDevice mockDevice = reinterpret_cast<VkDevice>(static_cast<uintptr_t>(0x87654321));
         VkPhysicalDevice mockPhysicalDevice = reinterpret_cast<VkPhysicalDevice>(0x12345678);
         
         // Validate device handle types

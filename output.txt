@@ -1,0 +1,141 @@
+[18:25:27.956] [INFO ] VulkanMon starting up...
+[18:25:27.957] [INFO ] Initializing GLFW window system...
+[18:25:27.979] [INFO ] GLFW window initialized successfully
+[18:25:27.979] [INFO ] Legacy camera initialization removed - ECS camera system active
+[18:25:27.979] [INFO ] VulkanRenderer created
+[18:25:27.979] [INFO ] Initializing Vulkan renderer...
+[18:25:28.065] [INFO ] Creating Vulkan surface for window...
+[18:25:28.065] [INFO ] Vulkan surface created successfully
+[18:25:28.065] [INFO ] Selecting physical device and creating logical device...
+[18:25:28.067] [INFO ] Selected GPU: NVIDIA GeForce RTX 5070 Ti
+[18:25:28.128] [INFO ] Swap chain created successfully with 3 images
+[18:25:28.128] [INFO ] Creating render pass...
+[18:25:28.129] [INFO ] Creating global descriptor set layout (UBO, texture, lighting)...
+[18:25:28.129] [INFO ] Global descriptor set layout created successfully
+[18:25:28.129] [INFO ] Creating material descriptor set layout (per-material data)...
+[18:25:28.129] [INFO ] Material descriptor set layout created successfully
+[18:25:28.129] [INFO ] Creating legacy descriptor set layout...
+[18:25:28.129] [INFO ] Legacy descriptor set layout created successfully
+[18:25:28.129] [INFO ] Shaders loaded successfully
+[18:25:28.129] [INFO ] Creating graphics pipeline...
+[18:25:28.130] [INFO ] Creating depth resources...
+[18:25:28.131] [INFO ] Depth buffer created successfully
+[18:25:28.131] [INFO ] Command pool created successfully
+[18:25:28.131] [INFO ] Initializing core engine systems...
+[RESOURCE MANAGER] Initialized for device
+[18:25:28.131] [INFO ] Found assets directory: D:\ws\vulkanmon\assets
+[RESOURCE MANAGER] Initialized for device
+[18:25:28.131] [INFO ] AssetManager initialized with root path: D:\ws\vulkanmon\assets/
+[18:25:28.132] [INFO ] ModelLoader initialized with Assimp support
+[18:25:28.132] [INFO ] Initializing LightingSystem
+[18:25:28.132] [INFO ] Creating lighting uniform buffers
+[18:25:28.132] [INFO ] LightingSystem buffers created successfully
+[18:25:28.132] [INFO ] MaterialSystem: Created material 0
+[18:25:28.132] [INFO ] Core engine systems initialized successfully!
+[18:25:28.132] [INFO ] Creating GPU instance buffer for 1000 creatures
+[18:25:28.133] [INFO ] GPU instance buffer created: 93 KB
+[18:25:28.134] [INFO ] Texture sampler created successfully
+[18:25:28.134] [INFO ] Creating descriptor pool...
+[18:25:28.134] [INFO ] Descriptor pool created successfully
+[18:25:28.134] [INFO ] Creating descriptor set...
+[18:25:28.134] [INFO ] Descriptor set created successfully
+[18:25:28.134] [INFO ] Creating global descriptor pool (UBO, texture, lighting)...
+[18:25:28.134] [INFO ] Global descriptor pool created successfully
+[18:25:28.134] [INFO ] Creating global descriptor set (UBO, texture, lighting)...
+[18:25:28.134] [INFO ] Global descriptor set created successfully
+[18:25:28.134] [INFO ] Creating command buffers...
+[18:25:28.134] [INFO ] Command buffers allocated successfully
+[18:25:28.134] [INFO ] Recording command buffers...
+[18:25:28.134] [INFO ] Drawing commands recorded successfully
+[18:25:28.134] [INFO ] Creating synchronization objects...
+[18:25:28.134] [INFO ] Sync objects created successfully
+[18:25:28.134] [INFO ] Vulkan initialization completed
+[18:25:28.134] [INFO ] VulkanRenderer initialization completed successfully
+[18:25:28.134] [INFO ] Initializing ImGui debug interface...
+[18:25:28.138] [INFO ] ImGui debug interface initialized successfully
+[18:25:28.138] [INFO ] ImGui initialization completed successfully
+[18:25:28.138] [INFO ] CreatureRenderSystem initialized - GPU instancing enabled
+[18:25:28.138] [INFO ] Target performance: 200+ creatures at 60+ FPS
+[18:25:28.138] [INFO ] Using world config: Test World bounds (-30.000000,-5.000000,-30.000000) to (30.000000,35.000000,30.000000)
+[18:25:28.138] [ERROR] World::connectSystems: SpatialSystem not initialized - cannot connect system dependencies
+[18:25:28.138] [INFO ] System dependency connection completed via World::connectSystems()
+[18:25:28.138] [INFO ] ECS Inspector initialized successfully
+[18:25:28.138] [INFO ] ECS systems initialized successfully
+[18:25:28.138] [INFO ] InputHandler initialized with ECS camera system
+[18:25:28.138] [INFO ] InputHandler initialized with ECS camera system
+[18:25:28.138] [INFO ] System callbacks connected
+[18:25:28.138] [INFO ] Input system initialized
+[18:25:28.138] [INFO ] Creating Pokemon Legends Arceus Scale Test Scene...
+[18:25:28.138] [INFO ] Target: 1000 creatures - 10x10x10 cube formation stress test
+[18:25:28.138] [INFO ] Creating 1000 creatures in 10x10x10 cube formation
+[18:25:28.142] [INFO ] Scene setup complete: 1000 creatures with spatial AI
+[18:25:28.142] [INFO ] VulkanMon ready!
+[18:25:28.296] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/cube.obj
+[18:25:28.301] [INFO ] Model loaded: cube.obj (1 meshes, 24 vertices)
+[18:25:28.302] [INFO ] Model loaded and cached: cube.obj
+[18:25:30.311] [INFO ] Application Performance: 146 FPS, 6.585700ms frame time
+[18:25:32.294] [INFO ] Application Performance: 151 FPS, 6.569100ms frame time
+[18:25:34.283] [INFO ] Application Performance: 150 FPS, 6.585400ms frame time
+[18:25:36.283] [INFO ] Application Performance: 150 FPS, 6.622200ms frame time
+[18:25:38.283] [INFO ] Application Performance: 150 FPS, 6.648300ms frame time
+[18:25:40.284] [INFO ] Application Performance: 149 FPS, 6.575000ms frame time
+[18:25:40.290] [INFO ] GPU Render Performance (Frame 1800):
+  Creatures: 1000/1000 (0% culled)
+  GPU Efficiency: 4 batches, 250 creatures/draw
+  Render Time: 5.3132ms (Cull:1.1048ms + Batch:4.197ms + GPU:0.0105ms)
+[18:25:42.283] [INFO ] Application Performance: 150 FPS, 6.549500ms frame time
+[18:25:44.283] [INFO ] Application Performance: 150 FPS, 6.593300ms frame time
+[18:25:46.284] [INFO ] Application Performance: 149 FPS, 6.577100ms frame time
+[18:25:48.283] [INFO ] Application Performance: 150 FPS, 6.570600ms frame time
+[18:25:50.283] [INFO ] Application Performance: 150 FPS, 6.504100ms frame time
+[18:25:52.283] [INFO ] Application Performance: 150 FPS, 6.612400ms frame time
+[18:25:52.290] [INFO ] GPU Render Performance (Frame 3600):
+  Creatures: 1000/1000 (0% culled)
+  GPU Efficiency: 4 batches, 250 creatures/draw
+  Render Time: 5.2637ms (Cull:1.0895ms + Batch:4.163ms + GPU:0.0101ms)
+[18:25:54.284] [INFO ] Application Performance: 150 FPS, 6.646700ms frame time
+[18:25:56.283] [INFO ] Application Performance: 150 FPS, 6.533000ms frame time
+[18:25:58.284] [INFO ] Application Performance: 150 FPS, 6.654900ms frame time
+[18:26:00.284] [INFO ] Application Performance: 150 FPS, 6.661800ms frame time
+[18:26:02.284] [INFO ] Application Performance: 149 FPS, 6.559500ms frame time
+[18:26:04.285] [INFO ] Application Performance: 149 FPS, 7.604700ms frame time
+[18:26:04.291] [INFO ] GPU Render Performance (Frame 5400):
+  Creatures: 1000/1000 (0% culled)
+  GPU Efficiency: 4 batches, 250 creatures/draw
+  Render Time: 5.3144ms (Cull:1.0942ms + Batch:4.2053ms + GPU:0.0134ms)
+[18:26:06.284] [INFO ] Application Performance: 150 FPS, 6.526500ms frame time
+[18:26:08.284] [INFO ] Application Performance: 150 FPS, 6.632600ms frame time
+[18:26:10.284] [INFO ] Application Performance: 150 FPS, 6.518600ms frame time
+[18:26:12.284] [INFO ] Application Performance: 149 FPS, 6.637200ms frame time
+[18:26:14.284] [INFO ] Application Performance: 150 FPS, 6.569100ms frame time
+[18:26:16.284] [INFO ] Application Performance: 151 FPS, 6.591400ms frame time
+[18:26:16.291] [INFO ] GPU Render Performance (Frame 7200):
+  Creatures: 1000/1000 (0% culled)
+  GPU Efficiency: 4 batches, 250 creatures/draw
+  Render Time: 5.3213ms (Cull:1.0913ms + Batch:4.2169ms + GPU:0.0119ms)
+[18:26:18.285] [INFO ] Application Performance: 149 FPS, 6.587200ms frame time
+[18:26:20.285] [INFO ] Application Performance: 149 FPS, 6.609400ms frame time
+[18:26:22.285] [INFO ] Application Performance: 149 FPS, 6.566600ms frame time
+[18:26:24.285] [INFO ] Application Performance: 149 FPS, 6.502500ms frame time
+[18:26:26.285] [INFO ] Application Performance: 149 FPS, 6.511400ms frame time
+[18:26:28.286] [INFO ] Application Performance: 149 FPS, 6.646700ms frame time
+[18:26:28.293] [INFO ] GPU Render Performance (Frame 9000):
+  Creatures: 1000/1000 (0% culled)
+  GPU Efficiency: 4 batches, 250 creatures/draw
+  Render Time: 5.3553ms (Cull:1.1163ms + Batch:4.2273ms + GPU:0.0106ms)
+[18:26:30.284] [INFO ] Application Performance: 149 FPS, 6.607700ms frame time
+[18:26:32.285] [INFO ] Application Performance: 150 FPS, 6.591800ms frame time
+[18:26:34.285] [INFO ] Application Performance: 149 FPS, 6.625800ms frame time
+[18:26:36.284] [INFO ] Application Performance: 149 FPS, 6.573600ms frame time
+[18:26:38.291] [INFO ] Application Performance: 150 FPS, 6.801800ms frame time
+[18:26:38.998] [INFO ] Application finished successfully
+[18:26:38.998] [INFO ] Beginning Application cleanup...
+[18:26:38.999] [INFO ] Cleaning up renderer...
+[18:26:38.999] [INFO ] Cleaning up ImGui debug interface...
+[18:26:39.001] [INFO ] ImGui debug interface cleanup complete
+[18:26:39.001] [INFO ] Beginning VulkanRenderer cleanup...
+[18:26:39.003] [INFO ] GPU instance buffer cleanup complete
+[18:26:39.028] [INFO ] VulkanRenderer cleanup completed
+[18:26:39.028] [INFO ] VulkanRenderer destroyed
+[Vulkan Loader] ERROR:          vkUnmapMemory: Invalid device [VUID-vkUnmapMemory-device-parameter]
+abort() has been called

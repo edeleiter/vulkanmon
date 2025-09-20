@@ -192,57 +192,6 @@ TEST_CASE("LoadedTexture Data Structure", "[AssetManager][LoadedTexture]") {
     }
 }
 
-TEST_CASE("AssetManager Interface Design", "[AssetManager][Interface]") {
-    SECTION("Constructor parameter validation") {
-        // Test AssetManager constructor interface requirements
-        VkDevice mockDevice = reinterpret_cast<VkDevice>(0x12345678);
-        VkPhysicalDevice mockPhysicalDevice = reinterpret_cast<VkPhysicalDevice>(0x87654321);
-        VkCommandPool mockCommandPool = reinterpret_cast<VkCommandPool>(0x11111111);
-        VkQueue mockQueue = reinterpret_cast<VkQueue>(0x22222222);
-        std::string assetsPath = "test_assets/";
-        
-        // Validate constructor parameter types
-        REQUIRE(mockDevice != VK_NULL_HANDLE);
-        REQUIRE(mockPhysicalDevice != VK_NULL_HANDLE);
-        REQUIRE(mockCommandPool != VK_NULL_HANDLE);
-        REQUIRE(mockQueue != VK_NULL_HANDLE);
-        REQUIRE(!assetsPath.empty());
-        
-        // Test path validation
-        REQUIRE(assetsPath.back() == '/');
-    }
-    
-    SECTION("RAII design validation") {
-        // Test that AssetManager follows proper RAII design principles
-        REQUIRE_FALSE(std::is_copy_constructible_v<AssetManager>);
-        REQUIRE_FALSE(std::is_copy_assignable_v<AssetManager>);
-        REQUIRE(std::is_move_constructible_v<AssetManager>);
-        REQUIRE(std::is_move_assignable_v<AssetManager>);
-        REQUIRE(std::is_destructible_v<AssetManager>);
-    }
-    
-    SECTION("Method interface validation") {
-        // Test that expected methods exist and have correct signatures
-        // This validates the interface design at compile time
-        
-        std::string testFilename = "interface_test.png";
-        TextureLoadInfo testLoadInfo(testFilename);
-        
-        // Validate parameter types
-        REQUIRE(!testLoadInfo.filename.empty());
-        REQUIRE(!testLoadInfo.debugName.empty());
-        
-        // Test shader loading interface
-        std::string shaderFilename = "test_shader.spv";
-        std::string shaderType = "vertex";
-        
-        REQUIRE(!shaderFilename.empty());
-        REQUIRE(!shaderType.empty());
-        
-        // Interface validation passes
-        REQUIRE(true);
-    }
-}
 
 TEST_CASE("Asset Path Management", "[AssetManager][Paths]") {
     SECTION("Asset path validation logic") {

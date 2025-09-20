@@ -1,11 +1,11 @@
 /*
  * VulkanMon VulkanRenderer Unit Tests
- * 
+ *
  * Focused tests for the VulkanRenderer class following our philosophy:
  * - "Simple is Powerful" - Test component interfaces without full Vulkan setup
  * - "Test, Test, Test" - Verify constructor safety and state management
  * - "Document Often" - Clear test names that document expected behavior
- * 
+ *
  * Note: These tests focus on VulkanRenderer logic without initializing Vulkan systems
  */
 
@@ -14,41 +14,19 @@
 
 #include "../src/rendering/VulkanRenderer.h"
 #include "../src/core/Window.h"
-#include "../src/core/Camera.h"
+#include "../src/systems/CameraSystem.h"
 #include "fixtures/TestHelpers.h"
 #include <memory>
+#include <set>
 
 using namespace VulkanMon;
 using namespace VulkanMon::Testing;
 
-TEST_CASE("VulkanRenderer Basic Construction", "[VulkanRenderer][Basic]") {
-    SECTION("VulkanRenderer header inclusion") {
-        // Test that VulkanRenderer header includes properly
-        // This is a minimal test to verify the class exists
-        REQUIRE(true); // If we can include the header, this passes
-    }
-    
-    SECTION("VulkanRenderer constants") {
-        // Test any public constants if they exist
-        REQUIRE(true); // Placeholder for future constant tests
-    }
-}
+// REMOVED: Basic Construction test - pointless constructor testing
 
-TEST_CASE("VulkanRenderer State Management", "[VulkanRenderer][State]") {
-    SECTION("VulkanRenderer interface testing") {
-        // Test interface concepts without full construction
-        // VulkanRenderer should have methods for frame timing, initialization, etc.
-        REQUIRE(true); // Placeholder - detailed testing requires integration tests
-    }
-}
+// REMOVED: State Management test - redundant with integration tests
 
-TEST_CASE("VulkanRenderer RAII Behavior", "[VulkanRenderer][RAII]") {
-    SECTION("RAII principles") {
-        // VulkanRenderer follows RAII principles
-        // Full testing requires integration tests with actual Vulkan setup
-        REQUIRE(true); // Placeholder
-    }
-}
+// REMOVED: RAII Behavior test - pointless RAII testing
 
 TEST_CASE("VulkanRenderer Interface Contracts", "[VulkanRenderer][Interface]") {
     SECTION("Interface expectations") {
@@ -76,7 +54,7 @@ TEST_CASE("VulkanRenderer Model Caching System", "[VulkanRenderer][ModelCache]")
 
     SECTION("Model path validation design") {
         // Test expected behavior of model path handling
-        std::string testPath1 = "test_cube.obj";
+        std::string testPath1 = "cube.obj";
         std::string testPath2 = "sphere.obj";
         std::string testPath3 = "pyramid.obj";
         std::string testPath4 = "plane.obj";
@@ -94,7 +72,7 @@ TEST_CASE("VulkanRenderer Model Caching System", "[VulkanRenderer][ModelCache]")
         REQUIRE(testPath4.ends_with(".obj"));
 
         INFO("Model caching system supports diverse mesh paths:");
-        INFO("- test_cube.obj (24 vertices)");
+        INFO("- cube.obj (24 vertices)");
         INFO("- sphere.obj (58 vertices)");
         INFO("- pyramid.obj (5 vertices)");
         INFO("- plane.obj (25 vertices)");
@@ -106,7 +84,7 @@ TEST_CASE("VulkanRenderer Model Caching System", "[VulkanRenderer][ModelCache]")
 
         int expectedObjectCount = 5;
         std::vector<std::string> expectedMeshes = {
-            "test_cube.obj",
+            "cube.obj",
             "sphere.obj",
             "pyramid.obj",
             "sphere.obj",    // Second sphere instance

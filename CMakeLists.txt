@@ -52,10 +52,10 @@ add_custom_target(shaders
 add_executable(vulkanmon
     src/main.cpp
     src/core/Application.cpp
+    src/core/World.cpp
     src/rendering/VulkanRenderer.cpp
     src/core/Window.cpp
     src/core/InputHandler.cpp
-    src/core/Camera.cpp
     src/utils/Utils.cpp
     src/stb_image_impl.cpp
     src/rendering/ResourceManager.cpp
@@ -65,8 +65,13 @@ add_executable(vulkanmon
     src/systems/LightingSystem.cpp
     src/systems/MaterialSystem.cpp
     src/systems/RenderSystem.cpp
+    src/systems/CreatureRenderSystem.cpp
     src/systems/CameraSystem.cpp
     src/debug/ECSInspector.cpp
+    src/spatial/SpatialManager.cpp
+    src/spatial/WorldConfig.cpp
+    src/spatial/LayerMask.cpp
+    src/spatial/SpatialCache.cpp
 )
 
 # Make sure shaders are compiled before building the executable

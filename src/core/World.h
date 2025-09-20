@@ -3,6 +3,10 @@
 #include "EntityManager.h"
 #include "SystemManager.h"
 #include "../rendering/VulkanRenderer.h"
+#include "../utils/Logger.h"
+#include <stdexcept>
+#include <string>
+#include <typeinfo>
 
 namespace VulkanMon {
 
@@ -94,6 +98,21 @@ public:
     template<typename T>
     bool hasSystem() const {
         return systemManager.hasSystem<T>();
+    }
+
+    // System connection and validation helpers
+    void connectSystems();
+
+    // Checked system getter with better error messages
+    template<typename T>
+    T* getSystemChecked() {
+        T* system = getSystem<T>();
+        if (!system) {
+            throw std::runtime_error(
+                std::string("Required system not found: ") + typeid(T).name()
+            );
+        }
+        return system;
     }
 
     // Direct access to managers (for advanced use)
