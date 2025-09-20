@@ -160,6 +160,10 @@ void OctreeNode::update(EntityID entity, const glm::vec3& oldPos, const glm::vec
                     children_[oldChildIndex]->update(entity, oldPos, newPos);
                 }
             }
+        } else {
+            // LEAF NODE CASE: Entity is moving within the same leaf node
+            // The entity is already in this leaf's entities_ list, so no action needed
+            // Position tracking is handled by SpatialManager::updateEntity
         }
     }
 }
@@ -358,6 +362,26 @@ void SpatialManager::addEntity(EntityID entity, const glm::vec3& position, uint3
     entityPositions_[entity] = position;
     entityLayers_[entity] = layers;
     octree_->insert(entity, position);
+
+    // POKEMON PERFORMANCE: Check if subdivision is needed after insertion
+    // This is critical for handling hundreds of creatures efficiently
+    if (needsSubdivision()) {
+        // Create position lookup lambda for subdivision
+        auto getEntityPosition = [this](EntityID entityId) -> glm::vec3 {
+            auto it = entityPositions_.find(entityId);
+            if (it != entityPositions_.end()) {
+                return it->second;
+            }
+            throw std::runtime_error("Entity position not found during subdivision");
+        };
+
+        try {
+            octree_->subdivide(getEntityPosition);
+        } catch (const std::exception& e) {
+            VKMON_WARNING("Octree subdivision failed - continuing with single node");
+            // Subdivision failure is handled gracefully by the octree itself
+        }
+    }
 }
 
 void SpatialManager::removeEntity(EntityID entity) {
@@ -367,9 +391,16 @@ void SpatialManager::removeEntity(EntityID entity) {
         return;
     }
 
-    octree_->remove(entity, it->second);
+    glm::vec3 position = it->second;
+
+    octree_->remove(entity, position);
     entityPositions_.erase(it);
     entityLayers_.erase(entity);
+
+    // CACHE INVALIDATION: Invalidate any cached queries that might contain this entity
+    // Use a reasonable radius to invalidate queries around the removed entity's position
+    float influenceRadius = 20.0f; // Generous radius to ensure all relevant queries are invalidated
+    queryCache_->invalidateEntityMovement(position, position, influenceRadius);
 }
 
 void SpatialManager::updateEntity(EntityID entity, const glm::vec3& newPosition) {
@@ -612,6 +643,10 @@ void SpatialManager::clear() {
         std::lock_guard<std::mutex> lock(statsMutex_);
         stats_ = SpatialStats{};
     }
+}
+
+bool SpatialManager::needsSubdivision() const {
+    return octree_->shouldSubdivide();
 }
 
 void SpatialManager::updateStatistics(float queryTimeMs, size_t entitiesReturned) const {

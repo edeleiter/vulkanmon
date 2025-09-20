@@ -258,6 +258,7 @@ TEST_CASE("SpatialManager Octree Operations", "[spatial]") {
 
         // Remove entity
         spatialManager.removeEntity(e1);
+
         results = spatialManager.queryRadius(newPos1, 5.0f);
         foundE1 = false;
         for (auto entity : results) {

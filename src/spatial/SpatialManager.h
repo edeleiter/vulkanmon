@@ -87,10 +87,11 @@ public:
     size_t getEntityCount() const;
     void getStatistics(int& nodeCount, int& maxDepth, int& totalEntities) const;
 
+    bool shouldSubdivide() const;
+
 private:
     int getChildIndex(const glm::vec3& position) const;
     BoundingBox getChildBounds(int childIndex) const;
-    bool shouldSubdivide() const;
 };
 
 class SpatialManager {
@@ -174,6 +175,8 @@ public:
     }
     void clear();
 
+    // Octree management (Pokemon performance optimization)
+    bool needsSubdivision() const;
 
     const BoundingBox& getWorldBounds() const { return worldBounds_; }
 
