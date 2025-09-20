@@ -285,6 +285,13 @@ public:
     // GPU instancing for massive creature rendering
 
     /**
+     * Instance buffer management for multi-batch rendering
+     */
+    void resetInstanceOffset() { currentInstanceOffset_ = 0; }
+    uint32_t getCurrentInstanceOffset() const { return currentInstanceOffset_; }
+    void clearInstanceBuffer();  // Clear buffer and reset state for new frame
+
+    /**
      * Render multiple instances of the same mesh with different transforms
      * This is the high-performance path for rendering hundreds of identical objects
      *
@@ -478,6 +485,11 @@ private:
     MappedBuffer instanceBufferMapped_;  // RAII protected
     size_t instanceBufferSize_ = 0;
     static constexpr size_t maxInstances_ = 1000;  // Target: 200+ creatures + headroom
+
+    // Instance buffer offset tracking for multi-batch rendering
+    uint32_t currentInstanceOffset_ = 0;
+    uint32_t totalInstancesThisFrame_ = 0;
+    static constexpr uint32_t MAX_INSTANCES_PER_FRAME = 1000;
     
     // Vulkan initialization methods
     void initVulkan();

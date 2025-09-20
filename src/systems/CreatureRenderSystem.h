@@ -13,6 +13,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <unordered_map>
+#include <map>
 #include <string>
 #include <memory>
 #include <chrono>
@@ -102,7 +103,9 @@ private:
     SpatialSystem* spatialSystem_ = nullptr; // Safe: World guarantees lifetime
 
     // Instanced rendering data
-    std::unordered_map<std::string, InstancedBatch> instanceBatches_;
+    // ROBUSTNESS FIX: Use std::map for deterministic batch ordering
+    // This ensures consistent instance buffer layout across runs
+    std::map<std::string, InstancedBatch> instanceBatches_;
 
     // Performance and configuration
     CreatureRenderStats frameStats_;

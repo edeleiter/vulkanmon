@@ -65,8 +65,8 @@ struct WorldConfig {
 
     static WorldConfig createTestWorld() {
         return WorldConfig(
-            glm::vec3(-30.0f, -5.0f, -30.0f),  // Expanded to cover 16x16 grid at 3.0f spacing
-            glm::vec3(30.0f, 10.0f, 30.0f),   // Grid spans -22.5 to +22.5, so -30 to +30 provides buffer
+            glm::vec3(-30.0f, -5.0f, -30.0f),  // Expanded for 10x10x10 cube formation
+            glm::vec3(30.0f, 35.0f, 30.0f),   // Y expanded to 35 to accommodate cube 0-27 + buffer
             "Test World"
         );
     }

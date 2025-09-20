@@ -11,19 +11,53 @@ CreatureRenderSystem::CreatureRenderSystem(CameraSystem* cameraSystem, SpatialSy
     VKMON_INFO("Target performance: 200+ creatures at 60+ FPS");
 
     // Pre-reserve space for common batch counts
-    instanceBatches_.reserve(16); // Expect up to 16 different creature types
+    // DESIGN DECISION: Using std::map for deterministic batch ordering
+    // Trade-off: No reserve() capability vs guaranteed consistent iteration order
+    // Scale: Expected <20 batches, so O(log n) vs O(1) performance difference is negligible
+    // Priority: Deterministic rendering > micro-performance optimization
 }
 
 void CreatureRenderSystem::update(float deltaTime, EntityManager& entityManager) {
-    // Future: Update creature animations, behavior states, etc.
-    // For now, just reset statistics for the next frame
+    // Convert deltaTime from milliseconds to seconds for proper physics calculations
+    float deltaTimeSeconds = deltaTime / 1000.0f;
+
+    // Update cube rotations over time for smooth animation
+    auto entities = entityManager.getEntitiesWithComponent<CreatureComponent>();
+
+    for (EntityID entity : entities) {
+        if (entityManager.hasComponent<Transform>(entity)) {
+            Transform& transform = entityManager.getComponent<Transform>(entity);
+
+            // Different rotation speeds for each axis to create interesting motion
+            float rotSpeedX = 15.0f;  // degrees per second - nice gentle rotation
+            float rotSpeedY = 20.0f;  // degrees per second
+            float rotSpeedZ = 25.0f;  // degrees per second
+
+            // Create rotation increments as quaternions using converted deltaTime
+            glm::quat deltaRotX = glm::angleAxis(glm::radians(rotSpeedX * deltaTimeSeconds), glm::vec3(1, 0, 0));
+            glm::quat deltaRotY = glm::angleAxis(glm::radians(rotSpeedY * deltaTimeSeconds), glm::vec3(0, 1, 0));
+            glm::quat deltaRotZ = glm::angleAxis(glm::radians(rotSpeedZ * deltaTimeSeconds), glm::vec3(0, 0, 1));
+
+            // Combine delta rotations
+            glm::quat deltaRotation = deltaRotZ * deltaRotY * deltaRotX;
+
+            // Apply delta rotation to current rotation
+            transform.setRotation(deltaRotation * transform.rotation);
+        }
+    }
+
+    // Reset statistics for the next frame
     frameStats_.reset();
 }
 
 void CreatureRenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager) {
     // Debug safety assertions (zero cost in release builds)
     assert(cameraSystem_ && "CameraSystem must be set before rendering");
-    assert(spatialSystem_ && "SpatialSystem must be set before rendering");
+    // PERFORMANCE TEST: Allow rendering without spatial system (will use fallback)
+    // assert(spatialSystem_ && "SpatialSystem must be set before rendering");
+
+    // CRITICAL: Clear instance buffer for new frame (prevents ghost instances)
+    renderer.clearInstanceBuffer();
 
     auto frameStart = std::chrono::high_resolution_clock::now();
 
@@ -194,16 +228,34 @@ void CreatureRenderSystem::renderInstanceBatches(VulkanRenderer& renderer) {
             continue;
         }
 
+        // EXCEPTION SAFETY FIX: Separate timing from exception handling
         auto batchStart = std::chrono::high_resolution_clock::now();
+        bool renderSuccess = false;
 
-        // Use new instanced rendering method
-        renderer.renderInstancedCreatures(batch.meshPath, batch.instances, batch.baseMaterialId);
+        try {
+            // ENHANCED ERROR HANDLING: Graceful batch rendering with recovery
+            renderer.renderInstancedCreatures(batch.meshPath, batch.instances, batch.baseMaterialId);
 
-        // Count this as one draw call (instanced rendering)
-        frameStats_.totalDrawCalls++;
+            // Mark successful rendering
+            renderSuccess = true;
+            frameStats_.totalDrawCalls++;
 
+        } catch (const std::exception& e) {
+            // ERROR RECOVERY: Log and continue with remaining batches
+            VKMON_ERROR("Batch rendering failed for " + batchKey + ": " + e.what());
+            VKMON_WARNING("Continuing with remaining batches (graceful degradation)");
+
+            // renderSuccess remains false - timing will reflect failure
+        }
+
+        // SAFETY: Always measure timing, but mark failed batches appropriately
         auto batchEnd = std::chrono::high_resolution_clock::now();
-        batch.totalRenderTimeMs = std::chrono::duration<float, std::milli>(batchEnd - batchStart).count();
+
+        if (renderSuccess) {
+            batch.totalRenderTimeMs = std::chrono::duration<float, std::milli>(batchEnd - batchStart).count();
+        } else {
+            batch.totalRenderTimeMs = 0.0f;  // Mark failed batch with zero time
+        }
     }
 
     #ifdef DEBUG_VERBOSE

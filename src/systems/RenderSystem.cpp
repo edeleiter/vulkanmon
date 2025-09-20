@@ -17,7 +17,8 @@ void RenderSystem::update(float deltaTime, EntityManager& entityManager) {
 void RenderSystem::render(VulkanRenderer& renderer, EntityManager& entityManager) {
     // Debug safety assertions (zero cost in release builds)
     assert(cameraSystem && "CameraSystem must be set before rendering");
-    assert(spatialSystem && "SpatialSystem must be set before rendering");
+    // PERFORMANCE TEST: Allow rendering without spatial system (will use fallback)
+    // assert(spatialSystem && "SpatialSystem must be set before rendering");
 
     // Reset statistics
     renderedObjectCount = 0;

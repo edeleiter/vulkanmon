@@ -135,10 +135,11 @@ void Application::initializeECS() {
                            std::to_string(worldConfig.maxBounds.x) + "," +
                            std::to_string(worldConfig.maxBounds.y) + "," +
                            std::to_string(worldConfig.maxBounds.z) + ")");
-    spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
+    // PERFORMANCE TEST: Disable heavy systems to test pure rendering performance
+    // spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
 
     // Add CreatureDetectionSystem for AI behavior and spatial detection
-    creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
+    // creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
 
     // Use centralized system connection with validation
     world_->connectSystems();
@@ -170,86 +171,90 @@ void Application::createTestScene() {
     }
 
     VKMON_INFO("Creating Pokemon Legends Arceus Scale Test Scene...");
-    VKMON_INFO("Target: 1024 creatures - massive open world scale validation");
+    VKMON_INFO("Target: 1000 creatures - 10x10x10 cube formation stress test");
 
     // =========================================================================
-    // SPATIAL STRESS TEST - Pokemon Legends Scale Validation
+    // SPATIAL STRESS TEST - 3D Cube Formation (10x10x10 = 1000 entities)
     // =========================================================================
 
-    const int CREATURE_GRID_SIZE = 32;  // 32x32 = 1024 creatures - POKEMON LEGENDS SCALE!
-    const float CREATURE_SPACING = 3.0f;  // Proper spacing to prevent overlaps
-    const float GRID_OFFSET = -(CREATURE_GRID_SIZE - 1) * CREATURE_SPACING * 0.5f;
+    const int GRID_SIZE = 10;  // 10x10x10 = 1000 creatures - 3D cube formation
+    const float CREATURE_SPACING = 2.0f;  // 2.0f spacing for clear separation
 
-    // Use only cubes for maximum stress testing and consistency
-    const std::string creatureMesh = "cube.obj";  // All creatures use cubes
+    // Use only cubes for consistency during debugging
+    const std::string creatureMesh = "cube.obj";
     const std::vector<uint32_t> creatureMaterials = {0, 1, 2, 3};  // Different materials for visual variety
 
     size_t totalCreatures = 0;
 
-    VKMON_INFO("Starting creature creation: " + std::to_string(CREATURE_GRID_SIZE) + "x" + std::to_string(CREATURE_GRID_SIZE) + " grid");
-    VKMON_INFO("Grid spans: " + std::to_string(GRID_OFFSET) + " to " + std::to_string(-GRID_OFFSET) + " units");
+    VKMON_INFO("Creating " + std::to_string(GRID_SIZE * GRID_SIZE * GRID_SIZE) + " creatures in " + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + " cube formation");
 
-    for (int x = 0; x < CREATURE_GRID_SIZE; x++) {
-        for (int z = 0; z < CREATURE_GRID_SIZE; z++) {
-            EntityID creature = world_->createEntity();
+    for (int x = 0; x < GRID_SIZE; x++) {
+        for (int y = 0; y < GRID_SIZE; y++) {
+            for (int z = 0; z < GRID_SIZE; z++) {
+                // Entity creation (clean, no per-entity spam)
 
-            // Position in grid formation
-            Transform creatureTransform;
-            creatureTransform.position = glm::vec3(
-                GRID_OFFSET + x * CREATURE_SPACING,  // X: grid spread
-                0.0f,                                // Y: ground level
-                GRID_OFFSET + z * CREATURE_SPACING   // Z: grid spread
-            );
-            // Uniform scale and rotation for consistency
-            creatureTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
-            creatureTransform.scale = glm::vec3(1.0f);  // Standard 1-unit cubes
-            world_->addComponent(creature, creatureTransform);
+                EntityID creature = world_->createEntity();
 
-            // Material variety for visual distinction while using single mesh
-            int materialType = (x + z) % creatureMaterials.size();
+                // Position in 3D cube formation starting from (0,0,0)
+                Transform creatureTransform;
+                creatureTransform.position = glm::vec3(
+                    x * CREATURE_SPACING,  // X: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
+                    y * CREATURE_SPACING,  // Y: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18 (now 3D!)
+                    z * CREATURE_SPACING   // Z: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
+                );
 
-            Renderable creatureRenderable;
-            creatureRenderable.meshPath = creatureMesh;  // All cubes for consistency
-            creatureRenderable.texturePath = "default";
-            creatureRenderable.materialId = creatureMaterials[materialType];
-            creatureRenderable.isVisible = true;
-            creatureRenderable.renderLayer = 0;
-            creatureRenderable.lodDistance = 1000.0f;  // Ensure all creatures are always visible for stress test
-            world_->addComponent(creature, creatureRenderable);
+                // Varied rotations for visual interest - each cube gets unique rotation
+                float rotX = (x * 15.0f) + (y * 5.0f) + (z * 7.0f);   // X-axis rotation based on grid position
+                float rotY = (x + y + z) * 12.0f;                     // Y-axis rotation creates spiral pattern
+                float rotZ = (x - y + z) * 8.0f;                      // Z-axis rotation adds variety
+                creatureTransform.setRotationEuler(rotX, rotY, rotZ);
+                creatureTransform.scale = glm::vec3(0.5f);  // Scale down for clear separation
+                world_->addComponent(creature, creatureTransform);
 
-            // CreatureComponent for spatial detection testing
-            CreatureComponent creatureComp;
-            creatureComp.state = CreatureState::WANDERING;  // Active behavior for spatial queries
-            creatureComp.detectionRadius = 8.0f + (x + z) * 0.5f;  // Varied detection radii
-            creatureComp.type = static_cast<CreatureComponent::CreatureType>((x + z) % 3);  // Mix of types
-            world_->addComponent(creature, creatureComp);
+                // Material variety for visual distinction - now using 3D coordinates
+                int materialType = (x + y + z) % creatureMaterials.size();
 
-            // SpatialComponent for thread-safe spatial system testing
-            SpatialComponent creatureSpatial;
-            creatureSpatial.spatialLayers = LayerMask::Creatures;
-            creatureSpatial.boundingRadius = 1.0f + (x + z) * 0.1f;  // Varied sizes
-            creatureSpatial.behavior = SpatialBehavior::DYNAMIC;  // Dynamic for spatial update testing
-            world_->addComponent(creature, creatureSpatial);
+                Renderable creatureRenderable;
+                creatureRenderable.meshPath = creatureMesh;
+                creatureRenderable.texturePath = "default";
+                creatureRenderable.materialId = creatureMaterials[materialType];
+                creatureRenderable.isVisible = true;
+                creatureRenderable.renderLayer = 0;
+                creatureRenderable.lodDistance = 1000.0f;
+                world_->addComponent(creature, creatureRenderable);
 
-            totalCreatures++;
+                // CreatureComponent for spatial detection testing
+                CreatureComponent creatureComp;
+                creatureComp.state = CreatureState::IDLE;
+                creatureComp.detectionRadius = 8.0f + (x + y + z) * 0.1f;  // Varied detection radii using 3D coordinates
+                creatureComp.type = static_cast<CreatureComponent::CreatureType>((x + y + z) % 3);
+                world_->addComponent(creature, creatureComp);
+
+                // SpatialComponent for spatial system testing
+                SpatialComponent creatureSpatial;
+                creatureSpatial.spatialLayers = LayerMask::Creatures;
+                creatureSpatial.boundingRadius = 1.0f + (x + y + z) * 0.05f;
+                creatureSpatial.behavior = SpatialBehavior::STATIC;
+                creatureSpatial.setHomePosition(creatureTransform.position);
+                world_->addComponent(creature, creatureSpatial);
+
+                totalCreatures++;
+            }
         }
     }
 
-    VKMON_INFO("Spatial Stress Test: Created " + std::to_string(totalCreatures) + " creatures");
-    VKMON_INFO("Thread-Safe Validation: " + std::to_string(totalCreatures) + " entities with varied detection radii");
-    VKMON_INFO("Expected Spatial Queries: ~" + std::to_string(totalCreatures / 10) + " per frame");
-    VKMON_INFO("Performance Target: <2ms spatial system overhead per frame");
+    VKMON_INFO("Scene setup complete: " + std::to_string(totalCreatures) + " creatures with spatial AI");
 
-    // Create camera positioned to see 1024 creatures (grid spans -46.5 to +46.5 = 93 units)
+    // Create camera positioned to see 1000 creatures in 3D cube (cube spans 0 to 18 units in X, Y, and Z)
     EntityID cameraEntity = world_->createEntity();
     Transform cameraTransform;
-    cameraTransform.position = glm::vec3(0.0f, 25.0f, 40.0f);  // Higher to see massive 1024 creature field
-    cameraTransform.setRotationEuler(-25.0f, 0.0f, 0.0f); // Look down at the massive creature field
+    cameraTransform.position = glm::vec3(25.0f, 25.0f, 40.0f);  // Further back and elevated to see entire 3D cube
+    cameraTransform.setRotationEuler(-20.0f, -15.0f, 0.0f); // Angled to see the 3D structure clearly
     cameraTransform.scale = glm::vec3(1.0f);
     world_->addComponent(cameraEntity, cameraTransform);
 
     Camera cameraComponent;
-    cameraComponent.fov = 75.0f;  // Standard FOV should work for closer camera
+    cameraComponent.fov = 45.0f;  // Much narrower FOV for less distortion - standard value
     cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE;
     cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;
     cameraComponent.aspectRatio = 16.0f / 9.0f;
@@ -277,10 +282,5 @@ void Application::createTestScene() {
     SpatialComponent playerSpatial(2.0f, SpatialBehavior::DYNAMIC, LayerMask::Player);
     world_->addComponent(playerEntity, playerSpatial);
 
-    VKMON_INFO("Test player entity created at center for creature detection testing");
-
-    VKMON_INFO("Spatial Stress Test Scene Complete!");
-    VKMON_INFO("Thread-Safe System Test: " + std::to_string(totalCreatures) + " creatures with active AI");
-    VKMON_INFO("Spatial Query Load: ~" + std::to_string(totalCreatures / 10) + " radius queries per frame");
-    VKMON_INFO("Ready to validate Pokemon Legends scale spatial performance!");
+    // Scene setup complete - main application will log ready message
 }

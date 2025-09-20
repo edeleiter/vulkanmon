@@ -164,15 +164,28 @@ void Application::updateECS(float deltaTime) {
             rotationAngle -= 360.0f;
         }
 
-        for (EntityID entity : entities) {
-            // Only rotate entities that have CreatureComponent (not cameras)
-            if (world_->hasComponent<CreatureComponent>(entity)) {
-                auto& transform = world_->getComponent<Transform>(entity);
-                // Apply rotation to creatures only
-                transform.setRotationEuler(0.0f, rotationAngle, 0.0f);
+        // Debug: Occasional grid verification (reduced frequency)
+        static int debugFrameCounter = 0;
+        if (debugFrameCounter % 1800 == 0) { // Every 30 seconds at 60fps
+            int entityCount = 0;
+            for (EntityID entity : entities) {
+                if (world_->hasComponent<CreatureComponent>(entity) && entityCount < 5) {
+                    auto& transform = world_->getComponent<Transform>(entity);
+                    VKMON_DEBUG("Entity " + std::to_string(entityCount) + " pos: (" +
+                               std::to_string(transform.position.x) + "," +
+                               std::to_string(transform.position.y) + "," +
+                               std::to_string(transform.position.z) + ")");
+                    entityCount++;
+                }
             }
+            VKMON_DEBUG("Total entities with CreatureComponent: " + std::to_string(entities.size()));
         }
+        debugFrameCounter++;
 
+        // TODO: Add back rotation animation as needed for specific entities
+        // Rotation animation disabled to see clean 10x10x10 cube formation
+
+        // PERFORMANCE TEST: Only essential systems enabled (CameraSystem + RenderSystem)
         world_->update(deltaTime);
     }
 }

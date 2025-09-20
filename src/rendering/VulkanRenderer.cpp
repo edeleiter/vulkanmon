@@ -457,7 +457,9 @@ void VulkanRenderer::renderInstanced(const std::string& meshPath,
         return;
     }
 
+    #ifdef DEBUG_VERBOSE
     VKMON_DEBUG("GPU Instancing: Rendering " + std::to_string(instanceCount) + " instances of " + meshPath);
+    #endif
 
     // Direct cast after validation - avoid unnecessary copy
     const auto* instances = static_cast<const InstanceData*>(instanceData);
@@ -514,10 +516,14 @@ void VulkanRenderer::renderInstanced(const std::string& meshPath,
                             instanceCount,                                 // instanceCount - THE MAGIC!
                             0,                                            // firstIndex
                             0,                                            // vertexOffset
-                            0);                                           // firstInstance
+                            currentInstanceOffset_);                      // firstInstance - USE OFFSET!
         }
-        VKMON_DEBUG("GPU Instancing: Rendered " + std::to_string(instanceCount) +
-                   " instances in 1 draw call for: " + meshPath);
+        #ifdef DEBUG_VERBOSE
+        VKMON_DEBUG("GPU: Successfully submitted " + std::to_string(instanceCount) + " instances in 1 draw call");
+        #endif
+
+        // Update offset for next batch
+        currentInstanceOffset_ += instanceCount;
     } else {
         VKMON_WARNING("No model cached for instanced meshPath: " + meshPath);
     }
@@ -2542,44 +2548,121 @@ void VulkanRenderer::createInstanceBuffer() {
 }
 
 void VulkanRenderer::updateInstanceData(const std::vector<VulkanMon::InstanceData>& instances) {
-    if (instances.size() > maxInstances_) {
-        throw std::runtime_error("Too many instances: " + std::to_string(instances.size()) +
-                                " (max: " + std::to_string(maxInstances_) + ")");
-    }
+    // SAFETY FIX: Deprecated method - force single-batch mode only to prevent corruption
+    // WARNING: This method should not be used with multi-batch rendering systems
+    VKMON_WARNING("updateInstanceData() is deprecated - use clearInstanceBuffer() + updateInstanceDataDirect()");
 
-    if (!instanceBufferMapped_.isValid()) {
-        VKMON_ERROR("Instance buffer not mapped!");
+    if (instances.empty()) {
         return;
     }
 
-    // Fast memcpy to GPU-visible memory
-    size_t dataSize = instances.size() * sizeof(VulkanMon::InstanceData);
-    memcpy(instanceBufferMapped_.get(), instances.data(), dataSize);
+    // CRITICAL SAFETY: Force clean state to prevent any possibility of corruption
+    // This ensures we never mix single-batch and multi-batch rendering unsafely
+    clearInstanceBuffer();
+
+    // Use the robust, offset-aware implementation starting from clean state
+    updateInstanceDataDirect(instances.data(), static_cast<uint32_t>(instances.size()));
+
+    // Note: No offset restoration - this method now owns the entire buffer
+}
+
+void VulkanRenderer::updateInstanceDataDirect(const InstanceData* instances, uint32_t instanceCount) {
+    // ENHANCED PROTECTION: Multiple validation layers with corruption detection
+
+    // Layer 0: CRITICAL - Buffer state corruption detection
+    if (currentInstanceOffset_ > maxInstances_) {
+        VKMON_ERROR("CRITICAL: Buffer state corrupted - offset " + std::to_string(currentInstanceOffset_) +
+                   " > max " + std::to_string(maxInstances_));
+        VKMON_WARNING("Auto-recovering: Resetting buffer to safe state");
+        clearInstanceBuffer();
+    }
+
+    if (totalInstancesThisFrame_ > MAX_INSTANCES_PER_FRAME) {
+        VKMON_ERROR("CRITICAL: Frame state corrupted - total " + std::to_string(totalInstancesThisFrame_) +
+                   " > max " + std::to_string(MAX_INSTANCES_PER_FRAME));
+        VKMON_WARNING("Auto-recovering: Resetting frame state");
+        clearInstanceBuffer();
+    }
+
+    // Layer 1: Basic parameter validation
+    if (!instances) {
+        VKMON_ERROR("Instance buffer update failed: Null instance data pointer");
+        return;
+    }
+
+    if (instanceCount == 0) {
+        return; // Valid but no-op
+    }
+
+    // Layer 2: Buffer state validation
+    if (!instanceBufferMapped_.isValid()) {
+        VKMON_ERROR("Instance buffer update failed: Buffer not mapped");
+        return;
+    }
+
+    // Layer 3: Per-batch overflow protection with graceful degradation
+    if (currentInstanceOffset_ + instanceCount > maxInstances_) {
+        // Calculate how many instances we can still fit
+        uint32_t remainingSpace = maxInstances_ - currentInstanceOffset_;
+
+        if (remainingSpace == 0) {
+            VKMON_WARNING("Instance buffer full - skipping batch of " + std::to_string(instanceCount) + " instances");
+            return; // Graceful degradation: skip this batch
+        }
+
+        // Partial batch rendering: fit what we can
+        VKMON_WARNING("Instance buffer overflow - rendering partial batch: " +
+                     std::to_string(remainingSpace) + "/" + std::to_string(instanceCount) + " instances");
+        instanceCount = remainingSpace;
+    }
+
+    // Layer 4: Frame-level overflow protection with graceful degradation
+    if (totalInstancesThisFrame_ + instanceCount > MAX_INSTANCES_PER_FRAME) {
+        // Calculate how many instances we can still fit this frame
+        uint32_t remainingFrameSpace = MAX_INSTANCES_PER_FRAME - totalInstancesThisFrame_;
+
+        if (remainingFrameSpace == 0) {
+            VKMON_WARNING("Frame instance limit reached - skipping batch of " + std::to_string(instanceCount) + " instances");
+            return; // Graceful degradation: skip this batch
+        }
+
+        // Partial batch rendering: fit what we can in this frame
+        VKMON_WARNING("Frame instance overflow - rendering partial batch: " +
+                     std::to_string(remainingFrameSpace) + "/" + std::to_string(instanceCount) + " instances");
+        instanceCount = remainingFrameSpace;
+    }
+
+    // Calculate offset position in buffer
+    size_t dataSize = instanceCount * sizeof(VulkanMon::InstanceData);
+    size_t offsetBytes = currentInstanceOffset_ * sizeof(VulkanMon::InstanceData);
+    char* bufferStart = static_cast<char*>(instanceBufferMapped_.get());
+
+    // Copy to offset position - append instead of overwrite
+    memcpy(bufferStart + offsetBytes, instances, dataSize);
+
+    // Update frame tracking (after successful write)
+    totalInstancesThisFrame_ += instanceCount;
+
+    #ifdef DEBUG_VERBOSE
+    VKMON_DEBUG("Instance buffer: Added " + std::to_string(instanceCount) +
+               " instances at offset " + std::to_string(currentInstanceOffset_) +
+               " (frame total: " + std::to_string(totalInstancesThisFrame_) + ")");
+    #endif
 
     // No need to flush due to HOST_COHERENT_BIT
 }
 
-void VulkanRenderer::updateInstanceDataDirect(const InstanceData* instances, uint32_t instanceCount) {
-    if (instanceCount > maxInstances_) {
-        throw std::runtime_error("Too many instances: " + std::to_string(instanceCount) +
-                                " (max: " + std::to_string(maxInstances_) + ")");
+void VulkanRenderer::clearInstanceBuffer() {
+    // Reset frame state for clean multi-batch rendering
+    currentInstanceOffset_ = 0;
+    totalInstancesThisFrame_ = 0;
+
+    // Optional: Zero buffer memory for debugging (expensive, only in debug builds)
+    #ifdef DEBUG_CLEAR_INSTANCE_BUFFER
+    if (instanceBufferMapped_.isValid()) {
+        memset(instanceBufferMapped_.get(), 0, instanceBufferSize_);
     }
-
-    if (!instanceBufferMapped_.isValid()) {
-        VKMON_ERROR("Instance buffer not mapped!");
-        return;
-    }
-
-    if (!instances) {
-        VKMON_ERROR("Null instance data pointer!");
-        return;
-    }
-
-    // Direct memcpy from validated pointer to GPU-visible memory - no intermediate copy
-    size_t dataSize = instanceCount * sizeof(VulkanMon::InstanceData);
-    memcpy(instanceBufferMapped_.get(), instances, dataSize);
-
-    // No need to flush due to HOST_COHERENT_BIT
+    #endif
 }
 
 void VulkanRenderer::cleanupInstanceBuffer() {
