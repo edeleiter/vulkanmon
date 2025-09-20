@@ -342,6 +342,7 @@ bool OctreeNode::shouldSubdivide() const {
 SpatialManager::SpatialManager(const BoundingBox& worldBounds)
     : worldBounds_(worldBounds) {
     octree_ = std::make_unique<OctreeNode>(worldBounds);
+    queryCache_ = std::make_unique<PredictiveSpatialCache>();
     VKMON_INFO("SpatialManager initialized with world bounds");
 }
 
@@ -383,6 +384,15 @@ void SpatialManager::updateEntity(EntityID entity, const glm::vec3& newPosition)
     it->second = newPosition;
 
     octree_->update(entity, oldPosition, newPosition);
+
+    // REGIONAL CACHE INVALIDATION: Only invalidate cache entries affected by movement
+    // This replaces the nuclear "clear everything" approach with targeted invalidation
+    float movementDistance = glm::distance(oldPosition, newPosition);
+    if (movementDistance > 0.1f) {  // Lower threshold for more precise invalidation
+        // Calculate entity influence radius based on typical query patterns
+        float influenceRadius = 10.0f; // Pokemon interaction/detection radius
+        queryCache_->invalidateEntityMovement(oldPosition, newPosition, influenceRadius);
+    }
 }
 
 void SpatialManager::updateEntityLayers(EntityID entity, uint32_t layers) {
@@ -423,7 +433,17 @@ std::vector<EntityID> SpatialManager::queryRegion(const BoundingBox& region, uin
 std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint32_t layerMask) const {
     auto start = std::chrono::high_resolution_clock::now();
 
+    // PERFORMANCE OPTIMIZATION: Try lock-free cache first
     std::vector<EntityID> results;
+    if (queryCache_->tryGetFrustumQuery(frustum, layerMask, results)) {
+        // Cache hit - update statistics and return
+        auto end = std::chrono::high_resolution_clock::now();
+        float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
+        updateStatistics(queryTime, results.size());
+        return results;
+    }
+
+    // Cache miss - perform octree query
     octree_->query(frustum, results);
 
     // Apply layer filtering
@@ -434,6 +454,9 @@ std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint3
         }
     }
 
+    // Cache the result for future queries
+    queryCache_->cacheFrustumQuery(frustum, layerMask, filteredResults);
+
     auto end = std::chrono::high_resolution_clock::now();
     float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
     updateStatistics(queryTime, filteredResults.size());
@@ -442,12 +465,19 @@ std::vector<EntityID> SpatialManager::queryFrustum(const Frustum& frustum, uint3
 }
 
 std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float radius, uint32_t layerMask) const {
-    // LOCK-FREE OPTIMIZATION: Skip cache entirely to eliminate mutex contention
-    // Direct octree query is faster than mutex overhead for massive creature counts
-
     auto start = std::chrono::high_resolution_clock::now();
 
+    // PERFORMANCE OPTIMIZATION: Try lock-free cache first
     std::vector<EntityID> results;
+    if (queryCache_->tryGetRadiusQuery(center, radius, layerMask, results)) {
+        // Cache hit - update statistics and return
+        auto end = std::chrono::high_resolution_clock::now();
+        float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
+        updateStatistics(queryTime, results.size());
+        return results;
+    }
+
+    // Cache miss - perform octree query
     octree_->queryRadius(center, radius, results);
 
     // Filter results by actual distance and layers (octree query returns candidates)
@@ -462,11 +492,13 @@ std::vector<EntityID> SpatialManager::queryRadius(const glm::vec3& center, float
         }
     }
 
+    // Cache the result for future queries
+    queryCache_->cacheRadiusQuery(center, radius, layerMask, filteredResults);
+
     auto end = std::chrono::high_resolution_clock::now();
     float queryTime = std::chrono::duration<float, std::milli>(end - start).count();
     updateStatistics(queryTime, filteredResults.size());
 
-    // LOCK-FREE: No caching - direct octree access is faster than mutex overhead
     return filteredResults;
 }
 

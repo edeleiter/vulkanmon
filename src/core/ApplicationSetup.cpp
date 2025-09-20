@@ -126,6 +126,11 @@ void Application::initializeECS() {
     // Add creature render system for massive creature rendering (Phase 7.1)
     creatureRenderSystem_ = world_->addSystem<CreatureRenderSystem>(cameraSystem_);
 
+    // PERFORMANCE OPTIMIZATION: Disable frustum culling for stress test scenario
+    // In 10x10x10 cube test, all 1000 creatures are visible, so spatial queries add overhead without benefit
+    creatureRenderSystem_->setEnableFrustumCulling(false);
+    VKMON_INFO("CreatureRenderSystem: Frustum culling DISABLED for stress test performance");
+
     // Add spatial system for Pokemon-style spatial queries and management
     WorldConfig worldConfig = WorldConfig::createTestWorld();
     VKMON_INFO("Using world config: " + worldConfig.name +
@@ -135,8 +140,8 @@ void Application::initializeECS() {
                            std::to_string(worldConfig.maxBounds.x) + "," +
                            std::to_string(worldConfig.maxBounds.y) + "," +
                            std::to_string(worldConfig.maxBounds.z) + ")");
-    // PERFORMANCE TEST: Disable heavy systems to test pure rendering performance
-    // spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
+    // Add spatial system for Pokemon-style spatial queries and octree partitioning
+    spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
 
     // Add CreatureDetectionSystem for AI behavior and spatial detection
     // creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
@@ -171,13 +176,13 @@ void Application::createTestScene() {
     }
 
     VKMON_INFO("Creating Pokemon Legends Arceus Scale Test Scene...");
-    VKMON_INFO("Target: 1000 creatures - 10x10x10 cube formation stress test");
+    VKMON_INFO("Target: 125 creatures - 5x5x5 realistic Pokemon overworld test");
 
     // =========================================================================
-    // SPATIAL STRESS TEST - 3D Cube Formation (10x10x10 = 1000 entities)
+    // REALISTIC POKEMON TEST - 3D Cube Formation (5x5x5 = 125 entities)
     // =========================================================================
 
-    const int GRID_SIZE = 10;  // 10x10x10 = 1000 creatures - 3D cube formation
+    const int GRID_SIZE = 5;  // 5x5x5 = 125 creatures - realistic Pokemon overworld scale
     const float CREATURE_SPACING = 2.0f;  // 2.0f spacing for clear separation
 
     // Use only cubes for consistency during debugging

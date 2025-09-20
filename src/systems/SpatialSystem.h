@@ -18,6 +18,8 @@ private:
     // Performance tracking
     struct SpatialSystemStats {
         size_t entitiesTracked = 0;
+        size_t entitiesProcessed = 0;
+        size_t staticEntitiesSkipped = 0;
         size_t entitiesUpdated = 0;
         size_t entitiesAdded = 0;
         size_t entitiesRemoved = 0;
@@ -55,6 +57,10 @@ public:
         // Ensure both vectors have the same size to prevent out-of-bounds access
         size_t maxIndex = std::min(transforms.size(), entityIds.size());
 
+        // PERFORMANCE OPTIMIZATION: Early exit for static-only scenarios
+        size_t entitiesProcessed = 0;
+        size_t staticEntitiesSkipped = 0;
+
         for (size_t i = 0; i < maxIndex; ++i) {
             EntityID entity = entityIds[i];
 
@@ -63,9 +69,21 @@ public:
                 auto& transform = transforms[i];
                 auto& spatial = entityManager.getComponent<SpatialComponent>(entity);
 
+                // SIMPLE IS POWERFUL: Skip static entities that don't need updates
+                if (spatial.behavior == SpatialBehavior::STATIC &&
+                    spatial.isInitialized &&
+                    !spatial.needsSpatialUpdate) {
+                    staticEntitiesSkipped++;
+                    continue;
+                }
+
                 updateEntitySpatialData(entity, transform, spatial, deltaTime);
+                entitiesProcessed++;
             }
         }
+
+        frameStats_.entitiesProcessed = entitiesProcessed;
+        frameStats_.staticEntitiesSkipped = staticEntitiesSkipped;
 
         auto end = std::chrono::high_resolution_clock::now();
         frameStats_.updateTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
@@ -171,6 +189,8 @@ private:
         VKMON_INFO("=== SpatialSystem Performance Report ===");
         VKMON_INFO("Frame Stats:");
         VKMON_INFO("  Entities tracked: " + std::to_string(frameStats_.entitiesTracked));
+        VKMON_INFO("  Entities processed: " + std::to_string(frameStats_.entitiesProcessed));
+        VKMON_INFO("  Static entities skipped: " + std::to_string(frameStats_.staticEntitiesSkipped));
         VKMON_INFO("  Entities updated: " + std::to_string(frameStats_.entitiesUpdated));
         VKMON_INFO("  Entities added: " + std::to_string(frameStats_.entitiesAdded));
         VKMON_INFO("  Entities removed: " + std::to_string(frameStats_.entitiesRemoved));
@@ -179,6 +199,9 @@ private:
         VKMON_INFO("  Total queries: " + std::to_string(spatialStats.totalQueries));
         VKMON_INFO("  Average query time: " + std::to_string(spatialStats.averageQueryTimeMs) + "ms");
         VKMON_INFO("  Total entities returned: " + std::to_string(spatialStats.totalEntitiesReturned));
+        VKMON_INFO("Cache Performance:");
+        VKMON_INFO("  Cache hit rate: " + std::to_string(spatialStats.cacheHitRate * 100.0f) + "%");
+        VKMON_INFO("  Cache size: " + std::to_string(spatialStats.cacheSize) + " entries");
         VKMON_INFO("Octree Structure:");
         VKMON_INFO("  Nodes: " + std::to_string(nodeCount));
         VKMON_INFO("  Max depth: " + std::to_string(maxDepth));

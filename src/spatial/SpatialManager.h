@@ -2,6 +2,7 @@
 
 #include "../core/Entity.h"
 #include "LayerMask.h"
+#include "SpatialCache.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <unordered_map>
@@ -100,6 +101,9 @@ public:
         size_t totalEntitiesReturned = 0;
         float lastQueryTimeMs = 0.0f;
         float averageQueryTimeMs = 0.0f;
+        // Cache performance metrics
+        float cacheHitRate = 0.0f;
+        size_t cacheSize = 0;
     };
 
 private:
@@ -109,6 +113,9 @@ private:
     // Entity tracking for updates
     std::unordered_map<EntityID, glm::vec3> entityPositions_;
     std::unordered_map<EntityID, uint32_t> entityLayers_;
+
+    // PERFORMANCE OPTIMIZATION: Lock-free spatial cache for query acceleration
+    mutable std::unique_ptr<PredictiveSpatialCache> queryCache_;
 
     // Performance tracking (thread-safe)
     mutable SpatialStats stats_;
@@ -159,7 +166,11 @@ public:
     void getStatistics(int& nodeCount, int& maxDepth, int& totalEntities) const;
     SpatialStats getPerformanceStats() const {
         std::lock_guard<std::mutex> lock(statsMutex_);
-        return stats_;
+        SpatialStats result = stats_;
+        // Add cache performance metrics
+        result.cacheHitRate = queryCache_->getCacheHitRate();
+        result.cacheSize = queryCache_->getCacheSize();
+        return result;
     }
     void clear();
 

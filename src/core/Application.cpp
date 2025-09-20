@@ -316,19 +316,20 @@ void Application::cleanup() {
         inputHandler_.reset();
     }
 
-    // Note: Systems cleanup order is important
-    // MaterialSystem and LightingSystem are owned by VulkanRenderer
-    if (renderer_) {
-        VKMON_INFO("Cleaning up renderer...");
-        renderer_.reset();  // This will cleanup owned systems
-    }
-
-    // These were references to renderer-owned systems, now null
+    // CRITICAL: Clear system shared_ptrs BEFORE destroying renderer
+    // This ensures systems are destroyed while Vulkan device is still valid
+    VKMON_INFO("Clearing system references before renderer cleanup...");
     materialSystem_.reset();
     lightingSystem_.reset();
     modelLoader_.reset();
     assetManager_.reset();
     resourceManager_.reset();
+
+    // Now safe to destroy renderer and Vulkan device
+    if (renderer_) {
+        VKMON_INFO("Cleaning up renderer...");
+        renderer_.reset();
+    }
 
     // Old camera_ cleanup removed - ECS camera entities managed by World
 
