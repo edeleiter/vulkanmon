@@ -18,6 +18,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(Jolt CONFIG REQUIRED)
 
 # Create executable
 # Use CMake's Vulkan component for glslangValidator
@@ -67,6 +68,7 @@ add_executable(vulkanmon
     src/systems/RenderSystem.cpp
     src/systems/CreatureRenderSystem.cpp
     src/systems/CameraSystem.cpp
+    src/systems/PhysicsSystem.cpp
     src/debug/ECSInspector.cpp
     src/spatial/SpatialManager.cpp
     src/spatial/WorldConfig.cpp
@@ -84,6 +86,7 @@ target_link_libraries(vulkanmon PRIVATE
     glm::glm
     assimp::assimp
     imgui::imgui
+    Jolt::Jolt
 )
 
 # Include directories

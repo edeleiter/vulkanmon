@@ -3,6 +3,7 @@
 #include "../systems/SpatialSystem.h"
 #include "../systems/RenderSystem.h"
 #include "../systems/CreatureRenderSystem.h"
+#include "../systems/PhysicsSystem.h"
 #include "../game/CreatureDetectionSystem.h"
 #include "../utils/Logger.h"
 
@@ -12,6 +13,7 @@ void World::connectSystems() {
     // Get all systems with validation
     auto* cameraSystem = getSystem<CameraSystem>();
     auto* spatialSystem = getSystem<SpatialSystem>();
+    auto* physicsSystem = getSystem<PhysicsSystem>();
     auto* renderSystem = getSystem<RenderSystem>();
     auto* creatureRenderSystem = getSystem<CreatureRenderSystem>();
     auto* creatureDetectionSystem = getSystem<CreatureDetectionSystem>();
@@ -39,6 +41,10 @@ void World::connectSystems() {
 
     if (creatureDetectionSystem) {
         creatureDetectionSystem->setSpatialSystem(spatialSystem);
+    }
+
+    if (physicsSystem) {
+        physicsSystem->setSpatialSystem(spatialSystem);
     }
 
     VKMON_INFO("World: All system dependencies connected successfully");

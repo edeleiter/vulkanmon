@@ -2,8 +2,11 @@
 #include "../utils/Utils.h"
 #include "../utils/Logger.h"
 #include "../game/CreatureDetectionSystem.h"
+#include "../components/RigidBodyComponent.h"
+#include "../components/CollisionComponent.h"
 #include <iostream>
 #include <stdexcept>
+#include <random>
 
 // ImGui includes for debug interface
 #include <imgui.h>
@@ -146,11 +149,26 @@ void Application::processInput(float deltaTime) {
 
 void Application::updateSystems(float deltaTime) {
     // Update various engine systems each frame
-    // Future: Update game logic, animations, physics, etc.
+
+    // Update physics simulation
+    if (physicsSystem_ && world_) {
+        physicsSystem_->update(world_->getEntityManager(), deltaTime);
+    }
+
+    // Future: Update game logic, animations, other systems, etc.
 }
 
 void Application::updateECS(float deltaTime) {
     if (world_) {
+        // Random falling cube demonstration - one cube falls every 5 seconds
+        static float fallingCubeTimer = 0.0f;
+        fallingCubeTimer += deltaTime;
+
+        if (fallingCubeTimer >= 5000.0f) { // 5 seconds in milliseconds
+            fallingCubeTimer = 0.0f;
+            makeRandomCubeFall();
+        }
+
         // Update cube rotations for animation
         static float rotationAngle = 0.0f;
         const auto& entities = world_->getEntityManager().getEntitiesWithComponent<Transform>();
@@ -187,6 +205,65 @@ void Application::updateECS(float deltaTime) {
 
         // PERFORMANCE TEST: Only essential systems enabled (CameraSystem + RenderSystem)
         world_->update(deltaTime);
+    }
+}
+
+void Application::makeRandomCubeFall() {
+    if (!world_ || !physicsSystem_) {
+        return;
+    }
+
+    // Get all entities with creature components (our cubes)
+    auto& entityManager = world_->getEntityManager();
+    const auto& creatureEntities = entityManager.getEntitiesWithComponent<CreatureComponent>();
+
+    if (creatureEntities.empty()) {
+        return;
+    }
+
+    // Select a random creature entity
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, creatureEntities.size() - 1);
+
+    EntityID randomEntity = creatureEntities[dis(gen)];
+
+    // Check if this entity already has physics components
+    if (entityManager.hasComponent<RigidBodyComponent>(randomEntity)) {
+        // Reset position to make it fall again
+        auto& transform = entityManager.getComponent<Transform>(randomEntity);
+        auto& rigidBody = entityManager.getComponent<RigidBodyComponent>(randomEntity);
+
+        // Reset to original position but higher up
+        transform.position.y += 10.0f; // Add 10 units height
+        rigidBody.velocity = glm::vec3(0.0f, 0.0f, 0.0f); // Reset velocity
+        rigidBody.needsSync = true;
+
+        VKMON_INFO("Making existing physics cube fall again from higher position");
+    } else {
+        // Add physics components to make it fall
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = true;
+        rigidBody.mass = 1.0f;
+        rigidBody.useGravity = true;
+        rigidBody.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+        rigidBody.restitution = 0.5f; // Add some bounce
+        rigidBody.friction = 0.7f;
+        rigidBody.needsSync = true;
+        entityManager.addComponent(randomEntity, rigidBody);
+
+        // Add collision detection only if it doesn't already exist
+        if (!entityManager.hasComponent<CollisionComponent>(randomEntity)) {
+            CollisionComponent collision = CollisionComponent::createCreature(0.5f, 1.0f);
+            entityManager.addComponent(randomEntity, collision);
+        }
+
+        // Get entity position for logging
+        auto& transform = entityManager.getComponent<Transform>(randomEntity);
+        VKMON_INFO("Making NEW cube fall with gravity at position (" +
+                   std::to_string(transform.position.x) + ", " +
+                   std::to_string(transform.position.y) + ", " +
+                   std::to_string(transform.position.z) + ")");
     }
 }
 

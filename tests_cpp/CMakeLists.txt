@@ -63,6 +63,10 @@ add_executable(vulkanmon_tests
     spatial/test_SpatialPerformance.cpp
     spatial/bench_SpatialSystem.cpp
 
+    # Physics System tests (Phase 7.1)
+    physics/test_PhysicsComponents.cpp
+    physics/test_PhysicsSystem.cpp
+
     # Performance Regression Tests (CRITICAL)
     performance/test_PerformanceRegression.cpp
     performance/test_CreatureDetectionRegression.cpp
@@ -85,6 +89,7 @@ add_executable(vulkanmon_tests
     ../src/systems/RenderSystem.cpp
     ../src/systems/CreatureRenderSystem.cpp  # Required by Application.cpp
     ../src/systems/CameraSystem.cpp
+    ../src/systems/PhysicsSystem.cpp
     ../src/spatial/SpatialManager.cpp
     ../src/spatial/WorldConfig.cpp
     ../src/spatial/LayerMask.cpp

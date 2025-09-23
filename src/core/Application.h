@@ -15,6 +15,7 @@
 #include "../systems/CreatureRenderSystem.h"
 #include "../systems/CameraSystem.h"
 #include "../systems/SpatialSystem.h"
+#include "../systems/PhysicsSystem.h"
 #include "../game/CreatureDetectionSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
@@ -169,6 +170,7 @@ private:
     CreatureRenderSystem* creatureRenderSystem_ = nullptr;  // Owned by World
     CameraSystem* cameraSystem_ = nullptr;        // Owned by World
     SpatialSystem* spatialSystem_ = nullptr;  // Owned by World
+    PhysicsSystem* physicsSystem_ = nullptr;  // Owned by World
     CreatureDetectionSystem* creatureDetectionSystem_ = nullptr;  // Owned by World
 
     // Debug tools
@@ -226,6 +228,9 @@ private:
     // Error handling
     void handleCriticalError(const std::exception& error);
     void logSystemState();
+
+    // Physics demonstration methods
+    void makeRandomCubeFall();
 
     // Cleanup methods
     void cleanup();

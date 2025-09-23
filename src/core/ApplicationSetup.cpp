@@ -4,6 +4,9 @@
 #include "../systems/CreatureRenderSystem.h"
 #include "../components/SpatialComponent.h"
 #include "../components/Camera.h"
+#include "../components/RigidBodyComponent.h"
+#include "../components/CollisionComponent.h"
+#include "../components/CreaturePhysicsComponent.h"
 #include "../spatial/WorldConfig.h"
 #include "../config/CameraConfig.h"
 #include <stdexcept>
@@ -143,6 +146,11 @@ void Application::initializeECS() {
     // Add spatial system for Pokemon-style spatial queries and octree partitioning
     spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
 
+    // Add physics system for realistic physics simulation
+    physicsSystem_ = world_->addSystem<PhysicsSystem>();
+    physicsSystem_->initialize(); // Initialize with default gravity
+    VKMON_INFO("PhysicsSystem added to World and initialized");
+
     // Add CreatureDetectionSystem for AI behavior and spatial detection
     // creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
 
@@ -242,6 +250,33 @@ void Application::createTestScene() {
                 creatureSpatial.behavior = SpatialBehavior::STATIC;
                 creatureSpatial.setHomePosition(creatureTransform.position);
                 world_->addComponent(creature, creatureSpatial);
+
+                // Add physics components to a very small subset for controlled testing
+                // Only make creatures dynamic if they're at specific positions (much fewer)
+                bool isDynamic = (x == 2 && y == 2 && z == 2); // Only center cube starts with physics
+
+                if (isDynamic) {
+                    // Add dynamic physics - creature will fall due to gravity
+                    RigidBodyComponent rigidBody;
+                    rigidBody.isDynamic = true;
+                    rigidBody.mass = 1.0f + (x + y + z) * 0.1f; // Varied mass
+                    rigidBody.useGravity = true;
+                    rigidBody.restitution = 0.3f; // Some bounciness
+                    rigidBody.friction = 0.8f;
+                    world_->addComponent(creature, rigidBody);
+
+                    // Add collision detection
+                    CollisionComponent collision = CollisionComponent::createCreature(0.5f, 1.0f);
+                    world_->addComponent(creature, collision);
+
+                    // Add creature-specific physics
+                    CreaturePhysicsComponent creaturePhysics = CreaturePhysicsComponent::createLandCreature(3.0f, 1.0f);
+                    world_->addComponent(creature, creaturePhysics);
+                } else {
+                    // Add static collision for non-dynamic creatures
+                    CollisionComponent collision = CollisionComponent::createEnvironment(glm::vec3(0.5f, 1.0f, 0.5f));
+                    world_->addComponent(creature, collision);
+                }
 
                 totalCreatures++;
             }
