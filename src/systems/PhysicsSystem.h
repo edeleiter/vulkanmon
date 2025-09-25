@@ -211,13 +211,13 @@ public:
 /**
  * PhysicsSystem
  *
- * Manages physics simulation for all entities with physics components.
- * Integrates with ECS architecture and spatial partitioning for performance.
+ * Modern Jolt Physics integration for VulkanMon ECS architecture.
+ * Provides professional-grade physics simulation with automatic ECS synchronization.
  *
  * Design Philosophy:
- * - Simple is Powerful: Clear physics simulation loop with minimal complexity
- * - ECS Integration: Works seamlessly with existing Transform and Spatial components
- * - Performance-aware: Spatial partitioning integration for collision culling
+ * - Simple is Powerful: Pure Jolt Physics with automatic ECS synchronization
+ * - Engine-Focused: Generic spatial queries and collision detection for any game type
+ * - Performance-Optimized: Multi-threaded Jolt engine with spatial partitioning
  */
 class PhysicsSystem : public SystemBase {
 public:
@@ -243,8 +243,8 @@ public:
     // =============================================================================
 
 
-    // Fixed timestep physics update for stability (called at fixed intervals)
-    // @param fixedDeltaTime Fixed timestep in MILLISECONDS (converted internally to seconds for Jolt)
+    // Fixed timestep physics update - delegates to Jolt Physics internal timestep management
+    // @param fixedDeltaTime Fixed timestep in MILLISECONDS (converted for main update)
     void fixedUpdate(EntityManager& entityManager, float fixedDeltaTime);
 
     // =============================================================================
@@ -331,18 +331,6 @@ public:
 
 private:
     // =============================================================================
-    // COLLISION DATA STRUCTURES
-    // =============================================================================
-
-    // Collision pair for tracking detected collisions
-    struct CollisionPair {
-        EntityID entityA = 0;
-        EntityID entityB = 0;
-        glm::vec3 normal{0.0f, 1.0f, 0.0f};  // Collision normal (A to B)
-        float penetration = 0.0f;             // Penetration depth
-    };
-
-    // =============================================================================
     // JOLT PHYSICS INTERNAL METHODS
     // =============================================================================
 
@@ -382,28 +370,6 @@ private:
     JPH::ObjectLayer mapLayerMaskToObjectLayer(uint32_t layerMask) const;
     JPH::BroadPhaseLayer mapObjectLayerToBroadPhaseLayer(JPH::ObjectLayer objectLayer) const;
 
-    // =============================================================================
-    // INTERNAL PHYSICS SIMULATION (LEGACY - TO BE REPLACED)
-    // =============================================================================
-
-    // Core physics steps
-    void detectCollisions(EntityManager& entityManager);
-    void resolveCollisions(EntityManager& entityManager, float deltaTime);
-    void updateCreaturePhysics(EntityManager& entityManager, float deltaTime);
-
-    // Collision detection helpers
-    bool checkCollision(const CollisionComponent& collider1, const Transform& transform1,
-                       const CollisionComponent& collider2, const Transform& transform2);
-
-    void resolveCollision(EntityID entity1, EntityID entity2,
-                         RigidBodyComponent& body1, RigidBodyComponent& body2,
-                         const glm::vec3& collisionNormal, float penetration);
-
-    // Ground detection for creatures
-    void updateGroundDetection(EntityManager& entityManager);
-
-    // Apply environmental forces (gravity, drag, etc.)
-    void applyEnvironmentalForces(EntityManager& entityManager, float deltaTime);
 
     // =============================================================================
     // MEMBER VARIABLES
@@ -447,15 +413,6 @@ private:
     // Performance tracking
     PhysicsStats stats_;                           // Current frame statistics
 
-    // Collision filtering matrix (layer pairs that can collide)
-    uint32_t collisionMatrix_[32];                 // Bit matrix for layer collision rules
-
-    // Collision detection state
-    std::vector<CollisionPair> currentCollisions_; // Current frame collision pairs
-
-    // Frame timing
-    float accumulator_{0.0f};                      // Fixed timestep accumulator
-    static constexpr float FIXED_TIMESTEP = 1.0f / 60.0f; // 60 Hz physics
 };
 
 } // namespace VulkanMon
