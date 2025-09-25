@@ -46,7 +46,6 @@ struct RigidBodyComponent {
     // =============================================================================
 
     uint32_t bodyID = 0;             // Jolt physics body identifier (0 = invalid)
-    bool needsSync = false;          // Flag when Transform needs updating from physics
 
     // =============================================================================
     // PHYSICS BEHAVIOR FLAGS
@@ -79,6 +78,50 @@ struct RigidBodyComponent {
         linearDamping = 0.3f;        // Creatures slow down naturally
     }
 
+    // =============================================================================
+    // ENGINE-FOCUSED FACTORY METHODS
+    // =============================================================================
+
+    // Dynamic physics object (affected by forces, gravity, collisions)
+    static RigidBodyComponent dynamic(float mass = 1.0f) {
+        RigidBodyComponent rb;
+        rb.isDynamic = true;
+        rb.mass = mass;
+        rb.useGravity = true;
+        rb.restitution = 0.3f;       // Moderate bounce
+        rb.friction = 0.7f;          // Good surface grip
+        rb.linearDamping = 0.1f;     // Natural air resistance
+        rb.angularDamping = 0.05f;   // Natural rotation damping
+        return rb;
+    }
+
+    // Kinematic object (moved programmatically, not affected by forces)
+    static RigidBodyComponent kinematic() {
+        RigidBodyComponent rb;
+        rb.isDynamic = true;         // Can move
+        rb.isKinematic = true;       // But controlled programmatically
+        rb.mass = 1.0f;
+        rb.useGravity = false;       // Not affected by physics forces
+        rb.restitution = 0.0f;       // No bouncing
+        rb.friction = 0.0f;          // Slides smoothly
+        return rb;
+    }
+
+    // Static object (immovable environment like terrain, buildings)
+    static RigidBodyComponent staticBody() {
+        RigidBodyComponent rb;
+        rb.isDynamic = false;        // Cannot move
+        rb.mass = 0.0f;              // Infinite mass
+        rb.useGravity = false;       // Not affected by gravity
+        rb.restitution = 0.5f;       // Objects bounce off it
+        rb.friction = 0.8f;          // High friction for realistic contact
+        return rb;
+    }
+
+    // =============================================================================
+    // GAME-SPECIFIC FACTORY METHODS (for reference/convenience)
+    // =============================================================================
+
     // Pokeball constructor
     static RigidBodyComponent createPokeball() {
         RigidBodyComponent pokeball;
@@ -89,13 +132,9 @@ struct RigidBodyComponent {
         return pokeball;
     }
 
-    // Static object constructor (terrain, buildings)
+    // Static object constructor (terrain, buildings) - DEPRECATED: Use staticBody()
     static RigidBodyComponent createStatic() {
-        RigidBodyComponent staticBody;
-        staticBody.isDynamic = false;
-        staticBody.mass = 0.0f;      // Infinite mass
-        staticBody.useGravity = false;
-        return staticBody;
+        return staticBody();
     }
 
     // =============================================================================
@@ -106,7 +145,6 @@ struct RigidBodyComponent {
     void applyImpulse(const glm::vec3& impulse) {
         if (isDynamic && mass > 0.0f) {
             velocity += impulse / mass;
-            markForSync();
         }
     }
 
@@ -133,10 +171,6 @@ struct RigidBodyComponent {
         return bodyID != 0;
     }
 
-    // Mark that Transform component needs updating from physics
-    void markForSync() {
-        needsSync = true;
-    }
 
     // =============================================================================
     // POKEMON GAMEPLAY UTILITIES
@@ -161,13 +195,11 @@ struct RigidBodyComponent {
     // Set velocity with automatic mass scaling
     void setVelocity(const glm::vec3& newVelocity) {
         velocity = newVelocity;
-        markForSync();
     }
 
     // Add velocity (useful for conveyor belts, moving platforms)
     void addVelocity(const glm::vec3& deltaVelocity) {
         velocity += deltaVelocity;
-        markForSync();
     }
 
     // Instantly stop all movement
@@ -175,7 +207,6 @@ struct RigidBodyComponent {
         velocity = glm::vec3(0.0f);
         angularVelocity = glm::vec3(0.0f);
         clearForces();
-        markForSync();
     }
 };
 

@@ -148,7 +148,7 @@ void Application::initializeECS() {
 
     // Add physics system for realistic physics simulation
     physicsSystem_ = world_->addSystem<PhysicsSystem>();
-    physicsSystem_->initialize(); // Initialize with default gravity
+    physicsSystem_->initialize(world_->getEntityManager()); // Initialize with default gravity
     VKMON_INFO("PhysicsSystem added to World and initialized");
 
     // Add CreatureDetectionSystem for AI behavior and spatial detection
@@ -418,14 +418,7 @@ void Application::createTestScene() {
 
     VKMON_INFO("Added visual ground plane at Y=-4.0 with collision detection");
 
-    // Scene setup complete - create Jolt physics bodies for all entities
-    if (world_ && world_->hasSystem<PhysicsSystem>()) {
-        auto* physicsSystem = world_->getSystem<PhysicsSystem>();
-        if (physicsSystem) {
-            physicsSystem->createJoltBodiesForAllEntities(world_->getEntityManager());
-            VKMON_INFO("All Jolt physics bodies created successfully - returning to main initialization");
-        }
-    }
+    // Scene setup complete - physics bodies will be created automatically on first update
 
     VKMON_INFO("createTestScene() completing successfully");
     // Scene setup complete - main application will log ready message

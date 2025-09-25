@@ -237,6 +237,12 @@ private:
     void makeRandomCubeFall();
     void cleanupFallenCubes();
 
+    // Physics testing methods
+    void testRaycastSystem();
+    void testSphereOverlapQueries();
+    void measureSpatialCollisionPerformance();
+    void runPhysicsValidationTests();
+
     // Cleanup methods
     void cleanup();
 };

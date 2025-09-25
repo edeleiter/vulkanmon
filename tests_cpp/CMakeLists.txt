@@ -67,6 +67,7 @@ add_executable(vulkanmon_tests
     # Physics System tests (Phase 7.1)
     physics/test_PhysicsComponents.cpp
     physics/test_PhysicsSystem.cpp
+    physics/test_PhysicsBlockers.cpp
 
     # Performance Regression Tests (CRITICAL)
     performance/test_PerformanceRegression.cpp

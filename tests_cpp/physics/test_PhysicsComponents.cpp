@@ -53,6 +53,46 @@ TEST_CASE("RigidBodyComponent Basic Functionality", "[Physics][RigidBody]") {
     }
 }
 
+TEST_CASE("RigidBodyComponent Engine Factory Methods", "[Physics][RigidBody][Factory]") {
+    SECTION("dynamic() factory creates movable physics body") {
+        auto dynamic = RigidBodyComponent::dynamic(5.0f);
+
+        REQUIRE(dynamic.isDynamic == true);
+        REQUIRE(dynamic.mass == 5.0f);
+        REQUIRE(dynamic.useGravity == true);
+        REQUIRE(dynamic.restitution == Catch::Approx(0.3f));
+        REQUIRE(dynamic.friction == Catch::Approx(0.7f));
+        REQUIRE(dynamic.linearDamping == Catch::Approx(0.1f));
+        REQUIRE(dynamic.angularDamping == Catch::Approx(0.05f));
+    }
+
+    SECTION("dynamic() factory uses default mass") {
+        auto dynamic = RigidBodyComponent::dynamic();
+        REQUIRE(dynamic.mass == 1.0f);
+    }
+
+    SECTION("kinematic() factory creates programmatically controlled body") {
+        auto kinematic = RigidBodyComponent::kinematic();
+
+        REQUIRE(kinematic.isDynamic == true);
+        REQUIRE(kinematic.isKinematic == true);
+        REQUIRE(kinematic.useGravity == false);
+        REQUIRE(kinematic.restitution == 0.0f);
+        REQUIRE(kinematic.friction == 0.0f);
+        REQUIRE(kinematic.mass == 1.0f);
+    }
+
+    SECTION("staticBody() factory creates immovable environment") {
+        auto staticBody = RigidBodyComponent::staticBody();
+
+        REQUIRE(staticBody.isDynamic == false);
+        REQUIRE(staticBody.mass == 0.0f);
+        REQUIRE(staticBody.useGravity == false);
+        REQUIRE(staticBody.restitution == Catch::Approx(0.5f));
+        REQUIRE(staticBody.friction == Catch::Approx(0.8f));
+    }
+}
+
 TEST_CASE("RigidBodyComponent Physics Calculations", "[Physics][RigidBody]") {
     RigidBodyComponent rigidBody;
     rigidBody.mass = 10.0f;
@@ -81,7 +121,7 @@ TEST_CASE("RigidBodyComponent Physics Calculations", "[Physics][RigidBody]") {
 
         // Impulse should change velocity by impulse/mass
         REQUIRE(rigidBody.velocity.x == Catch::Approx(7.0f)); // 5 + 20/10 = 7
-        REQUIRE(rigidBody.needsSync == true); // Should flag for sync
+        // needsSync removed - automatic sync now
     }
 }
 
@@ -136,6 +176,74 @@ TEST_CASE("CollisionComponent Basic Functionality", "[Physics][Collision]") {
         REQUIRE(water.isWater == true);
         REQUIRE_FALSE(water.blocksPokeballs);
         REQUIRE(water.layer == LayerMask::Water);
+    }
+}
+
+TEST_CASE("CollisionComponent Engine Factory Methods", "[Physics][Collision][Factory]") {
+    SECTION("sphere() factory creates spherical collision") {
+        auto sphere = CollisionComponent::sphere(2.5f, LayerMask::Creatures);
+
+        REQUIRE(sphere.shapeType == CollisionComponent::ShapeType::Sphere);
+        REQUIRE(sphere.dimensions.x == Catch::Approx(2.5f));
+        REQUIRE(sphere.dimensions.y == 0.0f); // Unused for sphere
+        REQUIRE(sphere.dimensions.z == 0.0f); // Unused for sphere
+        REQUIRE(sphere.layer == LayerMask::Creatures);
+        REQUIRE(sphere.collidesWith == LayerMask::All);
+    }
+
+    SECTION("sphere() factory uses default layer") {
+        auto sphere = CollisionComponent::sphere(1.0f);
+        REQUIRE(sphere.layer == LayerMask::Default);
+    }
+
+    SECTION("box() factory creates box collision with proper half-extents") {
+        auto box = CollisionComponent::box(glm::vec3(4.0f, 6.0f, 8.0f), LayerMask::Environment);
+
+        REQUIRE(box.shapeType == CollisionComponent::ShapeType::Box);
+        REQUIRE(box.dimensions.x == Catch::Approx(2.0f)); // Half-extent
+        REQUIRE(box.dimensions.y == Catch::Approx(3.0f)); // Half-extent
+        REQUIRE(box.dimensions.z == Catch::Approx(4.0f)); // Half-extent
+        REQUIRE(box.layer == LayerMask::Environment);
+        REQUIRE(box.collidesWith == LayerMask::All);
+    }
+
+    SECTION("box() factory uses default layer") {
+        auto box = CollisionComponent::box(glm::vec3(2.0f));
+        REQUIRE(box.layer == LayerMask::Default);
+    }
+
+    SECTION("capsule() factory creates capsule collision") {
+        auto capsule = CollisionComponent::capsule(1.5f, 3.0f, LayerMask::Creatures);
+
+        REQUIRE(capsule.shapeType == CollisionComponent::ShapeType::Capsule);
+        REQUIRE(capsule.dimensions.x == Catch::Approx(1.5f)); // radius
+        REQUIRE(capsule.dimensions.y == Catch::Approx(3.0f)); // height
+        REQUIRE(capsule.dimensions.z == Catch::Approx(1.5f)); // radius (repeated)
+        REQUIRE(capsule.layer == LayerMask::Creatures);
+        REQUIRE(capsule.collidesWith == LayerMask::All);
+    }
+
+    SECTION("capsule() factory uses default layer") {
+        auto capsule = CollisionComponent::capsule(1.0f, 2.0f);
+        REQUIRE(capsule.layer == LayerMask::Default);
+    }
+
+    SECTION("plane() factory creates large thin box for ground") {
+        auto plane = CollisionComponent::plane(glm::vec3(0, 1, 0), LayerMask::Terrain);
+
+        REQUIRE(plane.shapeType == CollisionComponent::ShapeType::Box);
+        REQUIRE(plane.dimensions.x == Catch::Approx(1000.0f)); // Large ground plane
+        REQUIRE(plane.dimensions.y == Catch::Approx(0.1f)); // Thin
+        REQUIRE(plane.dimensions.z == Catch::Approx(1000.0f)); // Large ground plane
+        REQUIRE(plane.layer == LayerMask::Terrain);
+        REQUIRE(plane.collidesWith == LayerMask::All);
+        REQUIRE(plane.isStatic == true);
+    }
+
+    SECTION("plane() factory uses default normal and layer") {
+        auto plane = CollisionComponent::plane();
+        REQUIRE(plane.layer == LayerMask::Environment);
+        REQUIRE(plane.isStatic == true);
     }
 }
 

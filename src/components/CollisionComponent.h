@@ -102,19 +102,66 @@ struct CollisionComponent {
     // Default constructor
     CollisionComponent() = default;
 
-    // Pokemon creature collision
-    static CollisionComponent createCreature(float radius, float height = 0.0f) {
+    // =============================================================================
+    // ENGINE-FOCUSED FACTORY METHODS
+    // =============================================================================
+
+    // Spherical collision shape (radius)
+    static CollisionComponent sphere(float radius, uint32_t layer = LayerMask::Default) {
         CollisionComponent collision;
-        if (height > 0.0f) {
-            collision.shapeType = ShapeType::Capsule;
-            collision.dimensions = glm::vec3(radius, height, radius);
-        } else {
-            collision.shapeType = ShapeType::Sphere;
-            collision.dimensions = glm::vec3(radius, 0.0f, 0.0f);
-        }
-        collision.layer = LayerMask::Creatures;
-        collision.collidesWith = LayerMask::All & ~LayerMask::Creatures; // Don't collide with other creatures by default
+        collision.shapeType = ShapeType::Sphere;
+        collision.dimensions = glm::vec3(radius, 0.0f, 0.0f);
+        collision.layer = layer;
+        collision.collidesWith = LayerMask::All;
         return collision;
+    }
+
+    // Box collision shape (half-extents)
+    static CollisionComponent box(glm::vec3 size, uint32_t layer = LayerMask::Default) {
+        CollisionComponent collision;
+        collision.shapeType = ShapeType::Box;
+        collision.dimensions = size * 0.5f; // Convert size to half-extents
+        collision.layer = layer;
+        collision.collidesWith = LayerMask::All;
+        return collision;
+    }
+
+    // Capsule collision shape (radius, height) - perfect for character controllers
+    static CollisionComponent capsule(float radius, float height, uint32_t layer = LayerMask::Default) {
+        CollisionComponent collision;
+        collision.shapeType = ShapeType::Capsule;
+        collision.dimensions = glm::vec3(radius, height, radius);
+        collision.layer = layer;
+        collision.collidesWith = LayerMask::All;
+        return collision;
+    }
+
+    // Plane collision (infinite ground plane)
+    static CollisionComponent plane(glm::vec3 normal = {0, 1, 0}, uint32_t layer = LayerMask::Environment) {
+        CollisionComponent collision;
+        collision.shapeType = ShapeType::Box;
+        collision.dimensions = glm::vec3(1000.0f, 0.1f, 1000.0f); // Large thin box
+        collision.layer = layer;
+        collision.collidesWith = LayerMask::All;
+        collision.isStatic = true;
+        return collision;
+    }
+
+    // =============================================================================
+    // GAME-SPECIFIC FACTORY METHODS (for reference/convenience)
+    // =============================================================================
+
+    // Pokemon creature collision - DEPRECATED: Use sphere() or capsule()
+    static CollisionComponent createCreature(float radius, float height = 0.0f) {
+        if (height > 0.0f) {
+            auto collision = capsule(radius, height, LayerMask::Creatures);
+            collision.collidesWith = LayerMask::All & ~LayerMask::Creatures; // Don't collide with other creatures by default
+            return collision;
+        } else {
+            auto collision = sphere(radius, LayerMask::Creatures);
+            collision.collidesWith = LayerMask::All & ~LayerMask::Creatures; // Don't collide with other creatures by default
+            return collision;
+        }
     }
 
     // Capture device collision (spheres, nets, capture tools)

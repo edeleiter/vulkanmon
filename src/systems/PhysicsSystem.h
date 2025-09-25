@@ -10,6 +10,8 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
+#include <thread>
 
 // Jolt Physics includes
 #include <Jolt/Jolt.h>
@@ -26,6 +28,10 @@
 #include <Jolt/Physics/Body/BodyActivationListener.h>
 #include <Jolt/Physics/Collision/ObjectLayer.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
 
 // Forward declare Jolt types to avoid naming conflicts
 
@@ -86,8 +92,25 @@ public:
 class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter {
 public:
     bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override {
-        // For now, allow all collisions - TODO: implement proper filtering
-        return true;
+        // General game engine broad phase filtering for performance optimization
+        switch (inLayer1) {
+            case ObjectLayers::CREATURES:
+            case ObjectLayers::PLAYER:
+            case ObjectLayers::PROJECTILES:
+                // Dynamic objects need to check collisions with both static and dynamic layers
+                return true;
+
+            case ObjectLayers::ENVIRONMENT:
+                // Static environment only needs to check collisions with moving objects
+                return inLayer2 == BroadPhaseLayers::MOVING;
+
+            case ObjectLayers::TRIGGERS:
+                // Trigger zones only detect moving objects passing through them
+                return inLayer2 == BroadPhaseLayers::MOVING;
+
+            default:
+                return true;
+        }
     }
 };
 
@@ -95,7 +118,92 @@ public:
 class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
 public:
     bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override {
-        // For now, allow all collisions - TODO: implement proper filtering
+        // General game engine collision layer rules
+        // Make collision checks symmetric by ordering layers
+        JPH::ObjectLayer layer1 = std::min(inObject1, inObject2);
+        JPH::ObjectLayer layer2 = std::max(inObject1, inObject2);
+
+        // Dynamic entities (creatures, NPCs, AI characters) collision rules
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::CREATURES) {
+            // Dynamic entities can collide with each other (AI interactions, character blocking)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::ENVIRONMENT) {
+            // Dynamic entities collide with static world geometry (terrain, buildings, obstacles)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::PROJECTILES) {
+            // Projectiles can hit dynamic entities (bullets, thrown objects, etc.)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::PLAYER) {
+            // Player can physically interact with dynamic entities
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::TRIGGERS) {
+            // Dynamic entities can trigger zone detection (switches, pressure plates, etc.)
+            return true;
+        }
+
+        // Static environment collision rules
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::ENVIRONMENT) {
+            // Static environment pieces don't collide with each other (optimization)
+            return false;
+        }
+
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::PROJECTILES) {
+            // Projectiles collide with world geometry (bullets hitting walls, bouncing objects)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::PLAYER) {
+            // Player collides with static world for movement constraints
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::TRIGGERS) {
+            // Static environment doesn't interact with trigger zones (optimization)
+            return false;
+        }
+
+        // Projectile collision rules
+        if (layer1 == ObjectLayers::PROJECTILES && layer2 == ObjectLayers::PROJECTILES) {
+            // Projectiles can collide with each other (bullet deflection, object interactions)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::PROJECTILES && layer2 == ObjectLayers::PLAYER) {
+            // Player can interact with projectiles (catching, deflecting, taking damage)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::PROJECTILES && layer2 == ObjectLayers::TRIGGERS) {
+            // Projectiles can activate trigger zones (shooting switches, target detection)
+            return true;
+        }
+
+        // Player collision rules
+        if (layer1 == ObjectLayers::PLAYER && layer2 == ObjectLayers::PLAYER) {
+            // Multiple players don't physically collide (prevents player blocking in multiplayer)
+            return false;
+        }
+
+        if (layer1 == ObjectLayers::PLAYER && layer2 == ObjectLayers::TRIGGERS) {
+            // Player activates trigger zones (doors, switches, area detection)
+            return true;
+        }
+
+        // Trigger zone rules
+        if (layer1 == ObjectLayers::TRIGGERS && layer2 == ObjectLayers::TRIGGERS) {
+            // Trigger zones don't interact with each other (optimization)
+            return false;
+        }
+
+        // Default to allowing collision for extensibility
         return true;
     }
 };
@@ -121,15 +229,11 @@ public:
     ~PhysicsSystem() = default;
 
     // SystemBase interface implementation
+    // @param deltaTime Frame time in MILLISECONDS (from Application::frameTime_)
     void update(float deltaTime, EntityManager& entityManager) override;
     void initialize(EntityManager& entityManager) override;
     void shutdown(EntityManager& entityManager) override;
 
-    // Physics-specific initialization with gravity parameter
-    void initialize(const glm::vec3& gravity = glm::vec3(0.0f, -9.81f, 0.0f));
-
-    // Clean shutdown of physics system
-    void shutdown();
 
     // Set reference to spatial system for collision detection optimization
     void setSpatialSystem(SpatialSystem* spatial) { spatialSystem_ = spatial; }
@@ -138,10 +242,9 @@ public:
     // CORE SIMULATION LOOP
     // =============================================================================
 
-    // Update all physics entities (called every frame)
-    void update(EntityManager& entityManager, float deltaTime);
 
     // Fixed timestep physics update for stability (called at fixed intervals)
+    // @param fixedDeltaTime Fixed timestep in MILLISECONDS (converted internally to seconds for Jolt)
     void fixedUpdate(EntityManager& entityManager, float fixedDeltaTime);
 
     // =============================================================================
@@ -161,6 +264,15 @@ public:
         velocityIterations_ = velocityIterations;
         positionIterations_ = positionIterations;
     }
+
+    // Thread configuration for Jolt Physics multithreading
+    void setThreadCount(uint32_t threadCount) {
+        threadCount_ = threadCount;
+        if (threadCount_ == 0) {
+            threadCount_ = std::max(1u, std::thread::hardware_concurrency() - 1);
+        }
+    }
+    uint32_t getThreadCount() const { return threadCount_; }
 
     // =============================================================================
     // COLLISION DETECTION AND RESPONSE
@@ -217,6 +329,30 @@ public:
     // JOLT PHYSICS INTEGRATION METHODS
     // =============================================================================
 
+private:
+    // =============================================================================
+    // COLLISION DATA STRUCTURES
+    // =============================================================================
+
+    // Collision pair for tracking detected collisions
+    struct CollisionPair {
+        EntityID entityA = 0;
+        EntityID entityB = 0;
+        glm::vec3 normal{0.0f, 1.0f, 0.0f};  // Collision normal (A to B)
+        float penetration = 0.0f;             // Penetration depth
+    };
+
+    // =============================================================================
+    // JOLT PHYSICS INTERNAL METHODS
+    // =============================================================================
+
+    // Jolt system lifecycle
+    void initializeJoltPhysics();
+    void shutdownJoltPhysics();
+
+    // Jolt layer configuration
+    void setupJoltLayers();
+
     // Jolt body management
     JPH::BodyID createJoltBody(EntityID entity, const RigidBodyComponent& rigidBody,
                                const CollisionComponent& collision, const Transform& transform);
@@ -242,30 +378,6 @@ public:
     void deactivateJoltBody(EntityID entity);
     bool isJoltBodyActive(EntityID entity) const;
 
-private:
-    // =============================================================================
-    // COLLISION DATA STRUCTURES
-    // =============================================================================
-
-    // Collision pair for tracking detected collisions
-    struct CollisionPair {
-        EntityID entityA = 0;
-        EntityID entityB = 0;
-        glm::vec3 normal{0.0f, 1.0f, 0.0f};  // Collision normal (A to B)
-        float penetration = 0.0f;             // Penetration depth
-    };
-
-    // =============================================================================
-    // JOLT PHYSICS INTERNAL METHODS
-    // =============================================================================
-
-    // Jolt system lifecycle
-    void initializeJoltPhysics();
-    void shutdownJoltPhysics();
-
-    // Jolt layer configuration
-    void setupJoltLayers();
-
     // Jolt utility methods
     JPH::ObjectLayer mapLayerMaskToObjectLayer(uint32_t layerMask) const;
     JPH::BroadPhaseLayer mapObjectLayerToBroadPhaseLayer(JPH::ObjectLayer objectLayer) const;
@@ -275,10 +387,8 @@ private:
     // =============================================================================
 
     // Core physics steps
-    void integrateRigidBodies(EntityManager& entityManager, float deltaTime);
     void detectCollisions(EntityManager& entityManager);
     void resolveCollisions(EntityManager& entityManager, float deltaTime);
-    void updateTransforms(EntityManager& entityManager, float deltaTime);
     void updateCreaturePhysics(EntityManager& entityManager, float deltaTime);
 
     // Collision detection helpers
@@ -306,6 +416,7 @@ private:
     // Solver configuration
     int velocityIterations_{8};                    // Velocity constraint solver iterations
     int positionIterations_{3};                    // Position constraint solver iterations
+    uint32_t threadCount_{0};                      // Physics thread count (0 = auto-detect)
 
     // System state
     bool initialized_{false};                      // System initialization status

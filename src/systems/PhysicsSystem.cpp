@@ -13,28 +13,60 @@ namespace VulkanMon {
 
 // SystemBase interface implementation
 void PhysicsSystem::update(float deltaTime, EntityManager& entityManager) {
-    // Delegate to our existing update method
-    update(entityManager, deltaTime);
+    if (!initialized_) return;
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    // Apply time scaling
+    float scaledDeltaTime = deltaTime * timeScale_;
+
+    // Reset frame statistics
+    stats_.activeRigidBodies = 0;
+    stats_.collisionChecks = 0;
+    stats_.collisionHits = 0;
+    stats_.averageVelocity = 0.0f;
+
+    // Step Jolt Physics simulation (only physics system)
+    if (joltPhysics_) {
+        try {
+            // Create Jolt bodies for any new entities with physics components
+            createJoltBodiesForNewEntities(entityManager);
+
+            // Update Jolt physics simulation with safe time step
+            // CRITICAL: Jolt Physics expects deltaTime in SECONDS
+            // Our deltaTime parameter comes from Application::frameTime_ which is in MILLISECONDS
+            const float deltaTimeSeconds = scaledDeltaTime / 1000.0f; // Convert milliseconds to seconds
+            const float maxTimeStep = 1.0f / 60.0f; // Cap at 60 FPS timestep (seconds)
+            const float clampedDeltaTime = std::min(deltaTimeSeconds, maxTimeStep);
+            const int collisionSteps = 1;
+
+            joltPhysics_->Update(clampedDeltaTime, collisionSteps, tempAllocator_.get(), jobSystem_.get());
+
+            // Sync transforms from Jolt back to ECS components
+            syncTransformsFromJolt(entityManager);
+
+            // Update statistics from Jolt
+            updateStatsFromJolt();
+        } catch (const std::exception& e) {
+            VKMON_ERROR("Jolt Physics update failed: " + std::string(e.what()));
+            VKMON_ERROR("Physics system cannot continue without Jolt Physics");
+            return;
+        }
+    } else {
+        VKMON_ERROR("PhysicsSystem: Jolt Physics not initialized! Cannot proceed.");
+        return;
+    }
+
+    // Calculate frame timing
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    stats_.updateTime = duration.count() / 1000.0f; // Convert to milliseconds
 }
 
 void PhysicsSystem::initialize(EntityManager& entityManager) {
-    // Initialize with default gravity
-    initialize();
-}
+    VKMON_INFO("Initializing PhysicsSystem with default gravity");
 
-void PhysicsSystem::shutdown(EntityManager& entityManager) {
-    // Delegate to our existing shutdown method
-    shutdown();
-}
-
-// Physics-specific methods
-void PhysicsSystem::initialize(const glm::vec3& gravity) {
-    VKMON_INFO("Initializing PhysicsSystem with gravity: " +
-               std::to_string(gravity.x) + ", " +
-               std::to_string(gravity.y) + ", " +
-               std::to_string(gravity.z));
-
-    worldGravity_ = gravity;
+    worldGravity_ = glm::vec3(0.0f, -9.81f, 0.0f);
     timeScale_ = 1.0f;
     collisionEnabled_ = true;
     debugDraw_ = false;
@@ -55,7 +87,7 @@ void PhysicsSystem::initialize(const glm::vec3& gravity) {
     VKMON_INFO("PhysicsSystem initialized successfully");
 }
 
-void PhysicsSystem::shutdown() {
+void PhysicsSystem::shutdown(EntityManager& entityManager) {
     if (!initialized_) return;
 
     VKMON_INFO("Shutting down PhysicsSystem");
@@ -69,70 +101,7 @@ void PhysicsSystem::shutdown() {
     VKMON_INFO("PhysicsSystem shutdown complete");
 }
 
-void PhysicsSystem::update(EntityManager& entityManager, float deltaTime) {
-    if (!initialized_) return;
-
-    auto startTime = std::chrono::high_resolution_clock::now();
-
-    // Apply time scaling
-    float scaledDeltaTime = deltaTime * timeScale_;
-
-    // Reset frame statistics
-    stats_.activeRigidBodies = 0;
-    stats_.collisionChecks = 0;
-    stats_.collisionHits = 0;
-    stats_.averageVelocity = 0.0f;
-
-    // Step Jolt Physics simulation (replaces all custom physics)
-    if (joltPhysics_ && collisionEnabled_) {
-        try {
-            // Create Jolt bodies for any new entities with physics components
-            createJoltBodiesForNewEntities(entityManager);
-
-            // Apply creature physics forces before Jolt simulation
-            updateCreaturePhysics(entityManager, scaledDeltaTime);
-
-            // Update Jolt physics simulation with safe time step
-            // CRITICAL: Jolt expects deltaTime in SECONDS, but frameTime_ is in MILLISECONDS
-            const float deltaTimeSeconds = scaledDeltaTime / 1000.0f; // Convert ms to seconds
-            const float maxTimeStep = 1.0f / 60.0f; // Cap at 60 FPS timestep (seconds)
-            const float clampedDeltaTime = std::min(deltaTimeSeconds, maxTimeStep);
-            const int collisionSteps = 1;
-
-            joltPhysics_->Update(clampedDeltaTime, collisionSteps, tempAllocator_.get(), jobSystem_.get());
-
-            // Sync transforms from Jolt back to ECS components
-            syncTransformsFromJolt(entityManager);
-
-            // Update statistics from Jolt
-            updateStatsFromJolt();
-        } catch (const std::exception& e) {
-            VKMON_ERROR("Jolt Physics update failed: " + std::string(e.what()));
-            VKMON_WARNING("Falling back to legacy physics for this frame");
-            // Fall through to legacy physics
-        }
-    } else {
-        // Fallback to legacy custom physics for compatibility
-        VKMON_WARNING("PhysicsSystem: Using legacy custom physics (Jolt disabled or not initialized)");
-
-        integrateRigidBodies(entityManager, scaledDeltaTime);
-        updateCreaturePhysics(entityManager, scaledDeltaTime);
-        applyEnvironmentalForces(entityManager, scaledDeltaTime);
-        updateGroundDetection(entityManager);
-
-        if (collisionEnabled_) {
-            detectCollisions(entityManager);
-            resolveCollisions(entityManager, scaledDeltaTime);
-        }
-
-        updateTransforms(entityManager, scaledDeltaTime);
-    }
-
-    // Calculate frame timing
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    stats_.updateTime = duration.count() / 1000.0f; // Convert to milliseconds
-}
+// Physics-specific methods
 
 void PhysicsSystem::fixedUpdate(EntityManager& entityManager, float fixedDeltaTime) {
     if (!initialized_) return;
@@ -181,16 +150,56 @@ PhysicsSystem::RaycastHit PhysicsSystem::raycast(const glm::vec3& origin,
                                                  uint32_t layerMask) {
     RaycastHit hit{};
 
-    // Use spatial system for efficient ray casting if available
-    if (spatialSystem_) {
-        // Get entities along ray path from spatial system
-        // This is a placeholder - actual implementation would use spatial queries
-        VKMON_DEBUG("PhysicsSystem: Raycast with spatial optimization not yet implemented");
+    if (!joltPhysics_) {
+        VKMON_WARNING("PhysicsSystem: Cannot perform raycast - Jolt Physics not initialized");
+        return hit;
     }
 
-    // Fallback: Check all entities with collision components
-    // TODO: Implement actual ray-sphere, ray-box intersection tests
-    VKMON_DEBUG("PhysicsSystem: Raycast performed");
+    // Normalize direction vector for consistent behavior
+    glm::vec3 normalizedDir = glm::normalize(direction);
+    glm::vec3 endPoint = origin + normalizedDir * maxDistance;
+
+    // Convert to Jolt coordinates
+    JPH::Vec3 joltOrigin(origin.x, origin.y, origin.z);
+    JPH::Vec3 joltDirection(normalizedDir.x, normalizedDir.y, normalizedDir.z);
+
+    // Create Jolt raycast settings
+    JPH::RayCast ray;
+    ray.mOrigin = joltOrigin;
+    ray.mDirection = joltDirection * maxDistance;
+
+    // Use narrow phase query for precise raycast
+    const JPH::NarrowPhaseQuery& narrowPhase = joltPhysics_->GetNarrowPhaseQuery();
+
+    // Simple raycast using Jolt's built-in result structure
+    JPH::RayCastResult rayResult;
+
+    // Use simplified raycast approach - cast ray and get single closest result
+    JPH::RRayCast joltRay{ray.mOrigin, ray.mDirection};
+
+    // Perform the raycast using all default filters for now (can be enhanced later)
+    bool hasHit = narrowPhase.CastRay(joltRay, rayResult, {}, {}, {});
+
+    // Process results
+    if (hasHit) {
+        // Find the entity ID from the body ID
+        auto it = bodyToEntityMap_.find(rayResult.mBodyID);
+        if (it != bodyToEntityMap_.end()) {
+            hit.hit = true;
+            hit.distance = rayResult.mFraction * maxDistance;
+            hit.entity = it->second;
+
+            // Calculate hit point
+            glm::vec3 hitPoint = origin + normalizedDir * hit.distance;
+            hit.point = hitPoint;
+
+            // Get surface normal from Jolt (simplified for now)
+            hit.normal = glm::vec3(0, 1, 0); // Default upward normal - can be improved with proper Jolt normal extraction
+
+            VKMON_DEBUG("PhysicsSystem: Raycast hit entity " + std::to_string(hit.entity) +
+                       " at distance " + std::to_string(hit.distance));
+        }
+    }
 
     return hit;
 }
@@ -200,13 +209,67 @@ std::vector<EntityID> PhysicsSystem::overlapSphere(const glm::vec3& center,
                                                    uint32_t layerMask) {
     std::vector<EntityID> results;
 
-    // Use spatial system for efficient overlap detection if available
-    if (spatialSystem_) {
-        // Leverage spatial partitioning for performance
-        VKMON_DEBUG("PhysicsSystem: Sphere overlap with spatial optimization not yet implemented");
+    if (!joltPhysics_) {
+        VKMON_WARNING("PhysicsSystem: Cannot perform sphere overlap - Jolt Physics not initialized");
+        return results;
     }
 
-    VKMON_DEBUG("PhysicsSystem: Sphere overlap performed");
+    // Use spatial system for pre-filtering if available (performance optimization)
+    if (spatialSystem_) {
+        // Get candidate entities from spatial system first
+        auto spatialCandidates = spatialSystem_->queryRadius(center, radius);
+
+        // TODO: Cross-reference spatial candidates with Jolt Physics for precise collision detection
+        // For now, we'll use the full Jolt Physics approach and optimize later
+        VKMON_DEBUG("PhysicsSystem: Sphere overlap with spatial pre-filtering (candidates: " +
+                   std::to_string(spatialCandidates.size()) + ")");
+    }
+
+    // Create sphere shape for overlap testing
+    JPH::SphereShapeSettings sphereSettings(radius);
+    JPH::ShapeRefC sphereShape = sphereSettings.Create().Get();
+
+    if (!sphereShape) {
+        VKMON_ERROR("PhysicsSystem: Failed to create sphere shape for overlap query");
+        return results;
+    }
+
+    // Convert center position to Jolt coordinates
+    JPH::Vec3 joltCenter(center.x, center.y, center.z);
+    JPH::Quat joltRotation = JPH::Quat::sIdentity();
+
+    // Create transformation matrix for CollideShape API
+    JPH::Mat44 transform = JPH::Mat44::sRotationTranslation(joltRotation, joltCenter);
+
+    // Use narrow phase query for precise overlap detection
+    const JPH::NarrowPhaseQuery& narrowPhase = joltPhysics_->GetNarrowPhaseQuery();
+
+    // Storage for collision results
+    JPH::AllHitCollisionCollector<JPH::CollideShapeCollector> collector;
+
+    // Perform the overlap query using CollideShape with correct API
+    JPH::CollideShapeSettings settings;
+    narrowPhase.CollideShape(sphereShape.GetPtr(), JPH::Vec3::sReplicate(1.0f), transform, settings, JPH::RVec3(joltCenter), collector, {}, {}, {}, {});
+
+    // Process results and convert body IDs back to entity IDs
+    for (const auto& hit : collector.mHits) {
+        // Find the entity ID from the body ID
+        auto it = bodyToEntityMap_.find(hit.mBodyID2);
+        if (it != bodyToEntityMap_.end()) {
+            EntityID entityId = it->second;
+
+            // TODO: Add layer mask filtering here for more precise control
+            // For now, include all hits
+            results.push_back(entityId);
+        }
+    }
+
+    VKMON_DEBUG("PhysicsSystem: Sphere overlap at (" +
+               std::to_string(center.x) + ", " +
+               std::to_string(center.y) + ", " +
+               std::to_string(center.z) + ") radius " +
+               std::to_string(radius) + " found " +
+               std::to_string(results.size()) + " entities");
 
     return results;
 }
@@ -215,65 +278,6 @@ std::vector<EntityID> PhysicsSystem::overlapSphere(const glm::vec3& center,
 // PRIVATE IMPLEMENTATION (STUB METHODS)
 // =============================================================================
 
-void PhysicsSystem::integrateRigidBodies(EntityManager& entityManager, float deltaTime) {
-    // Get all entities with RigidBodyComponent
-    const auto& rigidBodyEntities = entityManager.getEntitiesWithComponent<RigidBodyComponent>();
-
-    // Convert deltaTime from milliseconds to seconds
-    float deltaTimeSeconds = deltaTime / 1000.0f;
-
-    for (EntityID entity : rigidBodyEntities) {
-        if (!entityManager.hasComponent<RigidBodyComponent>(entity) ||
-            !entityManager.hasComponent<Transform>(entity)) {
-            continue;
-        }
-
-        auto& rigidBody = entityManager.getComponent<RigidBodyComponent>(entity);
-        auto& transform = entityManager.getComponent<Transform>(entity);
-
-        if (!rigidBody.isDynamic || rigidBody.mass <= 0.0f) continue;
-
-        stats_.activeRigidBodies++;
-
-        // Store initial velocity to detect changes
-        glm::vec3 initialVelocity = rigidBody.velocity;
-        glm::vec3 initialAngularVelocity = rigidBody.angularVelocity;
-
-        // Apply forces to velocity (F = ma -> a = F/m)
-        glm::vec3 acceleration = rigidBody.force / rigidBody.mass;
-        rigidBody.velocity += acceleration * deltaTimeSeconds;
-
-        // Apply linear damping (air resistance)
-        rigidBody.velocity *= (1.0f - rigidBody.linearDamping * deltaTimeSeconds);
-
-        // Apply angular damping
-        rigidBody.angularVelocity *= (1.0f - rigidBody.angularDamping * deltaTimeSeconds);
-
-        // Implement terminal velocity for realistic falling
-        float speed = glm::length(rigidBody.velocity);
-        float terminalVelocity = 30.0f; // Realistic terminal velocity (m/s)
-        if (speed > terminalVelocity) {
-            rigidBody.velocity = glm::normalize(rigidBody.velocity) * terminalVelocity;
-        }
-
-        // Check if physics properties changed and mark for synchronization
-        if (glm::length(rigidBody.velocity - initialVelocity) > 0.001f ||
-            glm::length(rigidBody.angularVelocity - initialAngularVelocity) > 0.001f) {
-            rigidBody.needsSync = true;
-        }
-
-        // Accumulate average velocity for statistics
-        stats_.averageVelocity += speed;
-
-        // Clear frame forces after integration
-        rigidBody.clearForces();
-    }
-
-    // Calculate average velocity
-    if (stats_.activeRigidBodies > 0) {
-        stats_.averageVelocity /= stats_.activeRigidBodies;
-    }
-}
 
 void PhysicsSystem::updateCreaturePhysics(EntityManager& entityManager, float deltaTime) {
     // Get all entities with CreaturePhysicsComponent
@@ -373,7 +377,6 @@ void PhysicsSystem::updateGroundDetection(EntityManager& entityManager) {
                 rigidBody.velocity.x *= (1.0f - rigidBody.friction * 0.1f);
                 rigidBody.velocity.z *= (1.0f - rigidBody.friction * 0.1f);
 
-                rigidBody.needsSync = true;
 
                 // Only log significant bounces
                 if (abs(oldVelocity) > 1.0f) {
@@ -384,7 +387,6 @@ void PhysicsSystem::updateGroundDetection(EntityManager& entityManager) {
             } else if (rigidBody.velocity.y < 0.0f) {
                 // Stop very slow downward movement
                 rigidBody.velocity.y = 0.0f;
-                rigidBody.needsSync = true;
             }
         }
     }
@@ -427,8 +429,8 @@ void PhysicsSystem::detectCollisions(EntityManager& entityManager) {
     stats_.collisionChecks = 0;
     stats_.collisionHits = 0;
 
-    // TEMPORARY: Use brute force collision detection for testing
-    if (false && spatialSystem_) { // Force brute force for debugging
+    // Use spatial system optimization when available
+    if (spatialSystem_) {
         // Spatial-optimized collision detection
         for (EntityID entityA : collisionEntities) {
             if (!entityManager.hasComponent<CollisionComponent>(entityA) ||
@@ -490,14 +492,23 @@ void PhysicsSystem::detectCollisions(EntityManager& entityManager) {
                     currentCollisions_.push_back(collision);
                     stats_.collisionHits++;
 
-                    VKMON_INFO("PhysicsSystem: Collision detected between entities " +
-                               std::to_string(entityA) + " and " + std::to_string(entityB));
+                    // Reduce logging frequency for performance
+                    static int collisionLogCounter = 0;
+                    if (++collisionLogCounter % 60 == 0) { // Log every 60 collisions (1 per second at 60 FPS)
+                        VKMON_DEBUG("PhysicsSystem: Collision detected between entities " +
+                                   std::to_string(entityA) + " and " + std::to_string(entityB) +
+                                   " (collision #" + std::to_string(collisionLogCounter) + ")");
+                    }
                 }
             }
         }
     } else {
         // Fallback: brute force O(n²) collision detection without spatial optimization
-        VKMON_WARNING("PhysicsSystem: No spatial system available, using brute force collision detection");
+        static bool warningLogged = false;
+        if (!warningLogged) {
+            VKMON_WARNING("PhysicsSystem: No spatial system available, using brute force collision detection");
+            warningLogged = true;
+        }
 
         for (size_t i = 0; i < collisionEntities.size(); ++i) {
             for (size_t j = i + 1; j < collisionEntities.size(); ++j) {
@@ -665,11 +676,9 @@ void PhysicsSystem::resolveCollisions(EntityManager& entityManager, float deltaT
 
             if (canMoveA) {
                 bodyA->velocity -= impulse / massA;
-                bodyA->markForSync();
             }
             if (canMoveB) {
                 bodyB->velocity += impulse / massB;
-                bodyB->markForSync();
             }
 
             // Apply friction (simple model)
@@ -703,39 +712,6 @@ void PhysicsSystem::resolveCollisions(EntityManager& entityManager, float deltaT
     // Collision resolution summary logging removed for performance
 }
 
-void PhysicsSystem::updateTransforms(EntityManager& entityManager, float deltaTime) {
-    // Update Transform components from RigidBody physics data
-    const auto& rigidBodyEntities = entityManager.getEntitiesWithComponent<RigidBodyComponent>();
-
-    for (EntityID entity : rigidBodyEntities) {
-        if (!entityManager.hasComponent<RigidBodyComponent>(entity) ||
-            !entityManager.hasComponent<Transform>(entity)) {
-            continue;
-        }
-
-        auto& rigidBody = entityManager.getComponent<RigidBodyComponent>(entity);
-        auto& transform = entityManager.getComponent<Transform>(entity);
-
-        if (!rigidBody.needsSync || !rigidBody.isDynamic) continue;
-
-        // Convert deltaTime from milliseconds to seconds for physics calculations
-        float deltaTimeSeconds = deltaTime / 1000.0f;
-
-        // Integrate position from velocity using real deltaTime
-        transform.position += rigidBody.velocity * deltaTimeSeconds;
-
-        // Integrate rotation from angular velocity using real deltaTime
-        if (!rigidBody.freezeRotation && glm::length(rigidBody.angularVelocity) > 0.001f) {
-            float angle = glm::length(rigidBody.angularVelocity) * deltaTimeSeconds;
-            glm::vec3 axis = glm::normalize(rigidBody.angularVelocity);
-            glm::quat deltaRotation = glm::angleAxis(angle, axis);
-            transform.rotation = deltaRotation * transform.rotation;
-        }
-
-        // Clear sync flag
-        rigidBody.needsSync = false;
-    }
-}
 
 bool PhysicsSystem::checkCollision(const CollisionComponent& collider1, const Transform& transform1,
                                   const CollisionComponent& collider2, const Transform& transform2) {
@@ -772,10 +748,14 @@ void PhysicsSystem::initializeJoltPhysics() {
     tempAllocator_ = std::make_unique<JPH::TempAllocatorImpl>(10 * 1024 * 1024);
 
     // Create job system for multi-threading
-    uint32_t threadCount = std::max(1u, std::thread::hardware_concurrency() - 1);
+    // Use configured thread count, or auto-detect if not set
+    uint32_t actualThreadCount = threadCount_;
+    if (actualThreadCount == 0) {
+        actualThreadCount = std::max(1u, std::thread::hardware_concurrency() - 1);
+    }
     jobSystem_ = std::make_unique<JPH::JobSystemThreadPool>(JPH::cMaxPhysicsJobs,
                                                             JPH::cMaxPhysicsBarriers,
-                                                            threadCount);
+                                                            actualThreadCount);
 
     // Configure physics system settings for game engine use
     const uint32_t cMaxBodies = 1024;           // Support up to 1024 physics bodies
@@ -799,7 +779,7 @@ void PhysicsSystem::initializeJoltPhysics() {
     // Setup collision layers
     setupJoltLayers();
 
-    VKMON_INFO("Jolt Physics initialized with " + std::to_string(threadCount) + " threads");
+    VKMON_INFO("Jolt Physics initialized with " + std::to_string(actualThreadCount) + " threads");
 }
 
 void PhysicsSystem::shutdownJoltPhysics() {
@@ -1005,36 +985,34 @@ void PhysicsSystem::syncTransformsFromJolt(EntityManager& entityManager) {
                     continue;
                 }
 
-                // Only sync transforms for active dynamic bodies to avoid unnecessary updates
-                if (bodyInterface.IsActive(bodyID) && bodyInterface.GetMotionType(bodyID) == JPH::EMotionType::Dynamic) {
-                    if (entityManager.hasComponent<Transform>(entityID)) {
-                        auto& transform = entityManager.getComponent<Transform>(entityID);
+                // Sync ALL physics entities every frame for reliable ECS integration
+                if (entityManager.hasComponent<Transform>(entityID)) {
+                    auto& transform = entityManager.getComponent<Transform>(entityID);
 
-                        // Get position and rotation from Jolt
-                        JPH::Vec3 position = bodyInterface.GetPosition(bodyID);
-                        JPH::Quat rotation = bodyInterface.GetRotation(bodyID);
+                    // Get position and rotation from Jolt
+                    JPH::Vec3 position = bodyInterface.GetPosition(bodyID);
+                    JPH::Quat rotation = bodyInterface.GetRotation(bodyID);
 
-                        // Update Transform component
-                        transform.position = glm::vec3(position.GetX(), position.GetY(), position.GetZ());
-                        transform.rotation = glm::quat(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ());
+                    // Update Transform component
+                    transform.position = glm::vec3(position.GetX(), position.GetY(), position.GetZ());
+                    transform.rotation = glm::quat(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ());
 
-                        // Mark transform as dirty for rendering
-                        transform.markDirty();
-                        syncCount++;
-                    }
+                    // Mark transform as dirty for rendering
+                    transform.markDirty();
+                    syncCount++;
+                }
 
-                    // Also sync velocity to RigidBodyComponent for test compatibility
-                    if (entityManager.hasComponent<RigidBodyComponent>(entityID)) {
-                        auto& rigidBody = entityManager.getComponent<RigidBodyComponent>(entityID);
+                // Also sync velocity to RigidBodyComponent for test compatibility
+                if (entityManager.hasComponent<RigidBodyComponent>(entityID)) {
+                    auto& rigidBody = entityManager.getComponent<RigidBodyComponent>(entityID);
 
-                        // Get velocity from Jolt
-                        JPH::Vec3 velocity = bodyInterface.GetLinearVelocity(bodyID);
-                        JPH::Vec3 angularVelocity = bodyInterface.GetAngularVelocity(bodyID);
+                    // Get velocity from Jolt
+                    JPH::Vec3 velocity = bodyInterface.GetLinearVelocity(bodyID);
+                    JPH::Vec3 angularVelocity = bodyInterface.GetAngularVelocity(bodyID);
 
-                        // Update RigidBodyComponent velocity
-                        rigidBody.velocity = glm::vec3(velocity.GetX(), velocity.GetY(), velocity.GetZ());
-                        rigidBody.angularVelocity = glm::vec3(angularVelocity.GetX(), angularVelocity.GetY(), angularVelocity.GetZ());
-                    }
+                    // Update RigidBodyComponent velocity
+                    rigidBody.velocity = glm::vec3(velocity.GetX(), velocity.GetY(), velocity.GetZ());
+                    rigidBody.angularVelocity = glm::vec3(angularVelocity.GetX(), angularVelocity.GetY(), angularVelocity.GetZ());
                 }
             } catch (const std::exception& e) {
                 VKMON_ERROR("syncTransformsFromJolt: Error syncing entity " + std::to_string(entityID) + ": " + e.what());

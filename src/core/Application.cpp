@@ -169,7 +169,7 @@ void Application::updateSystems(float deltaTime) {
 
     // Update physics simulation
     if (physicsSystem_ && world_) {
-        physicsSystem_->update(world_->getEntityManager(), deltaTime);
+        physicsSystem_->update(deltaTime, world_->getEntityManager());
     }
 
     // Future: Update game logic, animations, other systems, etc.
@@ -273,7 +273,6 @@ void Application::makeRandomCubeFall() {
     rigidBody.velocity = glm::vec3(velocity(gen), 0.0f, velocity(gen)); // Random horizontal velocity
     rigidBody.restitution = 0.7f; // Good bounce for visual feedback
     rigidBody.friction = 0.5f; // Moderate friction
-    rigidBody.needsSync = true;
     entityManager.addComponent(newCube, rigidBody);
 
     // Add Collision component (physical interaction)
@@ -326,6 +325,210 @@ void Application::cleanupFallenCubes() {
 
         ++it;
     }
+}
+
+// =============================================================================
+// PHYSICS TESTING AND VALIDATION METHODS
+// =============================================================================
+
+void Application::testRaycastSystem() {
+    VKMON_INFO("=== PHYSICS TEST: Raycast System Validation ===");
+
+    if (!physicsSystem_) {
+        VKMON_ERROR("Physics system not available for raycast testing");
+        return;
+    }
+
+    // Test 1: Raycast downward from sky to detect ground
+    glm::vec3 skyOrigin(0.0f, 15.0f, 0.0f);  // High above scene
+    glm::vec3 downDirection(0.0f, -1.0f, 0.0f);  // Straight down
+
+    VKMON_INFO("Test 1: Raycast from sky (0, 15, 0) downward to detect ground");
+    auto groundHit = physicsSystem_->raycast(skyOrigin, downDirection, 25.0f);
+
+    if (groundHit.hit) {
+        VKMON_INFO("✅ RAYCAST SUCCESS: Hit entity " + std::to_string(groundHit.entity) +
+                  " at distance " + std::to_string(groundHit.distance) +
+                  " (point: " + std::to_string(groundHit.point.x) + ", " +
+                  std::to_string(groundHit.point.y) + ", " + std::to_string(groundHit.point.z) + ")");
+    } else {
+        VKMON_WARNING("❌ RAYCAST FAILED: No ground detected from sky position");
+    }
+
+    // Test 2: Raycast horizontally through cube formation
+    glm::vec3 sideOrigin(-20.0f, 2.0f, 0.0f);  // Side of scene at cube level
+    glm::vec3 rightDirection(1.0f, 0.0f, 0.0f);  // Straight right
+
+    VKMON_INFO("Test 2: Raycast horizontally through cube formation");
+    auto cubeHit = physicsSystem_->raycast(sideOrigin, rightDirection, 40.0f);
+
+    if (cubeHit.hit) {
+        VKMON_INFO("✅ RAYCAST SUCCESS: Hit cube entity " + std::to_string(cubeHit.entity) +
+                  " at distance " + std::to_string(cubeHit.distance));
+    } else {
+        VKMON_WARNING("❌ RAYCAST FAILED: No cubes detected in horizontal raycast");
+    }
+
+    // Test 3: Raycast with no expected hits
+    glm::vec3 emptyOrigin(0.0f, 25.0f, 0.0f);  // High above scene
+    glm::vec3 upDirection(0.0f, 1.0f, 0.0f);  // Straight up into empty space
+
+    VKMON_INFO("Test 3: Raycast upward into empty space (should miss)");
+    auto missHit = physicsSystem_->raycast(emptyOrigin, upDirection, 10.0f);
+
+    if (!missHit.hit) {
+        VKMON_INFO("✅ RAYCAST SUCCESS: Correctly detected no hits in empty space");
+    } else {
+        VKMON_WARNING("❌ RAYCAST UNEXPECTED: Hit entity " + std::to_string(missHit.entity) + " in empty space");
+    }
+
+    VKMON_INFO("=== Raycast System Test Complete ===");
+}
+
+void Application::testSphereOverlapQueries() {
+    VKMON_INFO("=== PHYSICS TEST: Sphere Overlap Queries Validation ===");
+
+    if (!physicsSystem_) {
+        VKMON_ERROR("Physics system not available for sphere overlap testing");
+        return;
+    }
+
+    // Test 1: Large sphere at center to detect multiple cubes
+    glm::vec3 centerPosition(0.0f, 2.0f, 0.0f);  // Center of cube formation
+    float largeRadius = 5.0f;
+
+    VKMON_INFO("Test 1: Large sphere overlap at center (radius 5.0) to detect multiple cubes");
+    auto centerOverlaps = physicsSystem_->overlapSphere(centerPosition, largeRadius);
+
+    VKMON_INFO("✅ SPHERE OVERLAP: Found " + std::to_string(centerOverlaps.size()) + " entities in center sphere");
+    if (centerOverlaps.size() > 0) {
+        VKMON_INFO("First few detected entities: ");
+        for (size_t i = 0; i < std::min(centerOverlaps.size(), size_t(5)); ++i) {
+            VKMON_INFO("  - Entity " + std::to_string(centerOverlaps[i]));
+        }
+    }
+
+    // Test 2: Small sphere at specific cube location
+    glm::vec3 cubePosition(2.0f, 2.0f, 2.0f);  // Should be near a cube
+    float smallRadius = 1.5f;
+
+    VKMON_INFO("Test 2: Small sphere overlap at cube location (2,2,2) radius 1.5");
+    auto cubeOverlaps = physicsSystem_->overlapSphere(cubePosition, smallRadius);
+
+    VKMON_INFO("✅ SPHERE OVERLAP: Found " + std::to_string(cubeOverlaps.size()) + " entities near cube");
+
+    // Test 3: Sphere in empty space (should find nothing)
+    glm::vec3 emptyPosition(50.0f, 50.0f, 50.0f);  // Far from any objects
+    float mediumRadius = 3.0f;
+
+    VKMON_INFO("Test 3: Sphere overlap in empty space (50,50,50) radius 3.0 (should be empty)");
+    auto emptyOverlaps = physicsSystem_->overlapSphere(emptyPosition, mediumRadius);
+
+    if (emptyOverlaps.empty()) {
+        VKMON_INFO("✅ SPHERE OVERLAP SUCCESS: Correctly detected no entities in empty space");
+    } else {
+        VKMON_WARNING("❌ SPHERE OVERLAP UNEXPECTED: Found " + std::to_string(emptyOverlaps.size()) + " entities in empty space");
+    }
+
+    // Test 4: Ground detection sphere
+    glm::vec3 groundPosition(0.0f, -3.0f, 0.0f);  // At ground level
+    float groundRadius = 2.0f;
+
+    VKMON_INFO("Test 4: Sphere overlap at ground level to detect floor");
+    auto groundOverlaps = physicsSystem_->overlapSphere(groundPosition, groundRadius);
+
+    VKMON_INFO("✅ SPHERE OVERLAP: Found " + std::to_string(groundOverlaps.size()) + " entities at ground level");
+
+    VKMON_INFO("=== Sphere Overlap Queries Test Complete ===");
+}
+
+void Application::measureSpatialCollisionPerformance() {
+    VKMON_INFO("=== PHYSICS TEST: Spatial Collision Performance Measurement ===");
+
+    if (!physicsSystem_) {
+        VKMON_ERROR("Physics system not available for performance testing");
+        return;
+    }
+
+    // Get current physics statistics
+    auto stats = physicsSystem_->getStats();
+
+    VKMON_INFO("Current Physics Performance Metrics:");
+    VKMON_INFO("  Active Rigid Bodies: " + std::to_string(stats.activeRigidBodies));
+    VKMON_INFO("  Collision Checks: " + std::to_string(stats.collisionChecks));
+    VKMON_INFO("  Collision Hits: " + std::to_string(stats.collisionHits));
+    VKMON_INFO("  Update Time: " + std::to_string(stats.updateTime) + "ms");
+    VKMON_INFO("  Average Velocity: " + std::to_string(stats.averageVelocity));
+
+    // Performance validation thresholds
+    const float TARGET_UPDATE_TIME = 5.0f;  // < 5ms per frame
+    const int EXPECTED_ENTITIES = 512;      // 8x8x8 cube formation
+
+    VKMON_INFO("Performance Validation:");
+
+    // Check update time performance
+    if (stats.updateTime < TARGET_UPDATE_TIME) {
+        VKMON_INFO("✅ PERFORMANCE SUCCESS: Physics update time " + std::to_string(stats.updateTime) +
+                  "ms is under " + std::to_string(TARGET_UPDATE_TIME) + "ms target");
+    } else {
+        VKMON_WARNING("❌ PERFORMANCE ISSUE: Physics update time " + std::to_string(stats.updateTime) +
+                     "ms exceeds " + std::to_string(TARGET_UPDATE_TIME) + "ms target");
+    }
+
+    // Check entity count
+    if (stats.activeRigidBodies >= EXPECTED_ENTITIES) {
+        VKMON_INFO("✅ SCALE SUCCESS: Managing " + std::to_string(stats.activeRigidBodies) +
+                  " rigid bodies (target: " + std::to_string(EXPECTED_ENTITIES) + "+)");
+    } else {
+        VKMON_INFO("📊 SCALE INFO: Currently managing " + std::to_string(stats.activeRigidBodies) +
+                  " rigid bodies");
+    }
+
+    // Calculate collision check efficiency
+    if (stats.activeRigidBodies > 0) {
+        // For spatial optimization, collision checks should be much less than O(n²)
+        int theoreticalBruteForce = (stats.activeRigidBodies * (stats.activeRigidBodies - 1)) / 2;
+        float efficiency = (stats.collisionChecks > 0) ?
+                          (float(theoreticalBruteForce) / float(stats.collisionChecks)) : 0.0f;
+
+        VKMON_INFO("Collision Detection Efficiency:");
+        VKMON_INFO("  Brute Force Would Be: " + std::to_string(theoreticalBruteForce) + " checks");
+        VKMON_INFO("  Spatial Optimized: " + std::to_string(stats.collisionChecks) + " checks");
+        VKMON_INFO("  Efficiency Gain: " + std::to_string(efficiency) + "x improvement");
+
+        if (efficiency > 10.0f) {
+            VKMON_INFO("✅ SPATIAL SUCCESS: Achieving " + std::to_string(efficiency) + "x efficiency gain");
+        } else if (stats.collisionChecks == 0) {
+            VKMON_INFO("📊 SPATIAL INFO: No collisions detected this frame");
+        } else {
+            VKMON_WARNING("❌ SPATIAL ISSUE: Low efficiency gain of " + std::to_string(efficiency) + "x");
+        }
+    }
+
+    VKMON_INFO("=== Spatial Collision Performance Test Complete ===");
+}
+
+void Application::runPhysicsValidationTests() {
+    VKMON_INFO("🚀 === COMPREHENSIVE PHYSICS SYSTEM VALIDATION ===");
+    VKMON_INFO("Running all critical blocker validation tests...");
+
+    // Test all three critical blockers in sequence
+    testRaycastSystem();
+    VKMON_INFO("");  // Spacing between tests
+
+    testSphereOverlapQueries();
+    VKMON_INFO("");  // Spacing between tests
+
+    measureSpatialCollisionPerformance();
+    VKMON_INFO("");  // Final summary
+
+    VKMON_INFO("🎯 === Physics Validation Complete ===");
+    VKMON_INFO("All critical blockers tested. Check logs above for detailed results.");
+    VKMON_INFO("Key Controls:");
+    VKMON_INFO("  7 = Test Raycast System");
+    VKMON_INFO("  8 = Test Sphere Overlap");
+    VKMON_INFO("  9 = Measure Performance");
+    VKMON_INFO("  0 = Run All Tests");
 }
 
 void Application::updateImGui(float deltaTime) {
