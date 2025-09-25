@@ -191,6 +191,10 @@ private:
         bool ambientEnabled = true;
     } lightingState_;
 
+    // Dynamic falling cube spawner state
+    std::vector<EntityID> fallingCubes_;
+    static constexpr size_t MAX_FALLING_CUBES = 20; // Limit to prevent memory issues
+
     // System initialization methods
     void initializeLogger();
     void initializeWindow();
@@ -231,6 +235,7 @@ private:
 
     // Physics demonstration methods
     void makeRandomCubeFall();
+    void cleanupFallenCubes();
 
     // Cleanup methods
     void cleanup();

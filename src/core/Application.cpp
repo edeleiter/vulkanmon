@@ -99,16 +99,33 @@ void Application::shutdown() {
 // =============================================================================
 
 void Application::processFrame() {
-    updateFrameTiming();
+    try {
+        updateFrameTiming();
+        VKMON_DEBUG("Frame timing updated");
 
-    // Poll window events
-    window_->pollEvents();
+        // Poll window events
+        window_->pollEvents();
+        VKMON_DEBUG("Window events polled");
 
-    processInput(frameTime_);
-    updateSystems(frameTime_);
-    updateECS(frameTime_);
-    updateImGui(frameTime_);
-    render(frameTime_);
+        processInput(frameTime_);
+        VKMON_DEBUG("Input processed");
+
+        updateSystems(frameTime_);
+        VKMON_DEBUG("Systems updated");
+
+        updateECS(frameTime_);
+        VKMON_DEBUG("ECS updated");
+
+        updateImGui(frameTime_);
+        VKMON_DEBUG("ImGui updated");
+
+        render(frameTime_);
+        VKMON_DEBUG("Render completed");
+
+    } catch (const std::exception& e) {
+        VKMON_ERROR("processFrame error: " + std::string(e.what()));
+        throw;
+    }
 }
 
 void Application::updateFrameTiming() {
@@ -213,57 +230,101 @@ void Application::makeRandomCubeFall() {
         return;
     }
 
-    // Get all entities with creature components (our cubes)
+    // Enhanced Dynamic Falling Cube Spawner for Physics Stress Testing
     auto& entityManager = world_->getEntityManager();
-    const auto& creatureEntities = entityManager.getEntitiesWithComponent<CreatureComponent>();
 
-    if (creatureEntities.empty()) {
+    // Clean up cubes that have fallen below ground
+    cleanupFallenCubes();
+
+    // Check if we've reached maximum cube limit (prevent memory issues)
+    if (fallingCubes_.size() >= MAX_FALLING_CUBES) {
         return;
     }
 
-    // Select a random creature entity
+    // Random number generation for varied trajectories
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, creatureEntities.size() - 1);
+    std::uniform_real_distribution<float> xPos(-15.0f, 15.0f);  // Random X position
+    std::uniform_real_distribution<float> zPos(-15.0f, 15.0f);  // Random Z position
+    std::uniform_real_distribution<float> velocity(-2.0f, 2.0f); // Random initial velocity
 
-    EntityID randomEntity = creatureEntities[dis(gen)];
+    // Create new falling cube entity
+    EntityID newCube = entityManager.createEntity();
 
-    // Check if this entity already has physics components
-    if (entityManager.hasComponent<RigidBodyComponent>(randomEntity)) {
-        // Reset position to make it fall again
-        auto& transform = entityManager.getComponent<Transform>(randomEntity);
-        auto& rigidBody = entityManager.getComponent<RigidBodyComponent>(randomEntity);
+    // Add Transform component (spawn from sky)
+    Transform transform;
+    transform.position = glm::vec3(xPos(gen), 20.0f, zPos(gen)); // Spawn at Y=20 (sky)
+    transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // No rotation
+    transform.scale = glm::vec3(0.8f, 0.8f, 0.8f); // Slightly smaller than scene cubes
+    entityManager.addComponent(newCube, transform);
 
-        // Reset to original position but higher up
-        transform.position.y += 10.0f; // Add 10 units height
-        rigidBody.velocity = glm::vec3(0.0f, 0.0f, 0.0f); // Reset velocity
-        rigidBody.needsSync = true;
+    // Add Renderable component (visible cube)
+    Renderable renderable;
+    renderable.meshPath = "cube.obj";
+    renderable.materialId = 4; // Use Chrome material for distinction
+    renderable.isVisible = true;
+    entityManager.addComponent(newCube, renderable);
 
-        VKMON_INFO("Making existing physics cube fall again from higher position");
-    } else {
-        // Add physics components to make it fall
-        RigidBodyComponent rigidBody;
-        rigidBody.isDynamic = true;
-        rigidBody.mass = 1.0f;
-        rigidBody.useGravity = true;
-        rigidBody.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
-        rigidBody.restitution = 0.5f; // Add some bounce
-        rigidBody.friction = 0.7f;
-        rigidBody.needsSync = true;
-        entityManager.addComponent(randomEntity, rigidBody);
+    // Add RigidBody component (physics properties)
+    RigidBodyComponent rigidBody;
+    rigidBody.isDynamic = true;
+    rigidBody.mass = 2.0f; // Heavier than scene cubes for impact
+    rigidBody.useGravity = true;
+    rigidBody.velocity = glm::vec3(velocity(gen), 0.0f, velocity(gen)); // Random horizontal velocity
+    rigidBody.restitution = 0.7f; // Good bounce for visual feedback
+    rigidBody.friction = 0.5f; // Moderate friction
+    rigidBody.needsSync = true;
+    entityManager.addComponent(newCube, rigidBody);
 
-        // Add collision detection only if it doesn't already exist
-        if (!entityManager.hasComponent<CollisionComponent>(randomEntity)) {
-            CollisionComponent collision = CollisionComponent::createCreature(0.5f, 1.0f);
-            entityManager.addComponent(randomEntity, collision);
+    // Add Collision component (physical interaction)
+    CollisionComponent collision = CollisionComponent::createEnvironment(glm::vec3(0.8f, 0.8f, 0.8f));
+    collision.layer = LayerMask::Environment; // Collides with creatures and other cubes
+    entityManager.addComponent(newCube, collision);
+
+    // Add Spatial component for spatial partitioning
+    SpatialComponent spatial;
+    spatial.boundingRadius = 0.8f;
+    spatial.spatialLayers = LayerMask::Environment;
+    entityManager.addComponent(newCube, spatial);
+
+    // Track this cube for cleanup
+    fallingCubes_.push_back(newCube);
+
+    VKMON_INFO("Spawned dynamic falling cube #" + std::to_string(fallingCubes_.size()) +
+               " at (" + std::to_string(transform.position.x) + ", " +
+               std::to_string(transform.position.y) + ", " +
+               std::to_string(transform.position.z) + ") with velocity (" +
+               std::to_string(rigidBody.velocity.x) + ", " +
+               std::to_string(rigidBody.velocity.z) + ")");
+}
+
+void Application::cleanupFallenCubes() {
+    if (!world_) return;
+
+    auto& entityManager = world_->getEntityManager();
+    auto it = fallingCubes_.begin();
+
+    while (it != fallingCubes_.end()) {
+        EntityID cube = *it;
+
+        // Check if cube still exists and has fallen below cleanup threshold
+        if (entityManager.hasComponent<Transform>(cube)) {
+            const auto& transform = entityManager.getComponent<Transform>(cube);
+
+            // Clean up cubes that have fallen below Y = -10 (well below ground at Y = -4)
+            if (transform.position.y < -10.0f) {
+                VKMON_INFO("Cleaning up fallen cube at Y=" + std::to_string(transform.position.y));
+                entityManager.destroyEntity(cube);
+                it = fallingCubes_.erase(it);
+                continue;
+            }
+        } else {
+            // Entity no longer exists, remove from tracking
+            it = fallingCubes_.erase(it);
+            continue;
         }
 
-        // Get entity position for logging
-        auto& transform = entityManager.getComponent<Transform>(randomEntity);
-        VKMON_INFO("Making NEW cube fall with gravity at position (" +
-                   std::to_string(transform.position.x) + ", " +
-                   std::to_string(transform.position.y) + ", " +
-                   std::to_string(transform.position.z) + ")");
+        ++it;
     }
 }
 

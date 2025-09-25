@@ -26,7 +26,7 @@
 using namespace VulkanMon;
 
 int main() {
-    // Initialize minimal logging for startup
+    // Initialize logging for startup
     Logger::getInstance().enableConsoleOutput(true);
     Logger::getInstance().setLogLevel(LogLevel::INFO_LEVEL);
     
@@ -36,6 +36,8 @@ int main() {
 
         // Initialize all engine systems
         app.initialize();
+
+        VKMON_INFO("VulkanMon ready! Starting main loop...");
 
         // Run main application loop
         app.run();

@@ -8,6 +8,26 @@
 #include "../components/Transform.h"
 #include <glm/glm.hpp>
 #include <memory>
+#include <vector>
+#include <unordered_map>
+
+// Jolt Physics includes
+#include <Jolt/Jolt.h>
+#include <Jolt/RegisterTypes.h>
+#include <Jolt/Core/Factory.h>
+#include <Jolt/Core/TempAllocator.h>
+#include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/PhysicsSettings.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Body/BodyActivationListener.h>
+#include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+
+// Forward declare Jolt types to avoid naming conflicts
 
 namespace VulkanMon {
 
@@ -15,6 +35,70 @@ namespace VulkanMon {
 class EntityManager;
 class SpatialSystem;
 class VulkanRenderer;
+
+// =============================================================================
+// JOLT PHYSICS LAYER DEFINITIONS
+// =============================================================================
+
+// Object layers - define collision groups for different entity types
+namespace ObjectLayers {
+    static constexpr JPH::ObjectLayer CREATURES = 0;
+    static constexpr JPH::ObjectLayer ENVIRONMENT = 1;
+    static constexpr JPH::ObjectLayer PROJECTILES = 2;
+    static constexpr JPH::ObjectLayer PLAYER = 3;
+    static constexpr JPH::ObjectLayer TRIGGERS = 4;
+    static constexpr JPH::ObjectLayer NUM_LAYERS = 5;
+}
+
+// Broad phase layers - higher level collision filtering
+namespace BroadPhaseLayers {
+    static constexpr JPH::BroadPhaseLayer MOVING = JPH::BroadPhaseLayer(0);
+    static constexpr JPH::BroadPhaseLayer STATIC = JPH::BroadPhaseLayer(1);
+    static const JPH::uint NUM_LAYERS = 2;
+}
+
+// =============================================================================
+// JOLT PHYSICS INTERFACE IMPLEMENTATIONS
+// =============================================================================
+
+// BroadPhaseLayerInterface implementation
+class BroadPhaseLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
+public:
+    JPH::uint GetNumBroadPhaseLayers() const override {
+        return BroadPhaseLayers::NUM_LAYERS;
+    }
+
+    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override {
+        switch (inLayer) {
+            case ObjectLayers::CREATURES:
+            case ObjectLayers::PROJECTILES:
+            case ObjectLayers::PLAYER:
+                return BroadPhaseLayers::MOVING;
+            case ObjectLayers::ENVIRONMENT:
+            case ObjectLayers::TRIGGERS:
+            default:
+                return BroadPhaseLayers::STATIC;
+        }
+    }
+};
+
+// Object vs broad phase layer filter
+class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override {
+        // For now, allow all collisions - TODO: implement proper filtering
+        return true;
+    }
+};
+
+// Object layer pair filter
+class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override {
+        // For now, allow all collisions - TODO: implement proper filtering
+        return true;
+    }
+};
 
 /**
  * PhysicsSystem
@@ -129,9 +213,65 @@ public:
     void setDebugDraw(bool enabled) { debugDraw_ = enabled; }
     bool isDebugDrawEnabled() const { return debugDraw_; }
 
+    // =============================================================================
+    // JOLT PHYSICS INTEGRATION METHODS
+    // =============================================================================
+
+    // Jolt body management
+    JPH::BodyID createJoltBody(EntityID entity, const RigidBodyComponent& rigidBody,
+                               const CollisionComponent& collision, const Transform& transform);
+    void destroyJoltBody(EntityID entity);
+    void updateJoltBodyFromComponent(EntityID entity, const RigidBodyComponent& rigidBody);
+
+    // Jolt shape creation
+    JPH::ShapeRefC createJoltShape(const CollisionComponent& collision);
+
+    // Transform synchronization
+    void syncTransformsFromJolt(EntityManager& entityManager);
+    void syncTransformsToJolt(EntityManager& entityManager);
+
+    // Jolt statistics update
+    void updateStatsFromJolt();
+
+    // Automatic Jolt body management
+    void createJoltBodiesForNewEntities(EntityManager& entityManager);
+    void createJoltBodiesForAllEntities(EntityManager& entityManager);
+
+    // Body state management
+    void activateJoltBody(EntityID entity);
+    void deactivateJoltBody(EntityID entity);
+    bool isJoltBodyActive(EntityID entity) const;
+
 private:
     // =============================================================================
-    // INTERNAL PHYSICS SIMULATION
+    // COLLISION DATA STRUCTURES
+    // =============================================================================
+
+    // Collision pair for tracking detected collisions
+    struct CollisionPair {
+        EntityID entityA = 0;
+        EntityID entityB = 0;
+        glm::vec3 normal{0.0f, 1.0f, 0.0f};  // Collision normal (A to B)
+        float penetration = 0.0f;             // Penetration depth
+    };
+
+    // =============================================================================
+    // JOLT PHYSICS INTERNAL METHODS
+    // =============================================================================
+
+    // Jolt system lifecycle
+    void initializeJoltPhysics();
+    void shutdownJoltPhysics();
+
+    // Jolt layer configuration
+    void setupJoltLayers();
+
+    // Jolt utility methods
+    JPH::ObjectLayer mapLayerMaskToObjectLayer(uint32_t layerMask) const;
+    JPH::BroadPhaseLayer mapObjectLayerToBroadPhaseLayer(JPH::ObjectLayer objectLayer) const;
+
+    // =============================================================================
+    // INTERNAL PHYSICS SIMULATION (LEGACY - TO BE REPLACED)
     // =============================================================================
 
     // Core physics steps
@@ -175,11 +315,32 @@ private:
     // System references
     SpatialSystem* spatialSystem_{nullptr};        // Spatial partitioning system reference
 
+    // =============================================================================
+    // JOLT PHYSICS SYSTEM
+    // =============================================================================
+
+    // Core Jolt Physics objects
+    std::unique_ptr<JPH::PhysicsSystem> joltPhysics_;
+    std::unique_ptr<JPH::TempAllocatorImpl> tempAllocator_;
+    std::unique_ptr<JPH::JobSystemThreadPool> jobSystem_;
+
+    // Jolt interface implementations
+    std::unique_ptr<BroadPhaseLayerInterfaceImpl> broadPhaseLayerInterface_;
+    std::unique_ptr<ObjectVsBroadPhaseLayerFilterImpl> objectVsBroadPhaseLayerFilter_;
+    std::unique_ptr<ObjectLayerPairFilterImpl> objectLayerPairFilter_;
+
+    // Entity mapping for Jolt integration
+    std::unordered_map<EntityID, JPH::BodyID> entityToBodyMap_;  // Entity -> Jolt Body mapping
+    std::unordered_map<JPH::BodyID, EntityID> bodyToEntityMap_;  // Jolt Body -> Entity mapping
+
     // Performance tracking
     PhysicsStats stats_;                           // Current frame statistics
 
     // Collision filtering matrix (layer pairs that can collide)
     uint32_t collisionMatrix_[32];                 // Bit matrix for layer collision rules
+
+    // Collision detection state
+    std::vector<CollisionPair> currentCollisions_; // Current frame collision pairs
 
     // Frame timing
     float accumulator_{0.0f};                      // Fixed timestep accumulator

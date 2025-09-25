@@ -105,6 +105,10 @@ TEST_CASE("PhysicsSystem ECS Integration", "[Physics][PhysicsSystem]") {
         rigidBody.velocity = glm::vec3(0.0f);
         entityManager.addComponent(entity, rigidBody);
 
+        // Add collision component required for Jolt physics
+        CollisionComponent collision = CollisionComponent::createCreature(1.0f);
+        entityManager.addComponent(entity, collision);
+
         // Run physics update
         physicsSystem.update(entityManager, 0.016f);
 
@@ -142,6 +146,10 @@ TEST_CASE("PhysicsSystem ECS Integration", "[Physics][PhysicsSystem]") {
         rigidBody.mass = 2.0f;
         entityManager.addComponent(entity, rigidBody);
 
+        // Add collision component required for Jolt physics
+        CollisionComponent collision = CollisionComponent::createCreature(1.0f);
+        entityManager.addComponent(entity, collision);
+
         CreaturePhysicsComponent creaturePhysics;
         creaturePhysics.moveSpeed = 8.0f;
         creaturePhysics.isGrounded = true;
@@ -169,6 +177,11 @@ TEST_CASE("PhysicsSystem ECS Integration", "[Physics][PhysicsSystem]") {
         CollisionComponent collision1 = CollisionComponent::createCreature(1.0f, 2.0f);
         entityManager.addComponent(entity1, collision1);
 
+        RigidBodyComponent rigidBody1;
+        rigidBody1.isDynamic = true;
+        rigidBody1.mass = 1.0f;
+        entityManager.addComponent(entity1, rigidBody1);
+
         // Entity 2
         Transform transform2;
         transform2.position = glm::vec3(1.5f, 0.0f, 0.0f); // Close to entity1
@@ -176,6 +189,11 @@ TEST_CASE("PhysicsSystem ECS Integration", "[Physics][PhysicsSystem]") {
 
         CollisionComponent collision2 = CollisionComponent::createCreature(1.0f, 2.0f);
         entityManager.addComponent(entity2, collision2);
+
+        RigidBodyComponent rigidBody2;
+        rigidBody2.isDynamic = true;
+        rigidBody2.mass = 1.0f;
+        entityManager.addComponent(entity2, rigidBody2);
 
         // Run physics update
         physicsSystem.update(entityManager, 0.016f);
@@ -209,6 +227,10 @@ TEST_CASE("PhysicsSystem Performance", "[Physics][PhysicsSystem]") {
             rigidBody.mass = 1.0f + i * 0.1f;
             rigidBody.useGravity = true;
             entityManager.addComponent(entity, rigidBody);
+
+            // Add collision component required for Jolt physics
+            CollisionComponent collision = CollisionComponent::createCreature(0.5f);
+            entityManager.addComponent(entity, collision);
         }
 
         // Measure physics update performance
@@ -291,6 +313,223 @@ TEST_CASE("PhysicsSystem Fixed Timestep", "[Physics][PhysicsSystem]") {
         // Should complete without errors
         auto stats = physicsSystem.getStats();
         REQUIRE(stats.updateTime >= 0.0f);
+    }
+
+    physicsSystem.shutdown();
+}
+
+// =============================================================================
+// GROUND COLLISION TESTS
+// =============================================================================
+
+TEST_CASE("PhysicsSystem Ground Collision Detection", "[Physics][GroundCollision]") {
+    PhysicsSystem physicsSystem;
+    EntityManager entityManager;
+
+    physicsSystem.initialize();
+
+    SECTION("Entity hits ground and bounces correctly") {
+        // Create entity at ground intersection to test collision response
+        EntityID entity = entityManager.createEntity();
+
+        // Use sphere collision for simpler testing
+        CollisionComponent collision = CollisionComponent::createCreature(0.5f); // Sphere only
+        entityManager.addComponent(entity, collision);
+
+        float entityRadius = collision.getBoundingSphereRadius(); // Should be 0.5f
+        const float GROUND_Y = -4.0f;
+
+        Transform transform;
+        // Position entity so it's clearly intersecting ground
+        transform.position = glm::vec3(0.0f, GROUND_Y, 0.0f); // Center at ground level = bottom below ground
+        entityManager.addComponent(entity, transform);
+
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = true;
+        rigidBody.velocity = glm::vec3(0.0f, -2.0f, 0.0f); // Moderate downward velocity
+        rigidBody.restitution = 0.5f; // 50% bounce
+        rigidBody.friction = 0.3f;
+        rigidBody.useGravity = false; // Disable gravity for this test
+        rigidBody.needsSync = true;
+        entityManager.addComponent(entity, rigidBody);
+
+        // Store initial velocity
+        float initialDownwardVelocity = rigidBody.velocity.y;
+
+        // Run physics update - should trigger ground collision
+        physicsSystem.update(entityManager, 16.67f);
+
+        // Check results
+        auto& updatedRigidBody = entityManager.getComponent<RigidBodyComponent>(entity);
+        auto& updatedTransform = entityManager.getComponent<Transform>(entity);
+
+        // Entity should bounce upward (velocity reverses and applies restitution)
+        REQUIRE(updatedRigidBody.velocity.y > 0.0f);
+
+        // Entity should be positioned above ground
+        float expectedMinY = GROUND_Y + entityRadius;
+        REQUIRE(updatedTransform.position.y >= expectedMinY);
+
+        // Verify restitution was applied correctly
+        float expectedVelocity = abs(initialDownwardVelocity) * rigidBody.restitution;
+        REQUIRE(abs(updatedRigidBody.velocity.y - expectedVelocity) < 0.1f);
+    }
+
+    SECTION("Entity stops bouncing when velocity is too small") {
+        EntityID entity = entityManager.createEntity();
+
+        // Use sphere collision for consistency
+        CollisionComponent collision = CollisionComponent::createCreature(0.5f);
+        entityManager.addComponent(entity, collision);
+
+        float entityRadius = collision.getBoundingSphereRadius();
+        const float GROUND_Y = -4.0f;
+
+        Transform transform;
+        // Position intersecting ground with slow velocity
+        transform.position = glm::vec3(0.0f, GROUND_Y, 0.0f); // Center at ground level
+        entityManager.addComponent(entity, transform);
+
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = true;
+        rigidBody.velocity = glm::vec3(0.0f, -0.3f, 0.0f); // Slow fall, triggers stopping logic
+        rigidBody.restitution = 0.3f;
+        rigidBody.useGravity = false; // Disable gravity for this test
+        rigidBody.needsSync = true;
+        entityManager.addComponent(entity, rigidBody);
+
+        // Run physics update
+        physicsSystem.update(entityManager, 16.67f);
+
+        // Check that slow movement is stopped (velocity between 0 and -0.5f should be stopped)
+        auto& updatedRigidBody = entityManager.getComponent<RigidBodyComponent>(entity);
+        REQUIRE(updatedRigidBody.velocity.y == 0.0f);
+    }
+
+    SECTION("Static entities are not affected by ground collision") {
+        EntityID entity = entityManager.createEntity();
+
+        Transform transform;
+        transform.position = glm::vec3(0.0f, -10.0f, 0.0f); // Below ground
+        entityManager.addComponent(entity, transform);
+
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = false; // Static body
+        rigidBody.velocity = glm::vec3(0.0f, -5.0f, 0.0f);
+        entityManager.addComponent(entity, rigidBody);
+
+        CollisionComponent collision = CollisionComponent::createCreature(0.5f, 1.0f);
+        entityManager.addComponent(entity, collision);
+
+        float initialY = transform.position.y;
+
+        // Run physics update
+        physicsSystem.update(entityManager, 16.67f);
+
+        // Static entity should not move
+        auto& updatedTransform = entityManager.getComponent<Transform>(entity);
+        REQUIRE(updatedTransform.position.y == initialY);
+    }
+
+    physicsSystem.shutdown();
+}
+
+// =============================================================================
+// TRANSFORM INTEGRATION TESTS
+// =============================================================================
+
+TEST_CASE("PhysicsSystem Transform Integration", "[Physics][Transform]") {
+    PhysicsSystem physicsSystem;
+    EntityManager entityManager;
+
+    physicsSystem.initialize();
+
+    SECTION("needsSync flag controls transform updates") {
+        EntityID entity = entityManager.createEntity();
+
+        Transform transform;
+        transform.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        entityManager.addComponent(entity, transform);
+
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = true;
+        rigidBody.velocity = glm::vec3(0.0f, 0.0f, 0.0f); // Zero velocity = no changes
+        rigidBody.needsSync = false; // Should not update transform
+        entityManager.addComponent(entity, rigidBody);
+
+        glm::vec3 initialPosition = transform.position;
+
+        // Run physics update with zero velocity
+        physicsSystem.update(entityManager, 16.67f);
+
+        // Transform should not have changed because needsSync was false and no velocity changes
+        auto& updatedTransform = entityManager.getComponent<Transform>(entity);
+        REQUIRE(updatedTransform.position == initialPosition);
+
+        // Now manually set velocity and sync flag
+        auto& updatedRigidBody = entityManager.getComponent<RigidBodyComponent>(entity);
+        updatedRigidBody.velocity = glm::vec3(1.0f, 0.0f, 0.0f);
+        updatedRigidBody.needsSync = true;
+
+        // Run another update
+        physicsSystem.update(entityManager, 16.67f);
+
+        // Transform should have been updated
+        auto& finalTransform = entityManager.getComponent<Transform>(entity);
+        REQUIRE(finalTransform.position.x > initialPosition.x);
+    }
+
+    SECTION("deltaTime affects physics calculations correctly") {
+        EntityID entity = entityManager.createEntity();
+
+        Transform transform;
+        transform.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        entityManager.addComponent(entity, transform);
+
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = true;
+        rigidBody.velocity = glm::vec3(2.0f, 0.0f, 0.0f); // 2 units/second
+        rigidBody.needsSync = true;
+        entityManager.addComponent(entity, rigidBody);
+
+        glm::vec3 initialPosition = transform.position;
+
+        // Run with different delta times
+        physicsSystem.update(entityManager, 33.33f); // ~30 FPS (longer frame)
+
+        auto& updatedTransform = entityManager.getComponent<Transform>(entity);
+        float movement = updatedTransform.position.x - initialPosition.x;
+
+        // Movement should be proportional to deltaTime
+        // 33.33ms = 0.03333s, velocity = 2 units/s, expected movement ≈ 0.0667
+        REQUIRE(movement >= 0.06f);
+        REQUIRE(movement <= 0.08f);
+    }
+
+    SECTION("Velocity integration respects terminal velocity") {
+        EntityID entity = entityManager.createEntity();
+
+        Transform transform;
+        transform.position = glm::vec3(0.0f, 50.0f, 0.0f); // High up
+        entityManager.addComponent(entity, transform);
+
+        RigidBodyComponent rigidBody;
+        rigidBody.isDynamic = true;
+        rigidBody.velocity = glm::vec3(0.0f, -50.0f, 0.0f); // Very fast downward
+        rigidBody.useGravity = true;
+        rigidBody.mass = 1.0f;
+        rigidBody.needsSync = true;
+        entityManager.addComponent(entity, rigidBody);
+
+        // Run multiple physics updates to build up velocity
+        for (int i = 0; i < 10; i++) {
+            physicsSystem.update(entityManager, 16.67f);
+        }
+
+        auto& updatedRigidBody = entityManager.getComponent<RigidBodyComponent>(entity);
+
+        // Velocity should be clamped to terminal velocity (30 m/s)
+        REQUIRE(abs(updatedRigidBody.velocity.y) <= 30.1f);
     }
 
     physicsSystem.shutdown();

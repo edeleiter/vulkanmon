@@ -190,7 +190,7 @@ void Application::createTestScene() {
     // REALISTIC POKEMON TEST - 3D Cube Formation (5x5x5 = 125 entities)
     // =========================================================================
 
-    const int GRID_SIZE = 5;  // 5x5x5 = 125 creatures - realistic Pokemon overworld scale
+    const int GRID_SIZE = 8;  // 8x8x8 = 512 creatures - Massive Pokemon scale test
     const float CREATURE_SPACING = 2.0f;  // 2.0f spacing for clear separation
 
     // Use only cubes for consistency during debugging
@@ -199,7 +199,7 @@ void Application::createTestScene() {
 
     size_t totalCreatures = 0;
 
-    VKMON_INFO("Creating " + std::to_string(GRID_SIZE * GRID_SIZE * GRID_SIZE) + " creatures in " + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + " cube formation");
+    VKMON_INFO("Creating " + std::to_string(GRID_SIZE * GRID_SIZE * GRID_SIZE) + " creatures in " + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + " cube formation for collision testing");
 
     for (int x = 0; x < GRID_SIZE; x++) {
         for (int y = 0; y < GRID_SIZE; y++) {
@@ -251,9 +251,9 @@ void Application::createTestScene() {
                 creatureSpatial.setHomePosition(creatureTransform.position);
                 world_->addComponent(creature, creatureSpatial);
 
-                // Add physics components to a very small subset for controlled testing
-                // Only make creatures dynamic if they're at specific positions (much fewer)
-                bool isDynamic = (x == 2 && y == 2 && z == 2); // Only center cube starts with physics
+                // Add physics components for collision testing
+                // Make ALL creatures dynamic so they fall and collide with each other
+                bool isDynamic = true; // All 125 entities are dynamic for collision testing
 
                 if (isDynamic) {
                     // Add dynamic physics - creature will fall due to gravity
@@ -267,6 +267,8 @@ void Application::createTestScene() {
 
                     // Add collision detection
                     CollisionComponent collision = CollisionComponent::createCreature(0.5f, 1.0f);
+                    // Enable creature-creature collision for testing
+                    collision.collidesWith = LayerMask::All; // Collide with everything including other creatures
                     world_->addComponent(creature, collision);
 
                     // Add creature-specific physics
@@ -284,6 +286,63 @@ void Application::createTestScene() {
     }
 
     VKMON_INFO("Scene setup complete: " + std::to_string(totalCreatures) + " creatures with spatial AI");
+
+    // =========================================================================
+    // COLLISION TEST: Add two entities to test collision detection
+    // =========================================================================
+
+    VKMON_INFO("Creating collision test entities...");
+
+    // Test Entity A - Dynamic creature that will collide
+    EntityID testEntityA = world_->createEntity();
+    Transform transformA;
+    transformA.position = glm::vec3(12.0f, 5.0f, 0.0f);
+    transformA.scale = glm::vec3(0.8f);
+    world_->addComponent(testEntityA, transformA);
+
+    Renderable renderableA;
+    renderableA.meshPath = "cube.obj";
+    renderableA.texturePath = "default";
+    renderableA.materialId = 1; // Gold material for visibility
+    renderableA.isVisible = true;
+    world_->addComponent(testEntityA, renderableA);
+
+    RigidBodyComponent rigidBodyA;
+    rigidBodyA.isDynamic = true;
+    rigidBodyA.mass = 2.0f;
+    rigidBodyA.restitution = 0.8f; // Very bouncy
+    rigidBodyA.friction = 0.3f;
+    rigidBodyA.velocity = glm::vec3(-2.0f, 0.0f, 0.0f); // Moving left toward entity B
+    rigidBodyA.useGravity = false; // Disable gravity for cleaner collision test
+    world_->addComponent(testEntityA, rigidBodyA);
+
+    CollisionComponent collisionA = CollisionComponent::createCreature(1.0f);
+    world_->addComponent(testEntityA, collisionA);
+
+    // Test Entity B - Static obstacle to collide with
+    EntityID testEntityB = world_->createEntity();
+    Transform transformB;
+    transformB.position = glm::vec3(8.0f, 5.0f, 0.0f); // Will intersect with A's path
+    transformB.scale = glm::vec3(1.0f);
+    world_->addComponent(testEntityB, transformB);
+
+    Renderable renderableB;
+    renderableB.meshPath = "cube.obj";
+    renderableB.texturePath = "default";
+    renderableB.materialId = 2; // Ruby material for visibility
+    renderableB.isVisible = true;
+    world_->addComponent(testEntityB, renderableB);
+
+    RigidBodyComponent rigidBodyB = RigidBodyComponent::createStatic();
+    world_->addComponent(testEntityB, rigidBodyB);
+
+    CollisionComponent collisionB = CollisionComponent::createEnvironment(glm::vec3(1.0f));
+    world_->addComponent(testEntityB, collisionB);
+
+    VKMON_INFO("Collision test entities created:");
+    VKMON_INFO("  Entity A (Gold): Dynamic, moving from (12,5,0) toward Entity B");
+    VKMON_INFO("  Entity B (Ruby): Static obstacle at (8,5,0)");
+    VKMON_INFO("  Expected: Entity A will collide with Entity B and bounce back!");
 
     // Create camera positioned to see 1000 creatures in 3D cube (cube spans 0 to 18 units in X, Y, and Z)
     EntityID cameraEntity = world_->createEntity();
@@ -322,5 +381,52 @@ void Application::createTestScene() {
     SpatialComponent playerSpatial(2.0f, SpatialBehavior::DYNAMIC, LayerMask::Player);
     world_->addComponent(playerEntity, playerSpatial);
 
+    // Create visual ground plane
+    EntityID groundEntity = world_->createEntity();
+
+    // Position ground plane at physics ground level
+    Transform groundTransform;
+    groundTransform.position = glm::vec3(7.0f, -4.0f, 7.0f); // Center under 8x8x8 cube formation (grid spans 0-14)
+    groundTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+    groundTransform.scale = glm::vec3(40.0f, 0.1f, 40.0f); // Massive floor: covers cube grid (14x14) + falling cube spawn area (-15 to +15) with margin
+    world_->addComponent(groundEntity, groundTransform);
+
+    // Make ground plane visible
+    Renderable groundRenderable;
+    groundRenderable.meshPath = "plane.obj"; // Use plane mesh
+    groundRenderable.texturePath = "default";
+    groundRenderable.materialId = 2; // Ruby material for visibility
+    groundRenderable.isVisible = true;
+    groundRenderable.renderLayer = 0;
+    groundRenderable.lodDistance = 1000.0f;
+    world_->addComponent(groundEntity, groundRenderable);
+
+    // Add spatial component for ground
+    SpatialComponent groundSpatial;
+    groundSpatial.spatialLayers = LayerMask::Environment;
+    groundSpatial.boundingRadius = 15.0f;
+    groundSpatial.behavior = SpatialBehavior::STATIC;
+    world_->addComponent(groundEntity, groundSpatial);
+
+    // Add CollisionComponent for entity-entity collision testing
+    RigidBodyComponent groundRigidBody = RigidBodyComponent::createStatic();
+    world_->addComponent(groundEntity, groundRigidBody);
+
+    CollisionComponent groundCollision = CollisionComponent::createTerrain();
+    groundCollision.dimensions = glm::vec3(15.0f, 0.1f, 15.0f); // Match the visual scale
+    world_->addComponent(groundEntity, groundCollision);
+
+    VKMON_INFO("Added visual ground plane at Y=-4.0 with collision detection");
+
+    // Scene setup complete - create Jolt physics bodies for all entities
+    if (world_ && world_->hasSystem<PhysicsSystem>()) {
+        auto* physicsSystem = world_->getSystem<PhysicsSystem>();
+        if (physicsSystem) {
+            physicsSystem->createJoltBodiesForAllEntities(world_->getEntityManager());
+            VKMON_INFO("All Jolt physics bodies created successfully - returning to main initialization");
+        }
+    }
+
+    VKMON_INFO("createTestScene() completing successfully");
     // Scene setup complete - main application will log ready message
 }
