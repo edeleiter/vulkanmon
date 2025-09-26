@@ -44,9 +44,8 @@ void Window::initialize() {
     glfwSetKeyCallback(window_, glfwKeyCallback);
     glfwSetCursorPosCallback(window_, glfwMouseCallback);
     glfwSetFramebufferSizeCallback(window_, glfwResizeCallback);
-    
-    // Configure mouse input for 3D camera controls
-    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    // Note: Cursor mode will be set after window is shown to avoid message queue issues on fresh OS installs
     
     VKMON_INFO("GLFW window initialized successfully");
     VKMON_RESOURCE("Window", "created", title_ + " (" + std::to_string(width_) + "x" + std::to_string(height_) + ")");
@@ -82,6 +81,9 @@ void Window::pollEvents() {
 void Window::show() {
     if (window_) {
         glfwShowWindow(window_);
+
+        glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
         VKMON_INFO("Window shown - initialization complete, ready for rendering");
     }
 }
