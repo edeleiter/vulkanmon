@@ -27,25 +27,46 @@
 #include <functional>
 
 /**
- * VulkanMon Application
+ * @brief Main VulkanMon game engine application class
+ * @details Orchestrates all engine systems and manages the complete application lifecycle.
+ *          Extracted from main.cpp to create clean separation of concerns and testable architecture.
  *
- * Main application class that orchestrates all engine systems and manages the application lifecycle.
- * Extracted from main.cpp to create clean separation of concerns and testable architecture.
- *
- * Responsibilities:
+ * Key Responsibilities:
  * - Application initialization and shutdown
- * - System coordination and dependency injection
+ * - System coordination and lifecycle management
  * - Main game loop execution and timing
- * - High-level input event handling
+ * - Input event handling and game controls
  * - Error handling and recovery
- * - Configuration management
+ * - Game state management (materials, lighting, demo features)
  *
  * Design Philosophy:
- * - Single responsibility: Application orchestration only
- * - Dependency injection: All systems passed as shared_ptr
+ * - System coordination: Manages application lifecycle and coordinates engine systems
+ * - VulkanRenderer integration: Core systems created and managed by VulkanRenderer
  * - RAII compliance: Automatic resource cleanup
  * - Testable: Systems can be mocked for testing
  * - Clean interfaces: Modern C++20 patterns
+ *
+ * @example Basic Usage
+ * @code
+ * #include "core/Application.h"
+ *
+ * int main() {
+ *     try {
+ *         Application app;
+ *         app.initialize();  // REQUIRED: Initialize all systems first
+ *         app.run();         // Start main engine loop
+ *     } catch (const std::exception& e) {
+ *         std::cerr << "Engine error: " << e.what() << std::endl;
+ *         return -1;
+ *     }
+ *     return 0;
+ * }
+ * @endcode
+ *
+ * @see World
+ * @see PhysicsSystem
+ * @see VulkanRenderer
+ * @since Version 7.1
  */
 
 namespace VulkanMon {
@@ -58,12 +79,14 @@ public:
     // Configuration constants moved to Config::Camera namespace for single source of truth
 
     /**
-     * Create Application with default configuration
+     * @brief Create Application with default configuration
+     * @details Initializes all engine systems in the correct dependency order
      */
     Application();
 
     /**
-     * Destructor - automatic cleanup of all systems
+     * @brief Destructor - automatic cleanup of all systems
+     * @details RAII-compliant cleanup of Vulkan resources and engine systems
      */
     ~Application();
 
@@ -74,29 +97,32 @@ public:
     Application& operator=(Application&&) = default;
 
     /**
-     * Initialize all engine systems
-     * Must be called before run()
-     *
+     * @brief Initialize all engine systems
+     * @details Must be called before run(). Initializes Window, VulkanRenderer (which creates core systems),
+     *          ECS World, and connects all subsystems for stable operation.
      * @throws std::runtime_error if initialization fails
+     * @see run()
      */
     void initialize();
 
     /**
-     * Run the main application loop
-     * Blocks until application should exit
-     *
+     * @brief Run the main application loop
+     * @details Blocks until application should exit. Handles frame timing, input processing,
+     *          ECS updates, physics simulation, and rendering in optimized order.
      * @throws std::runtime_error if critical error occurs
+     * @note Call initialize() first
+     * @see initialize()
      */
     void run();
 
     /**
-     * Update camera data in VulkanRenderer from ECS CameraSystem
-     *
-     * Part of unified camera architecture - bridges ECS camera data to renderer.
-     * Updates view matrix, projection matrix, and camera position for consistent
-     * rendering, spatial culling, and lighting calculations.
-     *
-     * Called every frame to ensure VulkanRenderer uses current ECS camera state.
+     * @brief Update camera data in VulkanRenderer from ECS CameraSystem
+     * @details Part of unified camera architecture - bridges ECS camera data to renderer.
+     *          Updates view matrix, projection matrix, and camera position for consistent
+     *          rendering, spatial culling, and lighting calculations.
+     * @note Called every frame to ensure VulkanRenderer uses current ECS camera state
+     * @see CameraSystem
+     * @see VulkanRenderer
      */
     void updateCameraMatrices();
 

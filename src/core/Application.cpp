@@ -255,8 +255,8 @@ void Application::updateECS(float deltaTime) {
         }
         debugFrameCounter++;
 
-        // TODO: Add back rotation animation as needed for specific entities
-        // Rotation animation disabled to see clean 10x10x10 cube formation
+        // Entity rotation can be controlled per-entity through Transform components
+        // Global rotation animation was removed in favor of individual entity control
 
         // PERFORMANCE TEST: Only essential systems enabled (CameraSystem + RenderSystem)
         world_->update(deltaTime);
