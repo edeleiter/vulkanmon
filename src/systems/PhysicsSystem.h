@@ -6,12 +6,15 @@
 #include "../components/CollisionComponent.h"
 #include "../components/CreaturePhysicsComponent.h"
 #include "../components/Transform.h"
+#include "../spatial/LayerMask.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
 #include <thread>
+#include <chrono>
+#include <string>
 
 // Jolt Physics includes
 #include <Jolt/Jolt.h>
@@ -238,6 +241,11 @@ public:
     // Set reference to spatial system for collision detection optimization
     void setSpatialSystem(SpatialSystem* spatial) { spatialSystem_ = spatial; }
 
+    // Preload physics bodies during initialization phase
+    // Creates Jolt bodies for all entities with physics components immediately
+    // This prevents blocking during first physics update
+    void preloadPhysicsBodies(EntityManager& entityManager);
+
     // =============================================================================
     // CORE SIMULATION LOOP
     // =============================================================================
@@ -306,6 +314,36 @@ public:
     std::vector<EntityID> overlapSphere(const glm::vec3& center, float radius,
                                        uint32_t layerMask = 0xFFFFFFFF);
 
+    // Box overlap for rectangular area detection
+    std::vector<EntityID> overlapBox(const glm::vec3& center, const glm::vec3& halfExtents,
+                                    const glm::quat& rotation = glm::quat(1,0,0,0),
+                                    uint32_t layerMask = 0xFFFFFFFF);
+
+    // Capsule overlap for elongated area detection
+    std::vector<EntityID> overlapCapsule(const glm::vec3& pointA, const glm::vec3& pointB, float radius,
+                                        uint32_t layerMask = 0xFFFFFFFF);
+
+    // =============================================================================
+    // GENERIC SPATIAL QUERIES
+    // =============================================================================
+
+    // Find nearest entity within distance range
+    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = 100.0f,
+                              uint32_t layerMask = 0xFFFFFFFF, EntityID excludeEntity = 0);
+
+    // Find all entities within radius, sorted by distance
+    std::vector<std::pair<EntityID, float>> findEntitiesInRadius(const glm::vec3& position, float radius,
+                                                                uint32_t layerMask = 0xFFFFFFFF,
+                                                                bool sortByDistance = true);
+
+    // Check if path between two points is clear (no collisions)
+    bool isPathClear(const glm::vec3& startPosition, const glm::vec3& endPosition,
+                    float clearanceRadius = 0.1f, uint32_t layerMask = 0xFFFFFFFF);
+
+    // Find entities along a path (for AI pathfinding assistance)
+    std::vector<EntityID> getEntitiesAlongPath(const glm::vec3& startPosition, const glm::vec3& endPosition,
+                                              float pathWidth = 1.0f, uint32_t layerMask = 0xFFFFFFFF);
+
     // =============================================================================
     // PERFORMANCE AND DEBUGGING
     // =============================================================================
@@ -366,10 +404,73 @@ private:
     void deactivateJoltBody(EntityID entity);
     bool isJoltBodyActive(EntityID entity) const;
 
-    // Jolt utility methods
+    // =============================================================================
+    // ENHANCED LAYER MAPPING SYSTEM
+    // =============================================================================
+
+    // Bidirectional LayerMask ↔ ObjectLayer conversion for seamless integration
+
+    // LayerMask → ObjectLayer (enhanced with comprehensive mapping)
     JPH::ObjectLayer mapLayerMaskToObjectLayer(uint32_t layerMask) const;
+
+    // ObjectLayer → LayerMask (reverse conversion for query results)
+    uint32_t mapObjectLayerToLayerMask(JPH::ObjectLayer objectLayer) const;
+
+    // LayerMask → BroadPhaseLayer (direct conversion for performance optimization)
+    JPH::BroadPhaseLayer mapLayerMaskToBroadPhaseLayer(uint32_t layerMask) const;
+
+    // ObjectLayer → BroadPhaseLayer (existing method, enhanced with documentation)
     JPH::BroadPhaseLayer mapObjectLayerToBroadPhaseLayer(JPH::ObjectLayer objectLayer) const;
 
+    // Layer validation and debugging
+    bool isValidLayerMaskCombination(uint32_t layerMask) const;
+    std::vector<JPH::ObjectLayer> expandLayerMaskToObjectLayers(uint32_t layerMask) const;
+    std::string layerMaskToDebugString(uint32_t layerMask) const;
+    std::string objectLayerToDebugString(JPH::ObjectLayer objectLayer) const;
+
+    // =============================================================================
+    // TIME UNIT SAFETY SYSTEM
+    // =============================================================================
+
+    // Type-safe time conversion helpers for robust physics integration
+    // VulkanMon systems use MILLISECONDS, Jolt Physics expects SECONDS
+
+    // Time unit wrapper classes for compile-time safety
+    struct Milliseconds {
+        float value;
+        explicit Milliseconds(float ms) : value(ms) {}
+        static Milliseconds from(float ms) { return Milliseconds(ms); }
+    };
+
+    struct Seconds {
+        float value;
+        explicit Seconds(float s) : value(s) {}
+        static Seconds from(float s) { return Seconds(s); }
+    };
+
+    // Safe time conversion methods
+    static Seconds toSeconds(Milliseconds ms) {
+        return Seconds(ms.value / 1000.0f);
+    }
+
+    static Milliseconds toMilliseconds(Seconds s) {
+        return Milliseconds(s.value * 1000.0f);
+    }
+
+    // Physics-specific time handling
+    Seconds clampPhysicsTimestep(Milliseconds deltaTime) const;
+    bool isValidPhysicsTimestep(Milliseconds deltaTime) const;
+
+    // Time scale application with safety checks
+    Milliseconds applyTimeScale(Milliseconds deltaTime) const;
+
+    // Performance timing helpers
+    void recordTimingStart();
+    Milliseconds getElapsedTiming() const;
+
+    // Time unit validation and debugging
+    std::string timeToDebugString(Milliseconds ms) const;
+    std::string timeToDebugString(Seconds s) const;
 
     // =============================================================================
     // MEMBER VARIABLES
@@ -388,6 +489,9 @@ private:
     bool initialized_{false};                      // System initialization status
     bool collisionEnabled_{true};                  // Global collision detection toggle
     bool debugDraw_{false};                        // Debug visualization toggle
+
+    // Time unit safety tracking
+    mutable std::chrono::steady_clock::time_point lastTimingStart_; // Performance timing start point
 
     // System references
     SpatialSystem* spatialSystem_{nullptr};        // Spatial partitioning system reference

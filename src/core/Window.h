@@ -83,6 +83,12 @@ public:
     void pollEvents();
     
     /**
+     * Show the window after initialization is complete
+     * Window is initially hidden to eliminate perceived startup delay
+     */
+    void show();
+
+    /**
      * Manual cleanup - called automatically by destructor
      */
     void cleanup();

@@ -204,6 +204,7 @@ private:
     void initializeInputSystem();
     void initializeECS();           // Initialize ECS World and systems
     void createTestScene();         // Create test entities for ECS
+    void preloadSceneAssets();      // Preload all models used by Renderable components
 
     // Main loop methods
     void processFrame();

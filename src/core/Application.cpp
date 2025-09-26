@@ -48,8 +48,20 @@ void Application::initialize() {
         initializeInputSystem();
         createTestScene();          // Create test entities after ECS is set up
 
+        // Perform GPU warm-up to eliminate first-frame delay
+        if (renderer_ && renderer_->performGPUWarmup()) {
+            VKMON_INFO("GPU warm-up completed - first frame delay should be eliminated");
+        } else {
+            VKMON_WARNING("GPU warm-up failed - first frame may still have delay");
+        }
+
         initialized_ = true;
         VKMON_INFO("VulkanMon ready!");
+
+        // Show window now that all systems are initialized and ready to render
+        if (window_) {
+            window_->show();
+        }
 
     } catch (const std::exception& e) {
         VKMON_ERROR("Application initialization failed: " + std::string(e.what()));
@@ -64,9 +76,13 @@ void Application::run() {
     }
 
     running_ = true;
-    lastFrameTime_ = std::chrono::high_resolution_clock::now();
 
     try {
+        // Initialize timing AFTER all initialization is complete
+        // This prevents first frame from including initialization time
+        lastFrameTime_ = std::chrono::high_resolution_clock::now();
+
+        VKMON_INFO("About to enter main loop - checking window shouldClose()...");
         while (running_ && !window_->shouldClose()) {
             processFrame();
         }
@@ -100,27 +116,49 @@ void Application::shutdown() {
 
 void Application::processFrame() {
     try {
+        auto frameStart = std::chrono::high_resolution_clock::now();
+
         updateFrameTiming();
-        VKMON_DEBUG("Frame timing updated");
+        auto timingEnd = std::chrono::high_resolution_clock::now();
 
         // Poll window events
         window_->pollEvents();
-        VKMON_DEBUG("Window events polled");
+        auto eventsEnd = std::chrono::high_resolution_clock::now();
 
         processInput(frameTime_);
-        VKMON_DEBUG("Input processed");
+        auto inputEnd = std::chrono::high_resolution_clock::now();
 
         updateSystems(frameTime_);
-        VKMON_DEBUG("Systems updated");
+        auto systemsEnd = std::chrono::high_resolution_clock::now();
 
         updateECS(frameTime_);
-        VKMON_DEBUG("ECS updated");
+        auto ecsEnd = std::chrono::high_resolution_clock::now();
 
         updateImGui(frameTime_);
-        VKMON_DEBUG("ImGui updated");
+        auto imguiEnd = std::chrono::high_resolution_clock::now();
 
         render(frameTime_);
-        VKMON_DEBUG("Render completed");
+        auto renderEnd = std::chrono::high_resolution_clock::now();
+
+        // Log performance breakdown when frame is slow (>100ms)
+        if (frameTime_ > 100.0f) {
+            auto timingMs = std::chrono::duration<float, std::milli>(timingEnd - frameStart).count();
+            auto eventsMs = std::chrono::duration<float, std::milli>(eventsEnd - timingEnd).count();
+            auto inputMs = std::chrono::duration<float, std::milli>(inputEnd - eventsEnd).count();
+            auto systemsMs = std::chrono::duration<float, std::milli>(systemsEnd - inputEnd).count();
+            auto ecsMs = std::chrono::duration<float, std::milli>(ecsEnd - systemsEnd).count();
+            auto imguiMs = std::chrono::duration<float, std::milli>(imguiEnd - ecsEnd).count();
+            auto renderMs = std::chrono::duration<float, std::milli>(renderEnd - imguiEnd).count();
+
+            VKMON_WARNING("SLOW FRAME (" + std::to_string(frameTime_) + "ms total): " +
+                         "timing=" + std::to_string(timingMs) + "ms, " +
+                         "events=" + std::to_string(eventsMs) + "ms, " +
+                         "input=" + std::to_string(inputMs) + "ms, " +
+                         "systems=" + std::to_string(systemsMs) + "ms, " +
+                         "ecs=" + std::to_string(ecsMs) + "ms, " +
+                         "imgui=" + std::to_string(imguiMs) + "ms, " +
+                         "render=" + std::to_string(renderMs) + "ms");
+        }
 
     } catch (const std::exception& e) {
         VKMON_ERROR("processFrame error: " + std::string(e.what()));

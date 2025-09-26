@@ -2,6 +2,7 @@
 #include "Window.h"
 #include "../utils/Logger.h"
 #include <stdexcept>
+#include <chrono>
 
 namespace VulkanMon {
 
@@ -25,6 +26,8 @@ void Window::initialize() {
     // Configure GLFW for Vulkan (no OpenGL context)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    // Hide window during initialization to eliminate perceived startup delay
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     
     // Create the window
     window_ = glfwCreateWindow(static_cast<int>(width_), static_cast<int>(height_), 
@@ -66,11 +69,21 @@ void Window::createSurface(VkInstance instance) {
 }
 
 bool Window::shouldClose() const {
-    return window_ ? glfwWindowShouldClose(window_) : true;
+    if (!window_) return true;
+
+    // Directly call GLFW without timing overhead for better performance
+    return glfwWindowShouldClose(window_);
 }
 
 void Window::pollEvents() {
     glfwPollEvents();
+}
+
+void Window::show() {
+    if (window_) {
+        glfwShowWindow(window_);
+        VKMON_INFO("Window shown - initialization complete, ready for rendering");
+    }
 }
 
 void Window::cleanup() {
