@@ -10,7 +10,7 @@ VulkanMon aims to be a high-performance, cross-platform game engine that combine
 
 ### Core Engine (C++20)
 - **Vulkan Renderer**: Low-level graphics API for maximum performance
-- **Physics Integration**: Bullet Physics for realistic interactions
+- **Physics Integration**: Professional Jolt Physics engine with multi-threading
 - **Audio System**: OpenAL for 3D positioned audio
 - **Resource Management**: Efficient asset loading, caching, and streaming
 - **Memory Management**: RAII-based with smart pointers
