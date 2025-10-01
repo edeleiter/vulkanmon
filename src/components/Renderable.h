@@ -22,7 +22,7 @@ struct Renderable {
     bool receivesShadow = true;
 
     // Level of detail
-    float lodDistance = 100.0f;  // Distance at which to switch LOD
+    float lodDistance = 500.0f;  // Distance at which to switch LOD
     uint32_t currentLod = 0;     // Current LOD level (0 = highest quality)
 
     // Rendering layer (for sorting/culling)

@@ -4,9 +4,14 @@
 #include "../systems/CreatureRenderSystem.h"
 #include "../components/SpatialComponent.h"
 #include "../components/Camera.h"
+#include "../components/RigidBodyComponent.h"
+#include "../components/CollisionComponent.h"
+#include "../components/CreaturePhysicsComponent.h"
 #include "../spatial/WorldConfig.h"
 #include "../config/CameraConfig.h"
 #include <stdexcept>
+#include <set>
+#include <chrono>
 
 using namespace VulkanMon;
 
@@ -101,6 +106,32 @@ void Application::initializeInputSystem() {
         }
     });
 
+    // Connect mouse button callback for projectile spawning
+    window_->setMouseButtonCallback([this](int button, int action, int mods) {
+        if (inputHandler_) {
+            inputHandler_->processMouseButtonInput(button, action, mods);
+        }
+    });
+
+    // Connect projectile spawn callback from InputHandler to ProjectileSystem
+    if (projectileSystem_) {
+        inputHandler_->setProjectileSpawnCallback([this](double mouseX, double mouseY) {
+            if (projectileSystem_ && window_) {
+                uint32_t width = window_->getWidth();
+                uint32_t height = window_->getHeight();
+                projectileSystem_->spawnProjectileFromMouse(
+                    static_cast<float>(mouseX),
+                    static_cast<float>(mouseY),
+                    static_cast<float>(width),
+                    static_cast<float>(height),
+                    world_->getEntityManager(),
+                    ProjectileComponent::Type::PHYSICS_OBJECT
+                );
+            }
+        });
+        VKMON_INFO("Projectile spawn callback connected: Mouse clicks will spawn projectiles");
+    }
+
     // Connect window resize callback
     window_->setResizeCallback([this](int width, int height) {
         handleWindowResize(width, height);
@@ -143,6 +174,19 @@ void Application::initializeECS() {
     // Add spatial system for Pokemon-style spatial queries and octree partitioning
     spatialSystem_ = world_->addSystem<SpatialSystem>(worldConfig.getBoundingBox());
 
+    // Add physics system for realistic physics simulation
+    physicsSystem_ = world_->addSystem<PhysicsSystem>();
+    physicsSystem_->initialize(world_->getEntityManager()); // Initialize with default gravity
+    VKMON_INFO("PhysicsSystem added to World and initialized");
+
+    // Add projectile system for mouse-click projectile spawning
+    // Note: MaterialSystem will be connected after renderer systems are available
+    projectileSystem_ = world_->addSystem<ProjectileSystem>(cameraSystem_, nullptr);
+    projectileSystem_->setPhysicsSystem(physicsSystem_);
+    VKMON_INFO("ProjectileSystem added to World and connected to physics/camera (MaterialSystem deferred)");
+
+    // MaterialSystem connection will be done after renderer initialization
+
     // Add CreatureDetectionSystem for AI behavior and spatial detection
     // creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
 
@@ -169,123 +213,233 @@ void Application::initializeECS() {
     VKMON_INFO("ECS systems initialized successfully");
 }
 
-void Application::createTestScene() {
+void Application::connectDeferredSystems() {
+    VKMON_DEBUG("Connecting deferred systems with renderer resources...");
+
+    // Connect ProjectileSystem to MaterialSystem
+    if (projectileSystem_ && materialSystem_) {
+        projectileSystem_->setMaterialSystem(materialSystem_.get());
+        VKMON_INFO("ProjectileSystem: MaterialSystem connected");
+    } else if (projectileSystem_) {
+        VKMON_WARNING("ProjectileSystem: MaterialSystem not available for connection");
+    }
+
+    VKMON_INFO("Deferred system connections completed");
+}
+
+void Application::createProjectileTestScene() {
     if (!world_) {
-        VKMON_WARNING("Cannot create test scene: ECS World not initialized");
+        VKMON_WARNING("Cannot create projectile test scene: ECS World not initialized");
         return;
     }
 
-    VKMON_INFO("Creating Pokemon Legends Arceus Scale Test Scene...");
-    VKMON_INFO("Target: 125 creatures - 5x5x5 realistic Pokemon overworld test");
+    VKMON_INFO("Creating Clean Projectile Test Scene...");
+    VKMON_INFO("Focus: Mouse click projectile spawning and physics validation");
 
     // =========================================================================
-    // REALISTIC POKEMON TEST - 3D Cube Formation (5x5x5 = 125 entities)
+    // CLEAN PROJECTILE TEST SCENE
     // =========================================================================
 
-    const int GRID_SIZE = 5;  // 5x5x5 = 125 creatures - realistic Pokemon overworld scale
-    const float CREATURE_SPACING = 2.0f;  // 2.0f spacing for clear separation
+    size_t totalEntities = 0;
 
-    // Use only cubes for consistency during debugging
-    const std::string creatureMesh = "cube.obj";
-    const std::vector<uint32_t> creatureMaterials = {0, 1, 2, 3};  // Different materials for visual variety
+    // =========================================================================
+    // GROUND PLANE - Simple static collision surface
+    // =========================================================================
+    VKMON_INFO("Creating simple ground plane...");
 
-    size_t totalCreatures = 0;
+    EntityID groundEntity = world_->createEntity();
+    Transform groundTransform;
+    groundTransform.position = glm::vec3(0.0f, -2.0f, 0.0f);
+    groundTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+    groundTransform.scale = glm::vec3(20.0f, 1.0f, 20.0f);
+    world_->addComponent(groundEntity, groundTransform);
 
-    VKMON_INFO("Creating " + std::to_string(GRID_SIZE * GRID_SIZE * GRID_SIZE) + " creatures in " + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + "x" + std::to_string(GRID_SIZE) + " cube formation");
+    Renderable groundRenderable;
+    groundRenderable.meshPath = "plane.obj";
+    groundRenderable.texturePath = "default";
+    groundRenderable.materialId = 0; // Default material
+    groundRenderable.isVisible = true;
+    world_->addComponent(groundEntity, groundRenderable);
 
-    for (int x = 0; x < GRID_SIZE; x++) {
-        for (int y = 0; y < GRID_SIZE; y++) {
-            for (int z = 0; z < GRID_SIZE; z++) {
-                // Entity creation (clean, no per-entity spam)
+    SpatialComponent groundSpatial;
+    groundSpatial.spatialLayers = LayerMask::Environment;
+    groundSpatial.boundingRadius = 15.0f;
+    groundSpatial.behavior = SpatialBehavior::STATIC;
+    world_->addComponent(groundEntity, groundSpatial);
 
-                EntityID creature = world_->createEntity();
+    RigidBodyComponent groundRigidBody = RigidBodyComponent::staticBody();
+    world_->addComponent(groundEntity, groundRigidBody);
 
-                // Position in 3D cube formation starting from (0,0,0)
-                Transform creatureTransform;
-                creatureTransform.position = glm::vec3(
-                    x * CREATURE_SPACING,  // X: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
-                    y * CREATURE_SPACING,  // Y: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18 (now 3D!)
-                    z * CREATURE_SPACING   // Z: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
-                );
+    CollisionComponent groundCollision = CollisionComponent::box(glm::vec3(20.0f, 1.0f, 20.0f), LayerMask::Environment);
+    groundCollision.isStatic = true;
+    world_->addComponent(groundEntity, groundCollision);
 
-                // Varied rotations for visual interest - each cube gets unique rotation
-                float rotX = (x * 15.0f) + (y * 5.0f) + (z * 7.0f);   // X-axis rotation based on grid position
-                float rotY = (x + y + z) * 12.0f;                     // Y-axis rotation creates spiral pattern
-                float rotZ = (x - y + z) * 8.0f;                      // Z-axis rotation adds variety
-                creatureTransform.setRotationEuler(rotX, rotY, rotZ);
-                creatureTransform.scale = glm::vec3(0.5f);  // Scale down for clear separation
-                world_->addComponent(creature, creatureTransform);
+    totalEntities++;
+    VKMON_INFO("Ground plane created at Y=-2.0");
 
-                // Material variety for visual distinction - now using 3D coordinates
-                int materialType = (x + y + z) % creatureMaterials.size();
+    // =========================================================================
+    // TARGET CUBES - Simple targets for projectile testing
+    // =========================================================================
+    VKMON_INFO("Creating target cubes for projectile testing...");
 
-                Renderable creatureRenderable;
-                creatureRenderable.meshPath = creatureMesh;
-                creatureRenderable.texturePath = "default";
-                creatureRenderable.materialId = creatureMaterials[materialType];
-                creatureRenderable.isVisible = true;
-                creatureRenderable.renderLayer = 0;
-                creatureRenderable.lodDistance = 1000.0f;
-                world_->addComponent(creature, creatureRenderable);
+    // Create 3 target cubes at different distances
+    std::vector<glm::vec3> targetPositions = {
+        glm::vec3(-5.0f, 2.0f, -10.0f),  // Left target
+        glm::vec3(0.0f, 2.0f, -15.0f),   // Center target
+        glm::vec3(5.0f, 2.0f, -10.0f)    // Right target
+    };
 
-                // CreatureComponent for spatial detection testing
-                CreatureComponent creatureComp;
-                creatureComp.state = CreatureState::IDLE;
-                creatureComp.detectionRadius = 8.0f + (x + y + z) * 0.1f;  // Varied detection radii using 3D coordinates
-                creatureComp.type = static_cast<CreatureComponent::CreatureType>((x + y + z) % 3);
-                world_->addComponent(creature, creatureComp);
+    for (size_t i = 0; i < targetPositions.size(); i++) {
+        EntityID targetEntity = world_->createEntity();
 
-                // SpatialComponent for spatial system testing
-                SpatialComponent creatureSpatial;
-                creatureSpatial.spatialLayers = LayerMask::Creatures;
-                creatureSpatial.boundingRadius = 1.0f + (x + y + z) * 0.05f;
-                creatureSpatial.behavior = SpatialBehavior::STATIC;
-                creatureSpatial.setHomePosition(creatureTransform.position);
-                world_->addComponent(creature, creatureSpatial);
+        Transform targetTransform;
+        targetTransform.position = targetPositions[i];
+        targetTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+        targetTransform.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+        world_->addComponent(targetEntity, targetTransform);
 
-                totalCreatures++;
-            }
-        }
+        Renderable targetRenderable;
+        targetRenderable.meshPath = "cube.obj";
+        targetRenderable.texturePath = "default";
+        targetRenderable.materialId = 1 + static_cast<uint32_t>(i); // Different materials
+        targetRenderable.isVisible = true;
+        world_->addComponent(targetEntity, targetRenderable);
+
+        SpatialComponent targetSpatial;
+        targetSpatial.spatialLayers = LayerMask::Environment;
+        targetSpatial.boundingRadius = 1.0f;
+        targetSpatial.behavior = SpatialBehavior::STATIC;  // STATIC - targets don't move!
+        world_->addComponent(targetEntity, targetSpatial);
+
+        // NO PHYSICS - these are static visual targets, not dynamic physics objects
+        // RigidBodyComponent targetRigidBody = RigidBodyComponent::dynamic(1.0f);
+        // world_->addComponent(targetEntity, targetRigidBody);
+        // CollisionComponent targetCollision = CollisionComponent::box(glm::vec3(1.0f, 1.0f, 1.0f), LayerMask::Environment);
+        // world_->addComponent(targetEntity, targetCollision);
+
+        totalEntities++;
     }
 
-    VKMON_INFO("Scene setup complete: " + std::to_string(totalCreatures) + " creatures with spatial AI");
+    VKMON_INFO("Created 3 target cubes for projectile testing");
+    // =========================================================================
+    // CAMERA SETUP - Positioned for projectile testing
+    // =========================================================================
+    VKMON_INFO("Setting up camera for projectile testing...");
 
-    // Create camera positioned to see 1000 creatures in 3D cube (cube spans 0 to 18 units in X, Y, and Z)
     EntityID cameraEntity = world_->createEntity();
+
     Transform cameraTransform;
-    cameraTransform.position = glm::vec3(25.0f, 25.0f, 40.0f);  // Further back and elevated to see entire 3D cube
-    cameraTransform.setRotationEuler(-20.0f, -15.0f, 0.0f); // Angled to see the 3D structure clearly
-    cameraTransform.scale = glm::vec3(1.0f);
+    cameraTransform.position = glm::vec3(0.0f, 5.0f, 10.0f);  // Good position to see targets
+    cameraTransform.setRotationEuler(-15.0f, 0.0f, 0.0f);      // Look down slightly
     world_->addComponent(cameraEntity, cameraTransform);
 
-    Camera cameraComponent;
-    cameraComponent.fov = 45.0f;  // Much narrower FOV for less distortion - standard value
-    cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE;
-    cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;
-    cameraComponent.aspectRatio = 16.0f / 9.0f;
-    cameraComponent.isActive = true;
-    cameraComponent.updateProjectionMatrix();
-    world_->addComponent(cameraEntity, cameraComponent);
+    Camera camera;
+    camera.fov = 75.0f;
+    camera.nearPlane = 0.1f;
+    camera.farPlane = 1000.0f;
+    camera.priority = 1;
+    camera.isActive = true;
+    world_->addComponent(cameraEntity, camera);
 
     SpatialComponent cameraSpatial;
     cameraSpatial.spatialLayers = LayerMask::Camera;
-    cameraSpatial.boundingRadius = 0.1f;
+    cameraSpatial.boundingRadius = 1.0f;
     cameraSpatial.behavior = SpatialBehavior::DYNAMIC;
     world_->addComponent(cameraEntity, cameraSpatial);
 
-    // Create test player entity for creature detection testing
-    EntityID playerEntity = world_->createEntity();
+    totalEntities++;
 
-    // Add Transform component positioned at center of creature grid
-    Transform playerTransform;
-    playerTransform.position = glm::vec3(0.0f, 1.0f, 0.0f); // Center of 6x6 grid, slightly elevated
-    playerTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
-    playerTransform.scale = glm::vec3(1.0f);
-    world_->addComponent(playerEntity, playerTransform);
+    VKMON_INFO("Clean Projectile Test Scene Layout:");
+    VKMON_INFO("  - Ground plane at Y=-2.0");
+    VKMON_INFO("  - 3 target cubes positioned at different distances");
+    VKMON_INFO("  - Camera at (0,5,10) looking at targets");
+    VKMON_INFO("  - Total entities: " + std::to_string(totalEntities));
+    VKMON_INFO("  - Ready for mouse click projectile testing");
 
-    // Add SpatialComponent with Player layer
-    SpatialComponent playerSpatial(2.0f, SpatialBehavior::DYNAMIC, LayerMask::Player);
-    world_->addComponent(playerEntity, playerSpatial);
+    // =========================================================================
+    // ENHANCED LIGHTING SETUP - Ensure scene is visible
+    // =========================================================================
+    VKMON_INFO("Setting up enhanced lighting for projectile test scene...");
 
-    // Scene setup complete - main application will log ready message
+    if (lightingSystem_) {
+        // Set bright directional light
+        lightingSystem_->setDirectionalLight(
+            glm::vec3(-0.3f, -1.0f, -0.4f),  // Direction (slightly angled)
+            2.0f,                             // High intensity
+            glm::vec3(1.0f, 1.0f, 1.0f)      // White light
+        );
+
+        // Set bright ambient lighting
+        lightingSystem_->setAmbientLight(
+            glm::vec3(0.4f, 0.4f, 0.5f),     // Slightly blue ambient
+            0.6f                              // High ambient intensity
+        );
+
+        VKMON_INFO("Enhanced lighting configured: Directional(2.0x) + Ambient(0.6x)");
+    } else {
+        VKMON_WARNING("LightingSystem not available - using default lighting");
+    }
+
+    // Scene setup complete - physics bodies will be created automatically on first update
+    preloadSceneAssets();
+
+    VKMON_INFO("createProjectileTestScene() completing successfully");
+}
+
+void Application::preloadSceneAssets() {
+    if (!world_ || !renderer_) {
+        VKMON_WARNING("Cannot preload scene assets: World or Renderer not initialized");
+        return;
+    }
+
+    VKMON_INFO("Preloading all scene assets during initialization...");
+
+    // Get all entities with Renderable components
+    auto entities = world_->getEntityManager().getEntitiesWithComponent<Renderable>();
+
+    if (entities.empty()) {
+        VKMON_INFO("No renderable entities found - no assets to preload");
+        return;
+    }
+
+    // Collect unique mesh paths to avoid duplicate loading
+    std::set<std::string> uniqueMeshPaths;
+    int totalRenderables = 0;
+
+    for (EntityID entity : entities) {
+        auto& renderable = world_->getComponent<Renderable>(entity);
+        uniqueMeshPaths.insert(renderable.meshPath);
+        totalRenderables++;
+    }
+
+    VKMON_INFO("Found " + std::to_string(totalRenderables) + " renderable entities using " +
+               std::to_string(uniqueMeshPaths.size()) + " unique models");
+
+    // Preload each unique model
+    size_t successCount = 0;
+    size_t failureCount = 0;
+    double totalLoadTime = 0.0;
+
+    for (const std::string& meshPath : uniqueMeshPaths) {
+        VKMON_INFO("Preloading model: " + meshPath);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        if (renderer_->preloadModel(meshPath)) {
+            auto end = std::chrono::high_resolution_clock::now();
+            double loadTime = std::chrono::duration<double, std::milli>(end - start).count();
+            totalLoadTime += loadTime;
+
+            VKMON_INFO("Model preloaded successfully in " + std::to_string(loadTime) + "ms: " + meshPath);
+            successCount++;
+        } else {
+            VKMON_ERROR("Failed to preload model: " + meshPath);
+            failureCount++;
+        }
+    }
+
+    VKMON_INFO("Scene asset preloading complete: " +
+               std::to_string(successCount) + " models loaded successfully, " +
+               std::to_string(failureCount) + " failures, " +
+               std::to_string(totalLoadTime) + "ms total");
 }

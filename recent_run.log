@@ -1,0 +1,300 @@
+[17:43:50.233] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.233] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.233] [ERROR] Exception loading model assets/models/projectile_sphere.obj: ннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннПС
+[17:43:50.233] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.233] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.234] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.234] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.234] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.234] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.234] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.234] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.234] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.235] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.235] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.235] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.235] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.235] [INFO ] Projectile destroyed - Entity: 6, Reason: Time limit reached (30.293098s), Lifetime: 30.293098s, Distance: 0.000000m
+[17:43:50.257] [INFO ] Application Performance: 2029 FPS, 0.386600ms frame time
+[17:43:50.257] [INFO ] === SpatialSystem Performance Report ===
+[17:43:50.257] [INFO ] Frame Stats:
+[17:43:50.257] [INFO ]   Entities tracked: 6
+[17:43:50.257] [INFO ]   Entities processed: 5
+[17:43:50.257] [INFO ]   Static entities skipped: 1
+[17:43:50.257] [INFO ]   Entities updated: 0
+[17:43:50.257] [INFO ]   Entities added: 0
+[17:43:50.257] [INFO ]   Entities removed: 0
+[17:43:50.257] [INFO ]   Frame update time: 0.004100ms
+[17:43:50.257] [INFO ] Spatial Manager:
+[17:43:50.257] [INFO ]   Total queries: 41399
+[17:43:50.257] [INFO ]   Average query time: 0.003756ms
+[17:43:50.257] [INFO ]   Total entities returned: 242544
+[17:43:50.257] [INFO ] Cache Performance:
+[17:43:50.257] [INFO ]   Cache hit rate: 98.712524%
+[17:43:50.257] [INFO ]   Cache size: 97 entries
+[17:43:50.257] [INFO ] Octree Structure:
+[17:43:50.257] [INFO ]   Nodes: 1
+[17:43:50.257] [INFO ]   Max depth: 0
+[17:43:50.257] [INFO ]   Total entities: 7
+[17:43:50.257] [INFO ] ==========================================
+[17:43:50.258] [INFO ] RenderSystem (spatial+frustum): Candidates=7, Rendered=1, Culled=4
+[17:43:50.258] [INFO ] GPU Render Performance (Frame 41400):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0061ms (Cull:0.0014ms + Batch:0.0031ms + GPU:0.0003ms)
+DEBUG: GLFW mouse button 0 action 0 mods 0
+DEBUG: Calling Window mouse button callback
+DEBUG: InputHandler::processMouseButtonInput button=0 action=0 mods=0
+DEBUG: InputHandler ignoring non-press action: 0
+DEBUG: GLFW mouse button 0 action 1 mods 0
+DEBUG: Calling Window mouse button callback
+DEBUG: InputHandler::processMouseButtonInput button=0 action=1 mods=0
+[17:43:50.358] [INFO ] Projectile spawned - Entity: 6, Type: PHYSICS_OBJECT, Position: (0.341526, 4.880743, 8.032988), Speed: 5.385165m/s
+[17:43:50.358] [INFO ] [INPUT] Projectile spawn requested (Left Click)
+[17:43:50.358] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.358] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.358] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.358] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.359] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.359] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.359] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.359] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.360] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.360] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.360] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.360] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.360] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.360] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.360] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.360] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.361] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.361] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.361] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.361] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.361] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.361] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.362] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.362] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.362] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.362] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.362] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.362] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.363] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.363] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.363] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.363] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.363] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.363] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.363] [ERROR] Exception loading model assets/models/projectile_sphere.obj: ннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннПС
+[17:43:50.363] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.364] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.364] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.364] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.364] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.364] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.365] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.365] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.365] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.365] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.365] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.365] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.365] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.366] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.366] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.366] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.366] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.367] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.367] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.367] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.367] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.367] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.367] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.367] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.367] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.368] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.368] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.368] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.368] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.368] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.369] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.369] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.369] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.369] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.369] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.369] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.369] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.370] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.370] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.370] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.370] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.370] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.370] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.370] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.370] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.371] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.371] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.371] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.371] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.372] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.372] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.372] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.372] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.372] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.372] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.373] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.373] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.373] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.373] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.373] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.373] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.374] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.374] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.374] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.374] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.374] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.374] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.374] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.374] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.375] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.375] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.375] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.375] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.375] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.376] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.376] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.376] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.376] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.376] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.376] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.376] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.377] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.377] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.377] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.377] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.377] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.377] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.377] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.377] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.378] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.378] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.378] [ERROR] Exception loading model assets/models/projectile_sphere.obj: ннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннПС
+[17:43:50.378] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.379] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.379] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.379] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.379] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.379] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.379] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.379] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.379] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.380] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.380] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.380] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.380] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.381] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.381] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.381] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.381] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.381] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.381] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.381] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.381] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.382] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.382] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.382] [ERROR] Exception loading model assets/models/projectile_sphere.obj: ннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннПС
+[17:43:50.382] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.382] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.383] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.383] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.383] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.383] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.383] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.383] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.383] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.384] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.384] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.384] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.384] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.384] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.384] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.384] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.384] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.385] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.385] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.385] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.385] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.385] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.386] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.386] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.386] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.386] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.386] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.386] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.386] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.387] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.387] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.387] [ERROR] Exception loading model assets/models/projectile_sphere.obj: нннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннн
+[17:43:50.387] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.387] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj
+[17:43:50.387] [ERROR] Assimp failed to load model: Unable to open file "D:\ws\vulkanmon\assets/models/assets/models/projectile_sphere.obj".
+[17:43:50.387] [ERROR] Exception loading model assets/models/projectile_sphere.obj: ннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннннПС
+[17:43:50.387] [WARN ] No model cached for meshPath: assets/models/projectile_sphere.obj
+[17:43:50.388] [INFO ] Projectile destroyed - Entity: 6, Reason: Time limit reached (30.515501s), Lifetime: 30.515501s, Distance: 0.000000m
+[17:43:50.400] [INFO ] Application Performance: 1862 FPS, 0.377700ms frame time
+DEBUG: GLFW mouse button 0 action 0 mods 0
+DEBUG: Calling Window mouse button callback
+DEBUG: InputHandler::processMouseButtonInput button=0 action=0 mods=0
+DEBUG: InputHandler ignoring non-press action: 0
+[17:43:50.532] [INFO ] Application Performance: 2314 FPS, 0.389200ms frame time
+[17:43:50.664] [INFO ] Application Performance: 2204 FPS, 0.455800ms frame time
+[17:43:50.800] [INFO ] Application Performance: 2233 FPS, 0.435900ms frame time
+[17:43:50.929] [INFO ] Application Performance: 2348 FPS, 0.378900ms frame time
+[17:43:51.057] [INFO ] Application Performance: 2379 FPS, 0.393400ms frame time
+[17:43:51.057] [INFO ] === SpatialSystem Performance Report ===
+[17:43:51.057] [INFO ] Frame Stats:
+[17:43:51.057] [INFO ]   Entities tracked: 6
+[17:43:51.057] [INFO ]   Entities processed: 5
+[17:43:51.057] [INFO ]   Static entities skipped: 1
+[17:43:51.057] [INFO ]   Entities updated: 0
+[17:43:51.057] [INFO ]   Entities added: 0
+[17:43:51.057] [INFO ]   Entities removed: 0
+[17:43:51.057] [INFO ]   Frame update time: 0.004200ms
+[17:43:51.057] [INFO ] Spatial Manager:
+[17:43:51.057] [INFO ]   Total queries: 43199
+[17:43:51.057] [INFO ]   Average query time: 0.003648ms
+[17:43:51.057] [INFO ]   Total entities returned: 255144
+[17:43:51.057] [INFO ] Cache Performance:
+[17:43:51.057] [INFO ]   Cache hit rate: 98.689781%
+[17:43:51.057] [INFO ]   Cache size: 129 entries
+[17:43:51.057] [INFO ] Octree Structure:
+[17:43:51.057] [INFO ]   Nodes: 1
+[17:43:51.057] [INFO ]   Max depth: 0
+[17:43:51.057] [INFO ]   Total entities: 7
+[17:43:51.057] [INFO ] ==========================================
+[17:43:51.057] [INFO ] RenderSystem (spatial+frustum): Candidates=7, Rendered=1, Culled=4
+[17:43:51.057] [INFO ] GPU Render Performance (Frame 43200):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0058ms (Cull:0.0013ms + Batch:0.0029ms + GPU:0.0002ms)
+[17:43:51.082] [INFO ] Cleaning up fallen cube at Y=-460.659454
+[17:43:51.083] [INFO ] Spawned dynamic falling cube #1 at (-8.966150, 20.000000, -0.893898) with velocity (-0.566598, -1.945274)
+[17:43:51.083] [WARN ] Entity already exists in spatial manager, updating position
+[17:43:51.185] [INFO ] Application Performance: 2313 FPS, 0.405500ms frame time
+[17:43:51.311] [INFO ] Application Performance: 2308 FPS, 0.391700ms frame time
+[17:43:51.436] [INFO ] Application Performance: 2404 FPS, 0.433000ms frame time
+[17:43:51.562] [INFO ] Application Performance: 2386 FPS, 0.388100ms frame time
+[17:43:51.688] [INFO ] Application Performance: 2352 FPS, 0.566400ms frame time
+[17:43:51.789] [INFO ] Application finished successfully
+[17:43:51.789] [INFO ] Beginning Application cleanup...
+[17:43:51.789] [INFO ] Shutting down PhysicsSystem
+[17:43:51.789] [INFO ] Shutting down Jolt Physics...
+[17:43:51.823] [INFO ] Jolt Physics shutdown complete
+[17:43:51.823] [INFO ] PhysicsSystem shutdown complete
+[17:43:51.823] [INFO ] Clearing system references before renderer cleanup...
+[17:43:51.823] [INFO ] Cleaning up renderer...
+[17:43:51.823] [INFO ] Cleaning up ImGui debug interface...
+[17:43:51.824] [INFO ] ImGui debug interface cleanup complete
+[17:43:51.824] [INFO ] Beginning VulkanRenderer cleanup...
+[17:43:51.825] [INFO ] GPU instance buffer cleanup complete
+[17:43:51.846] [INFO ] VulkanRenderer cleanup completed
+[17:43:51.846] [INFO ] VulkanRenderer destroyed

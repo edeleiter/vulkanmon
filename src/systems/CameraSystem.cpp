@@ -35,13 +35,16 @@ void CameraSystem::update(float deltaTime, EntityManager& entityManager) {
         activeCameraEntity = bestCamera;
     }
 
-    // Update view matrices for all cameras based on their transforms
+    // Update view and projection matrices for all cameras
     for (size_t i = 0; i < cameras.size(); ++i) {
         EntityID entity = entityIds[i];
 
         if (hasRequiredComponents(entity, entityManager)) {
             Transform& transform = entityManager.getComponent<Transform>(entity);
             Camera& camera = cameras[i];
+
+            // Update projection matrix (aspect ratio from window, camera FOV/near/far)
+            camera.updateProjectionMatrix();
 
             // Update view matrix from transform
             camera.updateViewMatrix(
@@ -188,6 +191,58 @@ glm::mat4 CameraSystem::getActiveProjectionMatrix(EntityManager& entityManager) 
 bool CameraSystem::hasActiveCamera(EntityManager& entityManager) {
     return activeCameraEntity != INVALID_ENTITY &&
            entityManager.hasComponent<Camera>(activeCameraEntity);
+}
+
+CameraSystem::Ray CameraSystem::screenToWorldRay(float screenX, float screenY, float screenWidth, float screenHeight, EntityManager& entityManager) {
+    Ray ray;
+
+    // Default ray pointing forward if no active camera
+    if (!hasActiveCamera(entityManager)) {
+        VKMON_WARNING("CameraSystem: No active camera for ray projection, using default ray");
+        ray.origin = glm::vec3(0.0f, 15.0f, 25.0f);
+        ray.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+        return ray;
+    }
+
+    Camera* camera = getActiveCamera(entityManager);
+    Transform* transform = getActiveCameraTransform(entityManager);
+
+    if (!camera || !transform) {
+        VKMON_WARNING("CameraSystem: Invalid camera/transform for ray projection");
+        ray.origin = glm::vec3(0.0f, 15.0f, 25.0f);
+        ray.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+        return ray;
+    }
+
+    // Convert screen coordinates to NDC (Normalized Device Coordinates)
+    // Screen Y is typically inverted (0 at top), so flip it
+    float ndcX = (2.0f * screenX) / screenWidth - 1.0f;
+    float ndcY = 1.0f - (2.0f * screenY) / screenHeight;  // Flip Y axis
+
+    // Create ray in clip space (NDC with depth)
+    glm::vec4 rayClipSpace = glm::vec4(ndcX, ndcY, -1.0f, 1.0f);
+
+    // Transform to eye space (camera space)
+    glm::mat4 invProjection = glm::inverse(camera->projectionMatrix);
+    glm::vec4 rayEyeSpace = invProjection * rayClipSpace;
+
+    // Only XY are relevant in eye space, set Z to forward, W to 0 (direction vector)
+    rayEyeSpace = glm::vec4(rayEyeSpace.x, rayEyeSpace.y, -1.0f, 0.0f);
+
+    // Transform to world space
+    glm::mat4 invView = glm::inverse(camera->viewMatrix);
+    glm::vec4 rayWorldSpace = invView * rayEyeSpace;
+
+    // Extract world space ray
+    ray.origin = transform->position;  // Camera position is ray origin
+    ray.direction = glm::normalize(glm::vec3(rayWorldSpace.x, rayWorldSpace.y, rayWorldSpace.z));
+
+    // Debug logging for ray projection
+    VKMON_DEBUG("Ray projection: Screen(" + std::to_string(screenX) + "," + std::to_string(screenY) +
+                ") -> Origin(" + std::to_string(ray.origin.x) + "," + std::to_string(ray.origin.y) + "," + std::to_string(ray.origin.z) +
+                ") Dir(" + std::to_string(ray.direction.x) + "," + std::to_string(ray.direction.y) + "," + std::to_string(ray.direction.z) + ")");
+
+    return ray;
 }
 
 

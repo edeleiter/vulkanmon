@@ -50,6 +50,24 @@ public:
 
     /// Check if active camera is available
     bool hasActiveCamera(EntityManager& entityManager);
+
+    // =========================================================================
+    // RAY PROJECTION FOR PROJECTILE SYSTEMS
+    // =========================================================================
+
+    /// Convert screen coordinates to world space ray for projectile spawning
+    /// @param screenX Mouse X coordinate in screen space
+    /// @param screenY Mouse Y coordinate in screen space
+    /// @param screenWidth Window width in pixels
+    /// @param screenHeight Window height in pixels
+    /// @param entityManager Entity manager for camera access
+    /// @return Ray with origin and direction in world space
+    struct Ray {
+        glm::vec3 origin;
+        glm::vec3 direction;
+    };
+
+    Ray screenToWorldRay(float screenX, float screenY, float screenWidth, float screenHeight, EntityManager& entityManager);
 };
 
 } // namespace VulkanMon

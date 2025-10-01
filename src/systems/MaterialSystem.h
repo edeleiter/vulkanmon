@@ -11,7 +11,6 @@ namespace VulkanMon {
     class ResourceManager;
     class ManagedBuffer;
     struct Material; // Forward declaration from ModelLoader.h
-}
 
 struct MaterialData {
     glm::vec4 ambient;   // Using vec4 for proper alignment
@@ -75,3 +74,5 @@ private:
     
     uint32_t nextMaterialId = 0;
 };
+
+} // namespace VulkanMon

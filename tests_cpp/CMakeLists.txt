@@ -17,6 +17,7 @@ find_package(Catch2 CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(Jolt CONFIG REQUIRED)
 
 # Include directories for VulkanMon source files
 include_directories(../src)
@@ -63,9 +64,17 @@ add_executable(vulkanmon_tests
     spatial/test_SpatialPerformance.cpp
     spatial/bench_SpatialSystem.cpp
 
+    # Physics System tests (Phase 7.1)
+    physics/test_PhysicsComponents.cpp
+    physics/test_PhysicsSystem.cpp
+    physics/test_PhysicsBlockers.cpp
+
     # Performance Regression Tests (CRITICAL)
     performance/test_PerformanceRegression.cpp
     performance/test_CreatureDetectionRegression.cpp
+
+    # Projectile System tests (Phase 8)
+    test_ProjectileSystem.cpp
 
     # Test utilities
     fixtures/TestHelpers.cpp
@@ -85,6 +94,9 @@ add_executable(vulkanmon_tests
     ../src/systems/RenderSystem.cpp
     ../src/systems/CreatureRenderSystem.cpp  # Required by Application.cpp
     ../src/systems/CameraSystem.cpp
+    ../src/systems/PhysicsSystem.cpp
+    ../src/systems/ProjectileSystem.cpp  # Required by Application.cpp
+    ../src/materials/ProjectileMaterials.cpp  # Required by ProjectileSystem.cpp
     ../src/spatial/SpatialManager.cpp
     ../src/spatial/WorldConfig.cpp
     ../src/spatial/LayerMask.cpp
@@ -103,6 +115,7 @@ target_link_libraries(vulkanmon_tests PRIVATE
     assimp::assimp
     Catch2::Catch2WithMain
     imgui::imgui
+    Jolt::Jolt
 )
 
 # Include directories

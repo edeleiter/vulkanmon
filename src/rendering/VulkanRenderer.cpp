@@ -587,6 +587,142 @@ void VulkanRenderer::ensureMeshLoaded(const std::string& meshPath) {
     }
 }
 
+bool VulkanRenderer::preloadModel(const std::string& meshPath) {
+    try {
+        auto startTime = std::chrono::high_resolution_clock::now();
+
+        VKMON_INFO("Preloading model: " + meshPath);
+
+        // Use existing ensureMeshLoaded logic
+        ensureMeshLoaded(meshPath);
+
+        // Verify successful loading by checking cache
+        {
+            std::shared_lock<std::shared_mutex> lock(modelCacheMutex_);
+            if (modelCache_.find(meshPath) == modelCache_.end()) {
+                VKMON_ERROR("Model preloading failed - not found in cache: " + meshPath);
+                return false;
+            }
+        }
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto loadTimeMs = std::chrono::duration<float, std::milli>(endTime - startTime).count();
+
+        VKMON_INFO("Model preloaded successfully in " + std::to_string(loadTimeMs) + "ms: " + meshPath);
+        return true;
+
+    } catch (const std::exception& e) {
+        VKMON_ERROR("Model preloading exception for " + meshPath + ": " + e.what());
+        return false;
+    }
+}
+
+bool VulkanRenderer::performGPUWarmup() {
+    if (!initialized_) {
+        VKMON_ERROR("Cannot perform GPU warm-up: VulkanRenderer not initialized");
+        return false;
+    }
+
+    try {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        VKMON_INFO("Starting GPU warm-up render to eliminate first-frame delay...");
+
+        // Create a one-time command buffer for warm-up rendering
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool_;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer warmupCommandBuffer;
+        if (vkAllocateCommandBuffers(device_, &allocInfo, &warmupCommandBuffer) != VK_SUCCESS) {
+            VKMON_ERROR("Failed to allocate warm-up command buffer");
+            return false;
+        }
+
+        // Record a minimal render pass (same as normal frame but without presentation)
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(warmupCommandBuffer, &beginInfo);
+
+        // Begin render pass with the first framebuffer
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass_;
+        renderPassInfo.framebuffer = swapChainFramebuffers_[0];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = swapChainExtent_;
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = {{0.0f, 0.0f, 0.2f, 1.0f}};  // Dark blue background
+        clearValues[1].depthStencil = {1.0f, 0};
+
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        vkCmdBeginRenderPass(warmupCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        // Bind the graphics pipeline (this is the expensive operation we want to trigger)
+        vkCmdBindPipeline(warmupCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+        // Set viewport and scissor (dynamic state)
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(swapChainExtent_.width);
+        viewport.height = static_cast<float>(swapChainExtent_.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(warmupCommandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = swapChainExtent_;
+        vkCmdSetScissor(warmupCommandBuffer, 0, 1, &scissor);
+
+        // Bind descriptor sets to trigger any lazy descriptor creation
+        vkCmdBindDescriptorSets(warmupCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                               pipelineLayout_, 0, 1, &globalDescriptorSet_, 0, nullptr);
+
+        // No actual draw calls needed - pipeline binding is the expensive part
+
+        vkCmdEndRenderPass(warmupCommandBuffer);
+        vkEndCommandBuffer(warmupCommandBuffer);
+
+        // Submit the command buffer and wait for completion
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &warmupCommandBuffer;
+
+        if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+            VKMON_ERROR("Failed to submit GPU warm-up command buffer");
+            vkFreeCommandBuffers(device_, commandPool_, 1, &warmupCommandBuffer);
+            return false;
+        }
+
+        // Wait for the GPU warm-up to complete
+        vkQueueWaitIdle(graphicsQueue_);
+
+        // Clean up the command buffer
+        vkFreeCommandBuffers(device_, commandPool_, 1, &warmupCommandBuffer);
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto warmupTimeMs = std::chrono::duration<float, std::milli>(endTime - startTime).count();
+
+        VKMON_INFO("GPU warm-up render completed in " + std::to_string(warmupTimeMs) + "ms");
+        VKMON_INFO("GPU warm-up successful - driver optimizations should be loaded");
+
+        return true;
+
+    } catch (const std::exception& e) {
+        VKMON_ERROR("GPU warm-up exception: " + std::string(e.what()));
+        return false;
+    }
+}
+
 // =============================================================================
 // Vulkan Initialization Methods (extracted from main.cpp)
 // =============================================================================

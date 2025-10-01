@@ -92,4 +92,10 @@ venv/
 #models
 assets/3dmodels/
 
+# Documentation generation
+docs/api/
+docs/html/
+docs/latex/
+docs/xml/
+
 .claude/

@@ -18,6 +18,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(Jolt CONFIG REQUIRED)
 
 # Create executable
 # Use CMake's Vulkan component for glslangValidator
@@ -67,6 +68,9 @@ add_executable(vulkanmon
     src/systems/RenderSystem.cpp
     src/systems/CreatureRenderSystem.cpp
     src/systems/CameraSystem.cpp
+    src/systems/PhysicsSystem.cpp
+    src/systems/ProjectileSystem.cpp
+    src/materials/ProjectileMaterials.cpp
     src/debug/ECSInspector.cpp
     src/spatial/SpatialManager.cpp
     src/spatial/WorldConfig.cpp
@@ -84,6 +88,7 @@ target_link_libraries(vulkanmon PRIVATE
     glm::glm
     assimp::assimp
     imgui::imgui
+    Jolt::Jolt
 )
 
 # Include directories
@@ -101,4 +106,65 @@ endif()
 option(BUILD_TESTS "Build unit tests" ON)
 if(BUILD_TESTS)
     add_subdirectory(tests_cpp)
+endif()
+
+# =============================================================================
+# DOXYGEN DOCUMENTATION GENERATION
+# =============================================================================
+
+option(BUILD_DOCS "Generate API documentation with Doxygen" ON)
+
+if(BUILD_DOCS)
+    # Find Doxygen package
+    find_package(Doxygen QUIET)
+
+    if(DOXYGEN_FOUND)
+        # Set Doxygen configuration variables
+        set(DOXYGEN_PROJECT_NAME "VulkanMon Game Engine")
+        set(DOXYGEN_PROJECT_NUMBER "7.1")
+        set(DOXYGEN_PROJECT_BRIEF "Modern C++20 game engine with Vulkan graphics for Pokemon-style creature collector games")
+        set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/docs")
+        set(DOXYGEN_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+        set(DOXYGEN_EXCLUDE_PATTERNS "*/build/* */vcpkg/* */.git/* */external/*")
+
+        # Configure Doxygen settings
+        set(DOXYGEN_GENERATE_HTML YES)
+        set(DOXYGEN_GENERATE_LATEX NO)
+        set(DOXYGEN_EXTRACT_ALL NO)
+        set(DOXYGEN_EXTRACT_PRIVATE NO)
+        set(DOXYGEN_EXTRACT_STATIC YES)
+        set(DOXYGEN_HIDE_UNDOC_MEMBERS NO)
+        set(DOXYGEN_JAVADOC_AUTOBRIEF YES)
+        set(DOXYGEN_SOURCE_BROWSER YES)
+        set(DOXYGEN_ALPHABETICAL_INDEX YES)
+        set(DOXYGEN_SEARCHENGINE YES)
+        set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "README.md")
+        set(DOXYGEN_WARN_IF_UNDOCUMENTED YES)
+        set(DOXYGEN_WARN_IF_DOC_ERROR YES)
+        set(DOXYGEN_WARN_NO_PARAMDOC YES)
+
+        # Create documentation target
+        doxygen_add_docs(docs
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Generating VulkanMon API documentation with Doxygen"
+        )
+
+        # Create a docs-open target for convenience (Windows)
+        if(WIN32)
+            add_custom_target(docs-open
+                COMMAND cmd /c start ${CMAKE_CURRENT_BINARY_DIR}/docs/html/index.html
+                DEPENDS docs
+                COMMENT "Opening VulkanMon documentation in default browser"
+            )
+        endif()
+
+        message(STATUS "Doxygen found: Documentation target 'docs' available")
+        message(STATUS "  - Generate docs: cmake --build . --target docs")
+        message(STATUS "  - Open docs (Windows): cmake --build . --target docs-open")
+    else()
+        message(WARNING "Doxygen not found: Documentation target disabled")
+        message(STATUS "Install Doxygen to enable API documentation generation")
+    endif()
 endif()

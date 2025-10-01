@@ -40,6 +40,18 @@ void Application::handleLightingControl(int key) {
         case GLFW_KEY_L:  // Print lighting debug info
             printLightingInfo();
             break;
+        case GLFW_KEY_7:  // Test raycast system
+            testRaycastSystem();
+            break;
+        case GLFW_KEY_8:  // Test sphere overlap queries
+            testSphereOverlapQueries();
+            break;
+        case GLFW_KEY_9:  // Measure spatial collision performance
+            measureSpatialCollisionPerformance();
+            break;
+        case GLFW_KEY_0:  // Run comprehensive physics validation tests
+            runPhysicsValidationTests();
+            break;
         default:
             // Unknown lighting control key
             break;

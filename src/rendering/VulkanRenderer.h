@@ -313,6 +313,25 @@ public:
                                  const std::vector<VulkanMon::InstanceData>& instances,
                                  uint32_t baseMaterialId);
 
+    // ===== ASSET PRELOADING INTERFACE =====
+
+    /**
+     * Preload a 3D model during initialization phase
+     * Loads and caches model immediately instead of waiting for first render call
+     * This prevents blocking during gameplay when model is first needed
+     *
+     * @param meshPath Path to mesh file to preload
+     * @return true if model loaded successfully, false on error
+     */
+    bool preloadModel(const std::string& meshPath);
+
+    /**
+     * Perform GPU warm-up render to eliminate first-frame delay
+     * Submits a dummy render pass to trigger GPU driver optimizations
+     * @return true if warm-up completed successfully
+     */
+    bool performGPUWarmup();
+
     // ===== IMGUI DEBUG INTERFACE =====
     // Phase 6.3: ECS Inspector integration
 

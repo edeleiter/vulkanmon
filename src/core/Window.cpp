@@ -2,6 +2,7 @@
 #include "Window.h"
 #include "../utils/Logger.h"
 #include <stdexcept>
+#include <chrono>
 
 namespace VulkanMon {
 
@@ -25,6 +26,8 @@ void Window::initialize() {
     // Configure GLFW for Vulkan (no OpenGL context)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    // Hide window during initialization to eliminate perceived startup delay
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     
     // Create the window
     window_ = glfwCreateWindow(static_cast<int>(width_), static_cast<int>(height_), 
@@ -40,10 +43,10 @@ void Window::initialize() {
     // Register static GLFW callbacks
     glfwSetKeyCallback(window_, glfwKeyCallback);
     glfwSetCursorPosCallback(window_, glfwMouseCallback);
+    glfwSetMouseButtonCallback(window_, glfwMouseButtonCallback);
     glfwSetFramebufferSizeCallback(window_, glfwResizeCallback);
-    
-    // Configure mouse input for 3D camera controls
-    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    // Note: Cursor mode will be set after window is shown to avoid message queue issues on fresh OS installs
     
     VKMON_INFO("GLFW window initialized successfully");
     VKMON_RESOURCE("Window", "created", title_ + " (" + std::to_string(width_) + "x" + std::to_string(height_) + ")");
@@ -66,11 +69,26 @@ void Window::createSurface(VkInstance instance) {
 }
 
 bool Window::shouldClose() const {
-    return window_ ? glfwWindowShouldClose(window_) : true;
+    if (!window_) return true;
+
+    // Directly call GLFW without timing overhead for better performance
+    return glfwWindowShouldClose(window_);
 }
 
 void Window::pollEvents() {
     glfwPollEvents();
+}
+
+void Window::show() {
+    if (window_) {
+        glfwShowWindow(window_);
+
+        // Start with cursor enabled for mouse click testing - use TAB to toggle camera mode
+        glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+        VKMON_INFO("Window shown - initialization complete, ready for rendering");
+        VKMON_INFO("Mouse cursor enabled - click to test projectile spawning, TAB to toggle camera mode");
+    }
 }
 
 void Window::cleanup() {
@@ -107,6 +125,11 @@ void Window::setMouseCallback(MouseCallback callback) {
     VKMON_DEBUG("Mouse callback registered");
 }
 
+void Window::setMouseButtonCallback(MouseButtonCallback callback) {
+    mouseButtonCallback_ = callback;
+    VKMON_DEBUG("Mouse button callback registered");
+}
+
 void Window::setResizeCallback(ResizeCallback callback) {
     resizeCallback_ = callback;
     VKMON_DEBUG("Resize callback registered");
@@ -126,6 +149,13 @@ void Window::glfwMouseCallback(GLFWwindow* window, double xpos, double ypos) {
     Window* windowObj = static_cast<Window*>(glfwGetWindowUserPointer(window));
     if (windowObj && windowObj->mouseCallback_) {
         windowObj->mouseCallback_(xpos, ypos);
+    }
+}
+
+void Window::glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    Window* windowObj = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (windowObj && windowObj->mouseButtonCallback_) {
+        windowObj->mouseButtonCallback_(button, action, mods);
     }
 }
 

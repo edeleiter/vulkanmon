@@ -22,6 +22,7 @@
 #include <vector>
 
 using namespace VulkanMon::Testing;
+using namespace VulkanMon;  // Add this to access MaterialData
 using Catch::Approx;
 
 TEST_CASE("MaterialData Structure Validation", "[MaterialSystem][MaterialData]") {

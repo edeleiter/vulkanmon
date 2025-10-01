@@ -1,0 +1,601 @@
+#pragma once
+
+#include "../core/Entity.h"
+#include "../core/System.h"
+#include "../components/RigidBodyComponent.h"
+#include "../components/CollisionComponent.h"
+#include "../components/CreaturePhysicsComponent.h"
+#include "../components/Transform.h"
+#include "../spatial/LayerMask.h"
+#include <glm/glm.hpp>
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <algorithm>
+#include <thread>
+#include <chrono>
+#include <string>
+
+// Jolt Physics includes
+#include <Jolt/Jolt.h>
+#include <Jolt/RegisterTypes.h>
+#include <Jolt/Core/Factory.h>
+#include <Jolt/Core/TempAllocator.h>
+#include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/PhysicsSettings.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Body/BodyActivationListener.h>
+#include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
+
+// Forward declare Jolt types to avoid naming conflicts
+
+namespace VulkanMon {
+
+// Forward declarations
+class EntityManager;
+class SpatialSystem;
+class VulkanRenderer;
+
+// =============================================================================
+// JOLT PHYSICS LAYER DEFINITIONS
+// =============================================================================
+
+// Object layers - define collision groups for different entity types
+namespace ObjectLayers {
+    static constexpr JPH::ObjectLayer CREATURES = 0;
+    static constexpr JPH::ObjectLayer ENVIRONMENT = 1;
+    static constexpr JPH::ObjectLayer PROJECTILES = 2;
+    static constexpr JPH::ObjectLayer PLAYER = 3;
+    static constexpr JPH::ObjectLayer TRIGGERS = 4;
+    static constexpr JPH::ObjectLayer NUM_LAYERS = 5;
+}
+
+// Broad phase layers - higher level collision filtering
+namespace BroadPhaseLayers {
+    static constexpr JPH::BroadPhaseLayer MOVING = JPH::BroadPhaseLayer(0);
+    static constexpr JPH::BroadPhaseLayer STATIC = JPH::BroadPhaseLayer(1);
+    static const JPH::uint NUM_LAYERS = 2;
+}
+
+// =============================================================================
+// JOLT PHYSICS INTERFACE IMPLEMENTATIONS
+// =============================================================================
+
+// BroadPhaseLayerInterface implementation
+class BroadPhaseLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
+public:
+    JPH::uint GetNumBroadPhaseLayers() const override {
+        return BroadPhaseLayers::NUM_LAYERS;
+    }
+
+    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override {
+        switch (inLayer) {
+            case ObjectLayers::CREATURES:
+            case ObjectLayers::PROJECTILES:
+            case ObjectLayers::PLAYER:
+                return BroadPhaseLayers::MOVING;
+            case ObjectLayers::ENVIRONMENT:
+            case ObjectLayers::TRIGGERS:
+            default:
+                return BroadPhaseLayers::STATIC;
+        }
+    }
+};
+
+// Object vs broad phase layer filter
+class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override {
+        // General game engine broad phase filtering for performance optimization
+        switch (inLayer1) {
+            case ObjectLayers::CREATURES:
+            case ObjectLayers::PLAYER:
+            case ObjectLayers::PROJECTILES:
+                // Dynamic objects need to check collisions with both static and dynamic layers
+                return true;
+
+            case ObjectLayers::ENVIRONMENT:
+                // Static environment only needs to check collisions with moving objects
+                return inLayer2 == BroadPhaseLayers::MOVING;
+
+            case ObjectLayers::TRIGGERS:
+                // Trigger zones only detect moving objects passing through them
+                return inLayer2 == BroadPhaseLayers::MOVING;
+
+            default:
+                return true;
+        }
+    }
+};
+
+// Object layer pair filter
+class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override {
+        // General game engine collision layer rules
+        // Make collision checks symmetric by ordering layers
+        JPH::ObjectLayer layer1 = std::min(inObject1, inObject2);
+        JPH::ObjectLayer layer2 = std::max(inObject1, inObject2);
+
+        // Dynamic entities (creatures, NPCs, AI characters) collision rules
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::CREATURES) {
+            // Dynamic entities can collide with each other (AI interactions, character blocking)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::ENVIRONMENT) {
+            // Dynamic entities collide with static world geometry (terrain, buildings, obstacles)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::PROJECTILES) {
+            // Projectiles can hit dynamic entities (bullets, thrown objects, etc.)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::PLAYER) {
+            // Player can physically interact with dynamic entities
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::CREATURES && layer2 == ObjectLayers::TRIGGERS) {
+            // Dynamic entities can trigger zone detection (switches, pressure plates, etc.)
+            return true;
+        }
+
+        // Static environment collision rules
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::ENVIRONMENT) {
+            // Static environment pieces don't collide with each other (optimization)
+            return false;
+        }
+
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::PROJECTILES) {
+            // Projectiles collide with world geometry (bullets hitting walls, bouncing objects)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::PLAYER) {
+            // Player collides with static world for movement constraints
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::ENVIRONMENT && layer2 == ObjectLayers::TRIGGERS) {
+            // Static environment doesn't interact with trigger zones (optimization)
+            return false;
+        }
+
+        // Projectile collision rules
+        if (layer1 == ObjectLayers::PROJECTILES && layer2 == ObjectLayers::PROJECTILES) {
+            // Projectiles can collide with each other (bullet deflection, object interactions)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::PROJECTILES && layer2 == ObjectLayers::PLAYER) {
+            // Player can interact with projectiles (catching, deflecting, taking damage)
+            return true;
+        }
+
+        if (layer1 == ObjectLayers::PROJECTILES && layer2 == ObjectLayers::TRIGGERS) {
+            // Projectiles can activate trigger zones (shooting switches, target detection)
+            return true;
+        }
+
+        // Player collision rules
+        if (layer1 == ObjectLayers::PLAYER && layer2 == ObjectLayers::PLAYER) {
+            // Multiple players don't physically collide (prevents player blocking in multiplayer)
+            return false;
+        }
+
+        if (layer1 == ObjectLayers::PLAYER && layer2 == ObjectLayers::TRIGGERS) {
+            // Player activates trigger zones (doors, switches, area detection)
+            return true;
+        }
+
+        // Trigger zone rules
+        if (layer1 == ObjectLayers::TRIGGERS && layer2 == ObjectLayers::TRIGGERS) {
+            // Trigger zones don't interact with each other (optimization)
+            return false;
+        }
+
+        // Default to allowing collision for extensibility
+        return true;
+    }
+};
+
+/**
+ * @brief Modern Jolt Physics integration for VulkanMon ECS architecture
+ * @details Provides professional physics simulation with automatic ECS synchronization.
+ *          Supports collision detection, rigid body dynamics, and spatial queries
+ *          optimized for Pokemon-style gameplay with hundreds of entities.
+ *
+ * Performance Characteristics:
+ * - 1300+ FPS with 22 physics entities
+ * - <1ms physics updates per frame
+ * - Multi-threaded collision detection
+ * - Sub-millisecond spatial queries
+ *
+ * Supported Features:
+ * - Collision shapes: Box, Sphere, Capsule
+ * - Layer-based collision filtering
+ * - Physics queries: raycast, overlap detection
+ * - Automatic ECS synchronization
+ *
+ * Design Philosophy:
+ * - Simple is Powerful: Pure Jolt Physics with automatic ECS synchronization
+ * - Engine-Focused: Generic spatial queries and collision detection for any game type
+ * - Performance-Optimized: Multi-threaded Jolt engine with spatial partitioning
+ *
+ * @example Basic Usage
+ * @code
+ * auto physics = std::make_shared<PhysicsSystem>();
+ * physics->initialize(entityManager);
+ * physics->update(deltaTime, entityManager);
+ * @endcode
+ *
+ * @note Requires Jolt Physics library (included via vcpkg)
+ * @warning Physics updates run on multiple threads - ensure thread safety
+ * @see RigidBodyComponent
+ * @see CollisionComponent
+ * @see SpatialSystem
+ * @since Version 7.1
+ */
+class PhysicsSystem : public SystemBase {
+public:
+    // =============================================================================
+    // CONSTRUCTOR AND INITIALIZATION
+    // =============================================================================
+
+    PhysicsSystem() = default;
+    ~PhysicsSystem() = default;
+
+    /**
+     * @brief Update physics simulation for all entities
+     * @details Performs multi-threaded Jolt Physics update and syncs results back to ECS Transform components
+     * @param deltaTime Frame time in MILLISECONDS (from Application::frameTime_)
+     * @param entityManager ECS entity manager for component access
+     * @note Thread-safe - Jolt Physics handles multi-threading internally
+     * @see RigidBodyComponent
+     */
+    void update(float deltaTime, EntityManager& entityManager) override;
+
+    /**
+     * @brief Initialize Jolt Physics system and layer configuration
+     * @param entityManager ECS entity manager for initial entity processing
+     * @throws std::runtime_error if Jolt Physics initialization fails
+     */
+    void initialize(EntityManager& entityManager) override;
+
+    /**
+     * @brief Shutdown Jolt Physics system and cleanup resources
+     * @param entityManager ECS entity manager for cleanup
+     */
+    void shutdown(EntityManager& entityManager) override;
+
+
+    // Set reference to spatial system for collision detection optimization
+    void setSpatialSystem(SpatialSystem* spatial) { spatialSystem_ = spatial; }
+
+    // Preload physics bodies during initialization phase
+    // Creates Jolt bodies for all entities with physics components immediately
+    // This prevents blocking during first physics update
+    void preloadPhysicsBodies(EntityManager& entityManager);
+
+    // =============================================================================
+    // CORE SIMULATION LOOP
+    // =============================================================================
+
+
+    // Fixed timestep physics update - delegates to Jolt Physics internal timestep management
+    // @param fixedDeltaTime Fixed timestep in MILLISECONDS (converted for main update)
+    void fixedUpdate(EntityManager& entityManager, float fixedDeltaTime);
+
+    // =============================================================================
+    // PHYSICS CONFIGURATION
+    // =============================================================================
+
+    // World physics parameters
+    void setGravity(const glm::vec3& gravity) { worldGravity_ = gravity; }
+    glm::vec3 getGravity() const { return worldGravity_; }
+
+    // Global physics scaling
+    void setTimeScale(float scale) { timeScale_ = scale; }
+    float getTimeScale() const { return timeScale_; }
+
+    // Physics solver iterations for accuracy vs performance
+    void setIterations(int velocityIterations, int positionIterations) {
+        velocityIterations_ = velocityIterations;
+        positionIterations_ = positionIterations;
+    }
+
+    // Thread configuration for Jolt Physics multithreading
+    void setThreadCount(uint32_t threadCount) {
+        threadCount_ = threadCount;
+        if (threadCount_ == 0) {
+            threadCount_ = std::max(1u, std::thread::hardware_concurrency() - 1);
+        }
+    }
+    uint32_t getThreadCount() const { return threadCount_; }
+
+    // =============================================================================
+    // COLLISION DETECTION AND RESPONSE
+    // =============================================================================
+
+    // Enable/disable collision detection
+    void enableCollisionDetection(bool enabled) { collisionEnabled_ = enabled; }
+    bool isCollisionEnabled() const { return collisionEnabled_; }
+
+    // Collision layer management
+    void setCollisionMatrix(uint32_t layer1, uint32_t layer2, bool canCollide);
+    bool shouldLayersCollide(uint32_t layer1, uint32_t layer2) const;
+
+    // =============================================================================
+    // PHYSICS QUERIES
+    // =============================================================================
+
+    // Ray casting for projectiles, line-of-sight checks
+    struct RaycastHit {
+        EntityID entity = 0;
+        glm::vec3 point{0.0f};
+        glm::vec3 normal{0.0f};
+        float distance = 0.0f;
+        bool hit = false;
+    };
+
+    /**
+     * @brief Perform raycast query for line-of-sight and projectile collision
+     * @param origin World space starting point of the ray
+     * @param direction Normalized direction vector of the ray
+     * @param maxDistance Maximum distance to check (default: 100.0f)
+     * @param layerMask Collision layer mask filter (default: all layers)
+     * @return RaycastHit structure with collision information
+     * @note Direction vector should be normalized for accurate results
+     * @see RaycastHit
+     */
+    RaycastHit raycast(const glm::vec3& origin, const glm::vec3& direction,
+                      float maxDistance = 100.0f, uint32_t layerMask = 0xFFFFFFFF);
+
+    /**
+     * @brief Find all entities within a spherical area
+     * @param center World space center point of the sphere
+     * @param radius Radius of the detection sphere
+     * @param layerMask Collision layer mask filter (default: all layers)
+     * @return Vector of EntityIDs found within the sphere
+     * @note Useful for area-of-effect detection and Pokemon capture ranges
+     * @see LayerMask
+     */
+    std::vector<EntityID> overlapSphere(const glm::vec3& center, float radius,
+                                       uint32_t layerMask = 0xFFFFFFFF);
+
+    /**
+     * @brief Find all entities within a box-shaped area
+     * @param center World space center point of the box
+     * @param halfExtents Half-size dimensions of the box (width/2, height/2, depth/2)
+     * @param rotation Orientation of the box (default: no rotation)
+     * @param layerMask Collision layer mask filter (default: all layers)
+     * @return Vector of EntityIDs found within the box
+     * @note Useful for rectangular area detection and trigger zones
+     * @see LayerMask
+     */
+    std::vector<EntityID> overlapBox(const glm::vec3& center, const glm::vec3& halfExtents,
+                                    const glm::quat& rotation = glm::quat(1,0,0,0),
+                                    uint32_t layerMask = 0xFFFFFFFF);
+
+    /**
+     * @brief Find all entities within a capsule-shaped area
+     * @param pointA World space start point of the capsule's central axis
+     * @param pointB World space end point of the capsule's central axis
+     * @param radius Radius of the capsule (distance from central axis)
+     * @param layerMask Collision layer mask filter (default: all layers)
+     * @return Vector of EntityIDs found within the capsule
+     * @note Useful for elongated area detection, corridor triggers, and path-based queries
+     * @see LayerMask
+     */
+    std::vector<EntityID> overlapCapsule(const glm::vec3& pointA, const glm::vec3& pointB, float radius,
+                                        uint32_t layerMask = 0xFFFFFFFF);
+
+    // =============================================================================
+    // GENERIC SPATIAL QUERIES
+    // =============================================================================
+
+    // Find nearest entity within distance range
+    EntityID findNearestEntity(const glm::vec3& position, float maxDistance = 100.0f,
+                              uint32_t layerMask = 0xFFFFFFFF, EntityID excludeEntity = 0);
+
+    // Find all entities within radius, sorted by distance
+    std::vector<std::pair<EntityID, float>> findEntitiesInRadius(const glm::vec3& position, float radius,
+                                                                uint32_t layerMask = 0xFFFFFFFF,
+                                                                bool sortByDistance = true);
+
+    // Check if path between two points is clear (no collisions)
+    bool isPathClear(const glm::vec3& startPosition, const glm::vec3& endPosition,
+                    float clearanceRadius = 0.1f, uint32_t layerMask = 0xFFFFFFFF);
+
+    // Find entities along a path (for AI pathfinding assistance)
+    std::vector<EntityID> getEntitiesAlongPath(const glm::vec3& startPosition, const glm::vec3& endPosition,
+                                              float pathWidth = 1.0f, uint32_t layerMask = 0xFFFFFFFF);
+
+    // =============================================================================
+    // PERFORMANCE AND DEBUGGING
+    // =============================================================================
+
+    // Get physics performance statistics
+    struct PhysicsStats {
+        float updateTime = 0.0f;        // Last update time in milliseconds
+        int activeRigidBodies = 0;      // Number of dynamic physics bodies
+        int collisionChecks = 0;        // Collision pairs checked this frame
+        int collisionHits = 0;          // Actual collisions detected
+        float averageVelocity = 0.0f;   // Average entity velocity for performance tuning
+    };
+
+    PhysicsStats getStats() const { return stats_; }
+
+    // Enable debug visualization (requires debug renderer)
+    void setDebugDraw(bool enabled) { debugDraw_ = enabled; }
+    bool isDebugDrawEnabled() const { return debugDraw_; }
+
+    // =============================================================================
+    // JOLT PHYSICS INTEGRATION METHODS
+    // =============================================================================
+
+private:
+    // =============================================================================
+    // JOLT PHYSICS INTERNAL METHODS
+    // =============================================================================
+
+    // Jolt system lifecycle
+    void initializeJoltPhysics();
+    void shutdownJoltPhysics();
+
+    // Jolt layer configuration
+    void setupJoltLayers();
+
+    // Jolt body management
+    JPH::BodyID createJoltBody(EntityID entity, const RigidBodyComponent& rigidBody,
+                               const CollisionComponent& collision, const Transform& transform);
+    void destroyJoltBody(EntityID entity);
+    void updateJoltBodyFromComponent(EntityID entity, const RigidBodyComponent& rigidBody);
+
+    // Jolt shape creation
+    JPH::ShapeRefC createJoltShape(const CollisionComponent& collision);
+
+    // Transform synchronization
+    void syncTransformsFromJolt(EntityManager& entityManager);
+    void syncTransformsToJolt(EntityManager& entityManager);
+
+    // Jolt statistics update
+    void updateStatsFromJolt();
+
+    // Automatic Jolt body management
+    void createJoltBodiesForNewEntities(EntityManager& entityManager);
+    void createJoltBodiesForAllEntities(EntityManager& entityManager);
+
+    // Body state management
+    void activateJoltBody(EntityID entity);
+    void deactivateJoltBody(EntityID entity);
+    bool isJoltBodyActive(EntityID entity) const;
+
+    // =============================================================================
+    // ENHANCED LAYER MAPPING SYSTEM
+    // =============================================================================
+
+    // Bidirectional LayerMask ↔ ObjectLayer conversion for seamless integration
+
+    // LayerMask → ObjectLayer (enhanced with comprehensive mapping)
+    JPH::ObjectLayer mapLayerMaskToObjectLayer(uint32_t layerMask) const;
+
+    // ObjectLayer → LayerMask (reverse conversion for query results)
+    uint32_t mapObjectLayerToLayerMask(JPH::ObjectLayer objectLayer) const;
+
+    // LayerMask → BroadPhaseLayer (direct conversion for performance optimization)
+    JPH::BroadPhaseLayer mapLayerMaskToBroadPhaseLayer(uint32_t layerMask) const;
+
+    // ObjectLayer → BroadPhaseLayer (existing method, enhanced with documentation)
+    JPH::BroadPhaseLayer mapObjectLayerToBroadPhaseLayer(JPH::ObjectLayer objectLayer) const;
+
+    // Layer validation and debugging
+    bool isValidLayerMaskCombination(uint32_t layerMask) const;
+    std::vector<JPH::ObjectLayer> expandLayerMaskToObjectLayers(uint32_t layerMask) const;
+    std::string layerMaskToDebugString(uint32_t layerMask) const;
+    std::string objectLayerToDebugString(JPH::ObjectLayer objectLayer) const;
+
+    // =============================================================================
+    // TIME UNIT SAFETY SYSTEM
+    // =============================================================================
+
+    // Type-safe time conversion helpers for robust physics integration
+    // VulkanMon systems use MILLISECONDS, Jolt Physics expects SECONDS
+
+    // Time unit wrapper classes for compile-time safety
+    struct Milliseconds {
+        float value;
+        explicit Milliseconds(float ms) : value(ms) {}
+        static Milliseconds from(float ms) { return Milliseconds(ms); }
+    };
+
+    struct Seconds {
+        float value;
+        explicit Seconds(float s) : value(s) {}
+        static Seconds from(float s) { return Seconds(s); }
+    };
+
+    // Safe time conversion methods
+    static Seconds toSeconds(Milliseconds ms) {
+        return Seconds(ms.value / 1000.0f);
+    }
+
+    static Milliseconds toMilliseconds(Seconds s) {
+        return Milliseconds(s.value * 1000.0f);
+    }
+
+    // Physics-specific time handling
+    Seconds clampPhysicsTimestep(Milliseconds deltaTime) const;
+    bool isValidPhysicsTimestep(Milliseconds deltaTime) const;
+
+    // Time scale application with safety checks
+    Milliseconds applyTimeScale(Milliseconds deltaTime) const;
+
+    // Performance timing helpers
+    void recordTimingStart();
+    Milliseconds getElapsedTiming() const;
+
+    // Time unit validation and debugging
+    std::string timeToDebugString(Milliseconds ms) const;
+    std::string timeToDebugString(Seconds s) const;
+
+    // =============================================================================
+    // MEMBER VARIABLES
+    // =============================================================================
+
+    // World configuration
+    glm::vec3 worldGravity_{0.0f, -9.81f, 0.0f};  // World gravity vector
+    float timeScale_{1.0f};                        // Global time scaling factor
+
+    // Solver configuration
+    int velocityIterations_{8};                    // Velocity constraint solver iterations
+    int positionIterations_{3};                    // Position constraint solver iterations
+    uint32_t threadCount_{0};                      // Physics thread count (0 = auto-detect)
+
+    // System state
+    bool initialized_{false};                      // System initialization status
+    bool collisionEnabled_{true};                  // Global collision detection toggle
+    bool debugDraw_{false};                        // Debug visualization toggle
+
+    // Time unit safety tracking
+    mutable std::chrono::steady_clock::time_point lastTimingStart_; // Performance timing start point
+
+    // System references
+    SpatialSystem* spatialSystem_{nullptr};        // Spatial partitioning system reference
+
+    // =============================================================================
+    // JOLT PHYSICS SYSTEM
+    // =============================================================================
+
+    // Core Jolt Physics objects
+    std::unique_ptr<JPH::PhysicsSystem> joltPhysics_;
+    std::unique_ptr<JPH::TempAllocatorImpl> tempAllocator_;
+    std::unique_ptr<JPH::JobSystemThreadPool> jobSystem_;
+
+    // Jolt interface implementations
+    std::unique_ptr<BroadPhaseLayerInterfaceImpl> broadPhaseLayerInterface_;
+    std::unique_ptr<ObjectVsBroadPhaseLayerFilterImpl> objectVsBroadPhaseLayerFilter_;
+    std::unique_ptr<ObjectLayerPairFilterImpl> objectLayerPairFilter_;
+
+    // Entity mapping for Jolt integration
+    std::unordered_map<EntityID, JPH::BodyID> entityToBodyMap_;  // Entity -> Jolt Body mapping
+    std::unordered_map<JPH::BodyID, EntityID> bodyToEntityMap_;  // Jolt Body -> Entity mapping
+
+    // Performance tracking
+    PhysicsStats stats_;                           // Current frame statistics
+
+};
+
+} // namespace VulkanMon
