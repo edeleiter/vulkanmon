@@ -38,6 +38,7 @@ public:
     using LightingControlCallback = std::function<void(int key)>;
     using MaterialControlCallback = std::function<void(int key)>;
     using InspectorToggleCallback = std::function<void()>;
+    using ProjectileSpawnCallback = std::function<void(double mouseX, double mouseY)>;
 
     /**
      * Create InputHandler with ECS camera system and window references
@@ -78,11 +79,21 @@ public:
     /**
      * Process mouse movement input
      * Called when mouse position changes
-     * 
+     *
      * @param xpos Mouse X position in screen coordinates
      * @param ypos Mouse Y position in screen coordinates
      */
     void processMouseInput(double xpos, double ypos);
+
+    /**
+     * Process mouse button input
+     * Called when mouse buttons are pressed/released
+     *
+     * @param button Mouse button (GLFW_MOUSE_BUTTON_LEFT, GLFW_MOUSE_BUTTON_RIGHT, etc.)
+     * @param action GLFW_PRESS, GLFW_RELEASE, or GLFW_REPEAT
+     * @param mods Modifier keys (shift, ctrl, alt, etc.)
+     */
+    void processMouseButtonInput(int button, int action, int mods);
     
     /**
      * Process continuous input (held keys)
@@ -121,6 +132,13 @@ public:
      * @param callback Function to call when inspector toggle is requested (I key)
      */
     void setInspectorToggleCallback(InspectorToggleCallback callback);
+
+    /**
+     * Register projectile spawn callback
+     *
+     * @param callback Function to call when projectile spawn is requested (mouse click)
+     */
+    void setProjectileSpawnCallback(ProjectileSpawnCallback callback);
     
     /**
      * Reset mouse position tracking
@@ -188,6 +206,7 @@ private:
     LightingControlCallback lightingControlCallback_;
     MaterialControlCallback materialControlCallback_;
     InspectorToggleCallback inspectorToggleCallback_;
+    ProjectileSpawnCallback projectileSpawnCallback_;
     
     // Input processing helpers
     void handleCameraMovement(GLFWwindow* window, float deltaTime);

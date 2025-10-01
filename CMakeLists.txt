@@ -69,6 +69,8 @@ add_executable(vulkanmon
     src/systems/CreatureRenderSystem.cpp
     src/systems/CameraSystem.cpp
     src/systems/PhysicsSystem.cpp
+    src/systems/ProjectileSystem.cpp
+    src/materials/ProjectileMaterials.cpp
     src/debug/ECSInspector.cpp
     src/spatial/SpatialManager.cpp
     src/spatial/WorldConfig.cpp

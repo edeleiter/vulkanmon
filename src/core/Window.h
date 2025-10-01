@@ -31,6 +31,7 @@ public:
     // Callback type definitions for clean interface
     using KeyCallback = std::function<void(int key, int scancode, int action, int mods)>;
     using MouseCallback = std::function<void(double xpos, double ypos)>;
+    using MouseButtonCallback = std::function<void(int button, int action, int mods)>;
     using ResizeCallback = std::function<void(int width, int height)>;
 
     /**
@@ -103,14 +104,21 @@ public:
     
     /**
      * Register mouse movement callback
-     * 
+     *
      * @param callback Function to call on mouse movement
      */
     void setMouseCallback(MouseCallback callback);
-    
+
+    /**
+     * Register mouse button callback
+     *
+     * @param callback Function to call on mouse button events
+     */
+    void setMouseButtonCallback(MouseButtonCallback callback);
+
     /**
      * Register window resize callback
-     * 
+     *
      * @param callback Function to call on window resize
      */
     void setResizeCallback(ResizeCallback callback);
@@ -194,11 +202,13 @@ private:
     // Callbacks
     KeyCallback keyCallback_;
     MouseCallback mouseCallback_;
+    MouseButtonCallback mouseButtonCallback_;
     ResizeCallback resizeCallback_;
     
     // Static GLFW callbacks (bridge to member functions)
     static void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void glfwMouseCallback(GLFWwindow* window, double xpos, double ypos);
+    static void glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
     static void glfwResizeCallback(GLFWwindow* window, int width, int height);
 };
 

@@ -123,6 +123,31 @@ void InputHandler::processMouseInput(double xpos, double ypos) {
     }
 }
 
+void InputHandler::processMouseButtonInput(int button, int action, int mods) {
+    // Only process button press events (not release or repeat)
+    if (action != GLFW_PRESS) {
+        return;
+    }
+
+    // Handle left mouse button for projectile spawning
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (projectileSpawnCallback_) {
+            // Pass current mouse position to callback
+            projectileSpawnCallback_(lastMouseX_, lastMouseY_);
+            logInputAction("Projectile spawn requested (Left Click)");
+        }
+    }
+
+    // Handle right mouse button for alternative projectile types (future use)
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        if (projectileSpawnCallback_) {
+            // Could pass different parameters for different projectile types
+            projectileSpawnCallback_(lastMouseX_, lastMouseY_);
+            logInputAction("Alternative projectile spawn requested (Right Click)");
+        }
+    }
+}
+
 void InputHandler::processContinuousInput(GLFWwindow* window, float deltaTime) {
     if (!window || !cameraSystem_ || !world_) {
         return;
@@ -149,6 +174,11 @@ void InputHandler::setMaterialControlCallback(MaterialControlCallback callback) 
 void InputHandler::setInspectorToggleCallback(InspectorToggleCallback callback) {
     inspectorToggleCallback_ = callback;
     VKMON_DEBUG("Inspector toggle callback registered");
+}
+
+void InputHandler::setProjectileSpawnCallback(ProjectileSpawnCallback callback) {
+    projectileSpawnCallback_ = callback;
+    VKMON_DEBUG("Projectile spawn callback registered");
 }
 
 void InputHandler::resetMousePosition() {

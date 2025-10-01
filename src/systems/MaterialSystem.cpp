@@ -4,7 +4,9 @@
 #include "../utils/Logger.h"
 #include <stdexcept>
 
-MaterialSystem::MaterialSystem(std::shared_ptr<VulkanMon::ResourceManager> resourceManager)
+namespace VulkanMon {
+
+MaterialSystem::MaterialSystem(std::shared_ptr<ResourceManager> resourceManager)
     : resourceManager(resourceManager), descriptorSetLayout(VK_NULL_HANDLE), descriptorPool(VK_NULL_HANDLE) {
     VKMON_DEBUG("MaterialSystem: Initializing material management system");
 }
@@ -224,6 +226,8 @@ void MaterialSystem::cleanup() {
     
     materials.clear();
     materialNameMap.clear();
-    
+
     VKMON_INFO("MaterialSystem: Cleanup completed");
 }
+
+} // namespace VulkanMon

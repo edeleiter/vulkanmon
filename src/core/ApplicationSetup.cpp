@@ -106,6 +106,32 @@ void Application::initializeInputSystem() {
         }
     });
 
+    // Connect mouse button callback for projectile spawning
+    window_->setMouseButtonCallback([this](int button, int action, int mods) {
+        if (inputHandler_) {
+            inputHandler_->processMouseButtonInput(button, action, mods);
+        }
+    });
+
+    // Connect projectile spawn callback from InputHandler to ProjectileSystem
+    if (projectileSystem_) {
+        inputHandler_->setProjectileSpawnCallback([this](double mouseX, double mouseY) {
+            if (projectileSystem_ && window_) {
+                uint32_t width = window_->getWidth();
+                uint32_t height = window_->getHeight();
+                projectileSystem_->spawnProjectileFromMouse(
+                    static_cast<float>(mouseX),
+                    static_cast<float>(mouseY),
+                    static_cast<float>(width),
+                    static_cast<float>(height),
+                    world_->getEntityManager(),
+                    ProjectileComponent::Type::PHYSICS_OBJECT
+                );
+            }
+        });
+        VKMON_INFO("Projectile spawn callback connected: Mouse clicks will spawn projectiles");
+    }
+
     // Connect window resize callback
     window_->setResizeCallback([this](int width, int height) {
         handleWindowResize(width, height);
@@ -153,6 +179,14 @@ void Application::initializeECS() {
     physicsSystem_->initialize(world_->getEntityManager()); // Initialize with default gravity
     VKMON_INFO("PhysicsSystem added to World and initialized");
 
+    // Add projectile system for mouse-click projectile spawning
+    // Note: MaterialSystem will be connected after renderer systems are available
+    projectileSystem_ = world_->addSystem<ProjectileSystem>(cameraSystem_, nullptr);
+    projectileSystem_->setPhysicsSystem(physicsSystem_);
+    VKMON_INFO("ProjectileSystem added to World and connected to physics/camera (MaterialSystem deferred)");
+
+    // MaterialSystem connection will be done after renderer initialization
+
     // Add CreatureDetectionSystem for AI behavior and spatial detection
     // creatureDetectionSystem_ = world_->addSystem<CreatureDetectionSystem>();
 
@@ -179,339 +213,177 @@ void Application::initializeECS() {
     VKMON_INFO("ECS systems initialized successfully");
 }
 
-void Application::createTestScene() {
+void Application::connectDeferredSystems() {
+    VKMON_DEBUG("Connecting deferred systems with renderer resources...");
+
+    // Connect ProjectileSystem to MaterialSystem
+    if (projectileSystem_ && materialSystem_) {
+        projectileSystem_->setMaterialSystem(materialSystem_.get());
+        VKMON_INFO("ProjectileSystem: MaterialSystem connected");
+    } else if (projectileSystem_) {
+        VKMON_WARNING("ProjectileSystem: MaterialSystem not available for connection");
+    }
+
+    VKMON_INFO("Deferred system connections completed");
+}
+
+void Application::createProjectileTestScene() {
     if (!world_) {
-        VKMON_WARNING("Cannot create test scene: ECS World not initialized");
+        VKMON_WARNING("Cannot create projectile test scene: ECS World not initialized");
         return;
     }
 
-    VKMON_INFO("Creating Jolt Physics Demonstration Scene...");
-    VKMON_INFO("Showcasing: Different shapes, materials, physics behaviors, and spatial queries");
+    VKMON_INFO("Creating Clean Projectile Test Scene...");
+    VKMON_INFO("Focus: Mouse click projectile spawning and physics validation");
 
     // =========================================================================
-    // JOLT PHYSICS DEMONSTRATION SCENE
+    // CLEAN PROJECTILE TEST SCENE
     // =========================================================================
 
     size_t totalEntities = 0;
 
     // =========================================================================
-    // GROUND PLANE - CREATE FIRST so it's ready when objects start falling
+    // GROUND PLANE - Simple static collision surface
     // =========================================================================
-    VKMON_INFO("Creating ground plane collision first...");
+    VKMON_INFO("Creating simple ground plane...");
 
     EntityID groundEntity = world_->createEntity();
-
-    // Create visual ground plane
     Transform groundTransform;
-
-    // Position ground plane RIGHT AT ORIGIN for obvious collision test
-    groundTransform.position = glm::vec3(0.0f, 0.0f, 0.0f); // Ground at origin level - impossible to miss!
+    groundTransform.position = glm::vec3(0.0f, -2.0f, 0.0f);
     groundTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
-    groundTransform.scale = glm::vec3(50.0f, 2.0f, 50.0f); // MASSIVE thick ground - impossible to fall through
+    groundTransform.scale = glm::vec3(20.0f, 1.0f, 20.0f);
     world_->addComponent(groundEntity, groundTransform);
 
-    // Make ground plane visible
     Renderable groundRenderable;
-    groundRenderable.meshPath = "plane.obj"; // Use plane mesh
+    groundRenderable.meshPath = "plane.obj";
     groundRenderable.texturePath = "default";
-    groundRenderable.materialId = 3; // Chrome for visibility
+    groundRenderable.materialId = 0; // Default material
     groundRenderable.isVisible = true;
-    groundRenderable.renderLayer = 0;
-    groundRenderable.lodDistance = 1000.0f;
     world_->addComponent(groundEntity, groundRenderable);
 
-    // Add spatial component for ground
     SpatialComponent groundSpatial;
     groundSpatial.spatialLayers = LayerMask::Environment;
     groundSpatial.boundingRadius = 15.0f;
     groundSpatial.behavior = SpatialBehavior::STATIC;
     world_->addComponent(groundEntity, groundSpatial);
 
-    // CRITICAL: Add physics components FIRST
     RigidBodyComponent groundRigidBody = RigidBodyComponent::staticBody();
     world_->addComponent(groundEntity, groundRigidBody);
 
-    // MASSIVE box collision that matches the visual - impossible to miss
-    CollisionComponent groundCollision = CollisionComponent::box(glm::vec3(50.0f, 2.0f, 50.0f), LayerMask::Environment);
+    CollisionComponent groundCollision = CollisionComponent::box(glm::vec3(20.0f, 1.0f, 20.0f), LayerMask::Environment);
     groundCollision.isStatic = true;
     world_->addComponent(groundEntity, groundCollision);
 
-    VKMON_INFO("MASSIVE ground plane created at Y=0.0 - 50x2x50 box collision (impossible to miss!)");
     totalEntities++;
+    VKMON_INFO("Ground plane created at Y=-2.0");
 
     // =========================================================================
-    // SECTION 1: DIFFERENT COLLISION SHAPES DEMO
+    // TARGET CUBES - Simple targets for projectile testing
     // =========================================================================
-    VKMON_INFO("Section 1: Creating different collision shapes falling from height...");
+    VKMON_INFO("Creating target cubes for projectile testing...");
 
-    // Row 1: Spheres - Different masses and materials
-    for (int i = 0; i < 5; ++i) {
-        EntityID sphereEntity = world_->createEntity();
+    // Create 3 target cubes at different distances
+    std::vector<glm::vec3> targetPositions = {
+        glm::vec3(-5.0f, 2.0f, -10.0f),  // Left target
+        glm::vec3(0.0f, 2.0f, -15.0f),   // Center target
+        glm::vec3(5.0f, 2.0f, -10.0f)    // Right target
+    };
 
-        Transform sphereTransform;
-        sphereTransform.position = glm::vec3(-8.0f + i * 2.0f, 15.0f, -8.0f);
-        sphereTransform.scale = glm::vec3(0.6f);
-        world_->addComponent(sphereEntity, sphereTransform);
-
-        // Varied physics properties
-        RigidBodyComponent sphereRigidBody = RigidBodyComponent::dynamic(1.0f + i * 0.5f); // Mass: 1.0, 1.5, 2.0, 2.5, 3.0
-        sphereRigidBody.restitution = 0.1f + i * 0.2f; // Bouncy progression: 0.1 to 0.9
-        sphereRigidBody.friction = 0.3f + i * 0.15f;   // Friction progression
-        world_->addComponent(sphereEntity, sphereRigidBody);
-
-        CollisionComponent sphereCollision = CollisionComponent::sphere(0.6f, LayerMask::Creatures);
-        world_->addComponent(sphereEntity, sphereCollision);
-
-        // Visual appearance
-        Renderable sphereRenderable;
-        sphereRenderable.meshPath = "sphere.obj";
-        sphereRenderable.materialId = i % 4; // Cycle through materials
-        sphereRenderable.isVisible = true;
-        world_->addComponent(sphereEntity, sphereRenderable);
-
-        // Spatial tracking
-        SpatialComponent sphereSpatial(0.8f, SpatialBehavior::DYNAMIC, LayerMask::Creatures);
-        world_->addComponent(sphereEntity, sphereSpatial);
-
-        totalEntities++;
-    }
-
-    // Row 2: Boxes - Different sizes and orientations
-    for (int i = 0; i < 4; ++i) {
-        EntityID boxEntity = world_->createEntity();
-
-        Transform boxTransform;
-        boxTransform.position = glm::vec3(-6.0f + i * 3.0f, 12.0f, -4.0f);
-        boxTransform.setRotationEuler(i * 15.0f, i * 25.0f, i * 10.0f); // Varied rotations
-        boxTransform.scale = glm::vec3(0.8f + i * 0.2f); // Different sizes
-        world_->addComponent(boxEntity, boxTransform);
-
-        RigidBodyComponent boxRigidBody = RigidBodyComponent::dynamic(2.0f);
-        boxRigidBody.restitution = 0.2f;
-        boxRigidBody.friction = 0.8f;
-        world_->addComponent(boxEntity, boxRigidBody);
-
-        CollisionComponent boxCollision = CollisionComponent::box(glm::vec3(0.8f + i * 0.2f), LayerMask::Creatures);
-        world_->addComponent(boxEntity, boxCollision);
-
-        Renderable boxRenderable;
-        boxRenderable.meshPath = "cube.obj";
-        boxRenderable.materialId = (i + 1) % 4;
-        boxRenderable.isVisible = true;
-        world_->addComponent(boxEntity, boxRenderable);
-
-        SpatialComponent boxSpatial(1.0f + i * 0.2f, SpatialBehavior::DYNAMIC, LayerMask::Creatures);
-        world_->addComponent(boxEntity, boxSpatial);
-
-        totalEntities++;
-    }
-
-    // Row 3: Capsules - Character-like physics
-    for (int i = 0; i < 3; ++i) {
-        EntityID capsuleEntity = world_->createEntity();
-
-        Transform capsuleTransform;
-        capsuleTransform.position = glm::vec3(-4.0f + i * 4.0f, 18.0f, 0.0f);
-        capsuleTransform.scale = glm::vec3(0.5f, 1.2f, 0.5f); // Tall and narrow
-        world_->addComponent(capsuleEntity, capsuleTransform);
-
-        // Character-like physics
-        RigidBodyComponent capsuleRigidBody = RigidBodyComponent::dynamic(1.5f);
-        capsuleRigidBody.restitution = 0.1f; // Low bounce (character-like)
-        capsuleRigidBody.friction = 0.9f;    // High friction (good grip)
-        capsuleRigidBody.linearDamping = 0.3f; // Natural slowdown
-        world_->addComponent(capsuleEntity, capsuleRigidBody);
-
-        CollisionComponent capsuleCollision = CollisionComponent::capsule(0.5f, 2.4f, LayerMask::Creatures);
-        world_->addComponent(capsuleEntity, capsuleCollision);
-
-        Renderable capsuleRenderable;
-        capsuleRenderable.meshPath = "sphere.obj"; // Use sphere as capsule approximation
-        capsuleRenderable.materialId = (i + 2) % 4;
-        capsuleRenderable.isVisible = true;
-        world_->addComponent(capsuleEntity, capsuleRenderable);
-
-        // Add creature physics for character behavior
-        CreaturePhysicsComponent creaturePhysics = CreaturePhysicsComponent::createLandCreature(4.0f, 1.5f);
-        world_->addComponent(capsuleEntity, creaturePhysics);
-
-        SpatialComponent capsuleSpatial(0.8f, SpatialBehavior::DYNAMIC, LayerMask::Creatures);
-        world_->addComponent(capsuleEntity, capsuleSpatial);
-
-        totalEntities++;
-    }
-
-    // =========================================================================
-    // SECTION 2: STATIC ENVIRONMENT - Obstacles and Platforms
-    // =========================================================================
-    VKMON_INFO("Section 2: Creating static environment obstacles...");
-
-    // Static platform 1
-    EntityID platform1 = world_->createEntity();
-    Transform platform1Transform;
-    platform1Transform.position = glm::vec3(-5.0f, 8.0f, -2.0f);
-    platform1Transform.scale = glm::vec3(3.0f, 0.5f, 2.0f);
-    world_->addComponent(platform1, platform1Transform);
-
-    RigidBodyComponent platform1RigidBody = RigidBodyComponent::staticBody();
-    world_->addComponent(platform1, platform1RigidBody);
-
-    CollisionComponent platform1Collision = CollisionComponent::box(glm::vec3(3.0f, 0.5f, 2.0f), LayerMask::Environment);
-    world_->addComponent(platform1, platform1Collision);
-
-    Renderable platform1Renderable;
-    platform1Renderable.meshPath = "cube.obj";
-    platform1Renderable.materialId = 3; // Chrome material
-    platform1Renderable.isVisible = true;
-    world_->addComponent(platform1, platform1Renderable);
-
-    // Static platform 2
-    EntityID platform2 = world_->createEntity();
-    Transform platform2Transform;
-    platform2Transform.position = glm::vec3(5.0f, 6.0f, 2.0f);
-    platform2Transform.scale = glm::vec3(2.5f, 0.5f, 3.0f);
-    world_->addComponent(platform2, platform2Transform);
-
-    RigidBodyComponent platform2RigidBody = RigidBodyComponent::staticBody();
-    world_->addComponent(platform2, platform2RigidBody);
-
-    CollisionComponent platform2Collision = CollisionComponent::box(glm::vec3(2.5f, 0.5f, 3.0f), LayerMask::Environment);
-    world_->addComponent(platform2, platform2Collision);
-
-    Renderable platform2Renderable;
-    platform2Renderable.meshPath = "cube.obj";
-    platform2Renderable.materialId = 2; // Ruby material
-    platform2Renderable.isVisible = true;
-    world_->addComponent(platform2, platform2Renderable);
-
-    totalEntities += 2;
-
-    // =========================================================================
-    // SECTION 3: PHYSICS MATERIAL SHOWCASE
-    // =========================================================================
-    VKMON_INFO("Section 3: Creating physics material demonstration...");
-
-    // Bouncy balls with different restitution
-    std::vector<float> bounciness = {0.1f, 0.3f, 0.6f, 0.9f}; // Low to high bounce
-    for (int i = 0; i < 4; ++i) {
-        EntityID bounceEntity = world_->createEntity();
-
-        Transform bounceTransform;
-        bounceTransform.position = glm::vec3(6.0f + i * 1.5f, 20.0f, -6.0f);
-        bounceTransform.scale = glm::vec3(0.4f);
-        world_->addComponent(bounceEntity, bounceTransform);
-
-        RigidBodyComponent bounceRigidBody = RigidBodyComponent::dynamic(0.8f);
-        bounceRigidBody.restitution = bounciness[i];
-        bounceRigidBody.friction = 0.4f;
-        world_->addComponent(bounceEntity, bounceRigidBody);
-
-        CollisionComponent bounceCollision = CollisionComponent::sphere(0.4f, LayerMask::Items);
-        world_->addComponent(bounceEntity, bounceCollision);
-
-        Renderable bounceRenderable;
-        bounceRenderable.meshPath = "sphere.obj";
-        bounceRenderable.materialId = i; // Different colors for different bounce
-        bounceRenderable.isVisible = true;
-        world_->addComponent(bounceEntity, bounceRenderable);
-
-        SpatialComponent bounceSpatial(0.6f, SpatialBehavior::DYNAMIC, LayerMask::Items);
-        world_->addComponent(bounceEntity, bounceSpatial);
-
-        totalEntities++;
-    }
-
-    VKMON_INFO("Section 1-3 Complete: " + std::to_string(totalEntities) + " physics demonstration entities created");
-    VKMON_INFO("Physics Demo Scene Layout:");
-    VKMON_INFO("  - Row 1: 5 spheres falling from height 15 (different masses & bounce)");
-    VKMON_INFO("  - Row 2: 4 boxes falling from height 12 (different sizes & orientations)");
-    VKMON_INFO("  - Row 3: 3 capsules falling from height 18 (character-like physics)");
-    VKMON_INFO("  - Static platforms at heights 8 and 6 to catch falling objects");
-    VKMON_INFO("  - 4 bouncy balls from height 20 (bounce test: 0.1, 0.3, 0.6, 0.9)");
-    VKMON_INFO("  - Ground plane at Y=-4 to catch everything");
-    VKMON_INFO("  - Camera at (0,10,20) looking down at the action");
-
-    // =========================================================================
-    // SECTION 4: SPATIAL QUERY DEMONSTRATION
-    // =========================================================================
-    // Additional target objects for spatial query testing
-    for (int i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < targetPositions.size(); i++) {
         EntityID targetEntity = world_->createEntity();
 
         Transform targetTransform;
-        targetTransform.position = glm::vec3(-2.0f + i * 4.0f, 3.0f, 4.0f);
-        targetTransform.scale = glm::vec3(0.7f);
+        targetTransform.position = targetPositions[i];
+        targetTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
+        targetTransform.scale = glm::vec3(1.0f, 1.0f, 1.0f);
         world_->addComponent(targetEntity, targetTransform);
 
-        RigidBodyComponent targetRigidBody = RigidBodyComponent::kinematic(); // Controlled movement for queries
-        world_->addComponent(targetEntity, targetRigidBody);
-
-        CollisionComponent targetCollision = CollisionComponent::sphere(0.7f, LayerMask::Items);
-        world_->addComponent(targetEntity, targetCollision);
-
         Renderable targetRenderable;
-        targetRenderable.meshPath = "sphere.obj";
-        targetRenderable.materialId = 1; // Gold material for visibility
+        targetRenderable.meshPath = "cube.obj";
+        targetRenderable.texturePath = "default";
+        targetRenderable.materialId = 1 + static_cast<uint32_t>(i); // Different materials
         targetRenderable.isVisible = true;
         world_->addComponent(targetEntity, targetRenderable);
 
-        // These will be used for spatial query demonstrations
-        SpatialComponent targetSpatial(0.9f, SpatialBehavior::DYNAMIC, LayerMask::Items);
+        SpatialComponent targetSpatial;
+        targetSpatial.spatialLayers = LayerMask::Environment;
+        targetSpatial.boundingRadius = 1.0f;
+        targetSpatial.behavior = SpatialBehavior::STATIC;  // STATIC - targets don't move!
         world_->addComponent(targetEntity, targetSpatial);
+
+        // NO PHYSICS - these are static visual targets, not dynamic physics objects
+        // RigidBodyComponent targetRigidBody = RigidBodyComponent::dynamic(1.0f);
+        // world_->addComponent(targetEntity, targetRigidBody);
+        // CollisionComponent targetCollision = CollisionComponent::box(glm::vec3(1.0f, 1.0f, 1.0f), LayerMask::Environment);
+        // world_->addComponent(targetEntity, targetCollision);
 
         totalEntities++;
     }
 
-    VKMON_INFO("Section 4: Spatial query targets created");
+    VKMON_INFO("Created 3 target cubes for projectile testing");
+    // =========================================================================
+    // CAMERA SETUP - Positioned for projectile testing
+    // =========================================================================
+    VKMON_INFO("Setting up camera for projectile testing...");
 
-    // =========================================================================
-    // CAMERA SETUP - Positioned to see physics demonstration clearly
-    // =========================================================================
     EntityID cameraEntity = world_->createEntity();
+
     Transform cameraTransform;
-    cameraTransform.position = glm::vec3(0.0f, 10.0f, 20.0f);  // Closer view of physics demo
-    cameraTransform.setRotationEuler(-20.0f, 0.0f, 0.0f); // Angled down to see falling objects and ground
-    cameraTransform.scale = glm::vec3(1.0f);
+    cameraTransform.position = glm::vec3(0.0f, 5.0f, 10.0f);  // Good position to see targets
+    cameraTransform.setRotationEuler(-15.0f, 0.0f, 0.0f);      // Look down slightly
     world_->addComponent(cameraEntity, cameraTransform);
 
-    Camera cameraComponent;
-    cameraComponent.fov = 45.0f;  // Much narrower FOV for less distortion - standard value
-    cameraComponent.nearPlane = Config::Camera::DEFAULT_NEAR_PLANE;
-    cameraComponent.farPlane = Config::Camera::DEFAULT_FAR_PLANE;
-    cameraComponent.aspectRatio = 16.0f / 9.0f;
-    cameraComponent.isActive = true;
-    cameraComponent.updateProjectionMatrix();
-    world_->addComponent(cameraEntity, cameraComponent);
+    Camera camera;
+    camera.fov = 75.0f;
+    camera.nearPlane = 0.1f;
+    camera.farPlane = 1000.0f;
+    camera.priority = 1;
+    camera.isActive = true;
+    world_->addComponent(cameraEntity, camera);
 
     SpatialComponent cameraSpatial;
     cameraSpatial.spatialLayers = LayerMask::Camera;
-    cameraSpatial.boundingRadius = 0.1f;
+    cameraSpatial.boundingRadius = 1.0f;
     cameraSpatial.behavior = SpatialBehavior::DYNAMIC;
     world_->addComponent(cameraEntity, cameraSpatial);
 
-    // Create test player entity for creature detection testing
-    EntityID playerEntity = world_->createEntity();
+    totalEntities++;
 
-    // Add Transform component positioned at center of creature grid
-    Transform playerTransform;
-    playerTransform.position = glm::vec3(0.0f, 1.0f, 0.0f); // Center of 6x6 grid, slightly elevated
-    playerTransform.setRotationEuler(0.0f, 0.0f, 0.0f);
-    playerTransform.scale = glm::vec3(1.0f);
-    world_->addComponent(playerEntity, playerTransform);
+    VKMON_INFO("Clean Projectile Test Scene Layout:");
+    VKMON_INFO("  - Ground plane at Y=-2.0");
+    VKMON_INFO("  - 3 target cubes positioned at different distances");
+    VKMON_INFO("  - Camera at (0,5,10) looking at targets");
+    VKMON_INFO("  - Total entities: " + std::to_string(totalEntities));
+    VKMON_INFO("  - Ready for mouse click projectile testing");
 
-    // Add SpatialComponent with Player layer
-    SpatialComponent playerSpatial(2.0f, SpatialBehavior::DYNAMIC, LayerMask::Player);
-    world_->addComponent(playerEntity, playerSpatial);
+    // =========================================================================
+    // ENHANCED LIGHTING SETUP - Ensure scene is visible
+    // =========================================================================
+    VKMON_INFO("Setting up enhanced lighting for projectile test scene...");
 
-    VKMON_INFO("Physics demonstration scene setup complete: " + std::to_string(totalEntities) + " entities created");
+    if (lightingSystem_) {
+        // Set bright directional light
+        lightingSystem_->setDirectionalLight(
+            glm::vec3(-0.3f, -1.0f, -0.4f),  // Direction (slightly angled)
+            2.0f,                             // High intensity
+            glm::vec3(1.0f, 1.0f, 1.0f)      // White light
+        );
+
+        // Set bright ambient lighting
+        lightingSystem_->setAmbientLight(
+            glm::vec3(0.4f, 0.4f, 0.5f),     // Slightly blue ambient
+            0.6f                              // High ambient intensity
+        );
+
+        VKMON_INFO("Enhanced lighting configured: Directional(2.0x) + Ambient(0.6x)");
+    } else {
+        VKMON_WARNING("LightingSystem not available - using default lighting");
+    }
 
     // Scene setup complete - physics bodies will be created automatically on first update
-
-    // Preload all models before declaring scene ready
     preloadSceneAssets();
 
-    VKMON_INFO("createTestScene() completing successfully");
-    // Scene setup complete - main application will log ready message
+    VKMON_INFO("createProjectileTestScene() completing successfully");
 }
 
 void Application::preloadSceneAssets() {
@@ -544,28 +416,30 @@ void Application::preloadSceneAssets() {
                std::to_string(uniqueMeshPaths.size()) + " unique models");
 
     // Preload each unique model
-    int successCount = 0;
-    int failureCount = 0;
-    auto startTime = std::chrono::high_resolution_clock::now();
+    size_t successCount = 0;
+    size_t failureCount = 0;
+    double totalLoadTime = 0.0;
 
     for (const std::string& meshPath : uniqueMeshPaths) {
+        VKMON_INFO("Preloading model: " + meshPath);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
         if (renderer_->preloadModel(meshPath)) {
+            auto end = std::chrono::high_resolution_clock::now();
+            double loadTime = std::chrono::duration<double, std::milli>(end - start).count();
+            totalLoadTime += loadTime;
+
+            VKMON_INFO("Model preloaded successfully in " + std::to_string(loadTime) + "ms: " + meshPath);
             successCount++;
         } else {
+            VKMON_ERROR("Failed to preload model: " + meshPath);
             failureCount++;
         }
     }
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto totalTimeMs = std::chrono::duration<float, std::milli>(endTime - startTime).count();
-
     VKMON_INFO("Scene asset preloading complete: " +
                std::to_string(successCount) + " models loaded successfully, " +
                std::to_string(failureCount) + " failures, " +
-               std::to_string(totalTimeMs) + "ms total");
-
-    // Also preload physics bodies to prevent first-frame delay
-    if (physicsSystem_) {
-        physicsSystem_->preloadPhysicsBodies(world_->getEntityManager());
-    }
+               std::to_string(totalLoadTime) + "ms total");
 }

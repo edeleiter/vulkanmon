@@ -16,6 +16,7 @@
 #include "../systems/CameraSystem.h"
 #include "../systems/SpatialSystem.h"
 #include "../systems/PhysicsSystem.h"
+#include "../systems/ProjectileSystem.h"
 #include "../game/CreatureDetectionSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
@@ -197,6 +198,7 @@ private:
     CameraSystem* cameraSystem_ = nullptr;        // Owned by World
     SpatialSystem* spatialSystem_ = nullptr;  // Owned by World
     PhysicsSystem* physicsSystem_ = nullptr;  // Owned by World
+    ProjectileSystem* projectileSystem_ = nullptr;  // Owned by World
     CreatureDetectionSystem* creatureDetectionSystem_ = nullptr;  // Owned by World
 
     // Debug tools
@@ -229,7 +231,8 @@ private:
     void initializeRenderer();
     void initializeInputSystem();
     void initializeECS();           // Initialize ECS World and systems
-    void createTestScene();         // Create test entities for ECS
+    void connectDeferredSystems();  // Connect systems that need renderer resources
+    void createProjectileTestScene(); // Create clean projectile test scene
     void preloadSceneAssets();      // Preload all models used by Renderable components
 
     // Main loop methods

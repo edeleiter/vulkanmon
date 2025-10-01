@@ -1,0 +1,415 @@
+[19:35:12.295] [INFO ] VulkanMon starting up...
+[19:35:12.295] [INFO ] Initializing GLFW window system...
+[19:35:12.303] [INFO ] GLFW window initialized successfully
+[19:35:12.304] [INFO ] Legacy camera initialization removed - ECS camera system active
+[19:35:12.304] [INFO ] VulkanRenderer created
+[19:35:12.304] [INFO ] Initializing Vulkan renderer...
+[19:35:12.387] [INFO ] Creating Vulkan surface for window...
+[19:35:12.387] [INFO ] Vulkan surface created successfully
+[19:35:12.387] [INFO ] Selecting physical device and creating logical device...
+[19:35:12.389] [INFO ] Selected GPU: NVIDIA GeForce RTX 5070 Ti
+[19:35:12.447] [INFO ] Swap chain created successfully with 3 images
+[19:35:12.447] [INFO ] Creating render pass...
+[19:35:12.447] [INFO ] Creating global descriptor set layout (UBO, texture, lighting)...
+[19:35:12.447] [INFO ] Global descriptor set layout created successfully
+[19:35:12.447] [INFO ] Creating material descriptor set layout (per-material data)...
+[19:35:12.447] [INFO ] Material descriptor set layout created successfully
+[19:35:12.447] [INFO ] Creating legacy descriptor set layout...
+[19:35:12.447] [INFO ] Legacy descriptor set layout created successfully
+[19:35:12.448] [INFO ] Shaders loaded successfully
+[19:35:12.448] [INFO ] Creating graphics pipeline...
+[19:35:12.449] [INFO ] Creating depth resources...
+[19:35:12.449] [INFO ] Depth buffer created successfully
+[19:35:12.449] [INFO ] Command pool created successfully
+[19:35:12.449] [INFO ] Initializing core engine systems...
+[RESOURCE MANAGER] Initialized for device
+[19:35:12.450] [INFO ] Found assets directory: D:\ws\vulkanmon\assets
+[RESOURCE MANAGER] Initialized for device
+[19:35:12.450] [INFO ] AssetManager initialized with root path: D:\ws\vulkanmon\assets/
+[19:35:12.450] [INFO ] ModelLoader initialized with Assimp support
+[19:35:12.450] [INFO ] Initializing LightingSystem
+[19:35:12.450] [INFO ] Creating lighting uniform buffers
+[19:35:12.450] [INFO ] LightingSystem buffers created successfully
+[19:35:12.451] [INFO ] MaterialSystem: Created material 0
+[19:35:12.451] [INFO ] Core engine systems initialized successfully!
+[19:35:12.451] [INFO ] Creating GPU instance buffer for 1000 creatures
+[19:35:12.451] [INFO ] GPU instance buffer created: 93 KB
+[19:35:12.452] [INFO ] Texture sampler created successfully
+[19:35:12.452] [INFO ] Creating descriptor pool...
+[19:35:12.452] [INFO ] Descriptor pool created successfully
+[19:35:12.452] [INFO ] Creating descriptor set...
+[19:35:12.452] [INFO ] Descriptor set created successfully
+[19:35:12.452] [INFO ] Creating global descriptor pool (UBO, texture, lighting)...
+[19:35:12.452] [INFO ] Global descriptor pool created successfully
+[19:35:12.452] [INFO ] Creating global descriptor set (UBO, texture, lighting)...
+[19:35:12.452] [INFO ] Global descriptor set created successfully
+[19:35:12.452] [INFO ] Creating command buffers...
+[19:35:12.452] [INFO ] Command buffers allocated successfully
+[19:35:12.452] [INFO ] Recording command buffers...
+[19:35:12.452] [INFO ] Drawing commands recorded successfully
+[19:35:12.452] [INFO ] Creating synchronization objects...
+[19:35:12.452] [INFO ] Sync objects created successfully
+[19:35:12.452] [INFO ] Vulkan initialization completed
+[19:35:12.452] [INFO ] VulkanRenderer initialization completed successfully
+[19:35:12.452] [INFO ] Initializing ImGui debug interface...
+[19:35:12.455] [INFO ] ImGui debug interface initialized successfully
+[19:35:12.456] [INFO ] ImGui initialization completed successfully
+[19:35:12.456] [INFO ] CreatureRenderSystem initialized - GPU instancing enabled
+[19:35:12.456] [INFO ] Target performance: 200+ creatures at 60+ FPS
+[19:35:12.456] [INFO ] CreatureRenderSystem: Frustum culling DISABLED for stress test performance
+[19:35:12.456] [INFO ] Using world config: Test World bounds (-30.000000,-5.000000,-30.000000) to (30.000000,35.000000,30.000000)
+[19:35:12.456] [INFO ] SpatialManager initialized with world bounds
+[19:35:12.456] [INFO ] SpatialSystem initialized with world bounds
+[19:35:12.456] [INFO ] Initializing PhysicsSystem with default gravity
+[19:35:12.456] [INFO ] Initializing Jolt Physics system...
+[19:35:12.458] [INFO ] Jolt collision layers configured
+[19:35:12.458] [INFO ] Jolt Physics initialized with 15 threads
+[19:35:12.458] [INFO ] PhysicsSystem initialized successfully
+[19:35:12.458] [INFO ] PhysicsSystem added to World and initialized
+[19:35:12.458] [WARN ] ProjectileSystem created with null MaterialSystem - will use default materials
+[19:35:12.458] [INFO ] ProjectileSystem initialized successfully
+[19:35:12.458] [INFO ] ProjectileSystem: PhysicsSystem connected
+[19:35:12.458] [INFO ] ProjectileSystem added to World and connected to physics/camera (MaterialSystem deferred)
+[19:35:12.458] [INFO ] RenderSystem: CameraSystem reference updated
+[19:35:12.458] [INFO ] RenderSystem: SpatialSystem reference updated
+[19:35:12.458] [INFO ] CreatureRenderSystem: CameraSystem reference updated
+[19:35:12.458] [INFO ] CreatureRenderSystem: SpatialSystem reference updated
+[19:35:12.458] [INFO ] World: All system dependencies connected successfully
+[19:35:12.458] [INFO ] System dependency connection completed via World::connectSystems()
+[19:35:12.458] [INFO ] ECS Inspector initialized successfully
+[19:35:12.458] [INFO ] ECS systems initialized successfully
+[19:35:12.458] [INFO ] ProjectileSystem: MaterialSystem connected and material manager created
+[19:35:12.458] [INFO ] ProjectileSystem: MaterialSystem connected
+[19:35:12.458] [INFO ] Deferred system connections completed
+[19:35:12.458] [INFO ] InputHandler initialized with ECS camera system
+[19:35:12.458] [INFO ] InputHandler initialized with ECS camera system
+[19:35:12.458] [INFO ] Projectile spawn callback connected: Mouse clicks will spawn projectiles
+[19:35:12.458] [INFO ] System callbacks connected
+[19:35:12.458] [INFO ] Input system initialized
+[19:35:12.458] [INFO ] Creating Clean Projectile Test Scene...
+[19:35:12.458] [INFO ] Focus: Mouse click projectile spawning and physics validation
+[19:35:12.458] [INFO ] Creating simple ground plane...
+[19:35:12.458] [INFO ] Ground plane created at Y=-2.0
+[19:35:12.458] [INFO ] Creating target cubes for projectile testing...
+[19:35:12.458] [INFO ] Created 3 target cubes for projectile testing
+[19:35:12.458] [INFO ] Setting up camera for projectile testing...
+[19:35:12.458] [INFO ] Clean Projectile Test Scene Layout:
+[19:35:12.458] [INFO ]   - Ground plane at Y=-2.0
+[19:35:12.458] [INFO ]   - 3 target cubes positioned at different distances
+[19:35:12.458] [INFO ]   - Camera at (0,5,10) looking at targets
+[19:35:12.458] [INFO ]   - Total entities: 5
+[19:35:12.458] [INFO ]   - Ready for mouse click projectile testing
+[19:35:12.458] [INFO ] Setting up enhanced lighting for projectile test scene...
+[19:35:12.458] [INFO ] Enhanced lighting configured: Directional(2.0x) + Ambient(0.6x)
+[19:35:12.458] [INFO ] Preloading all scene assets during initialization...
+[19:35:12.458] [INFO ] Found 4 renderable entities using 2 unique models
+[19:35:12.458] [INFO ] Preloading model: cube.obj
+[19:35:12.458] [INFO ] Preloading model: cube.obj
+[19:35:12.458] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/cube.obj
+[19:35:12.463] [INFO ] Model loaded: cube.obj (1 meshes, 24 vertices)
+[19:35:12.463] [INFO ] Model loaded and cached: cube.obj
+[19:35:12.463] [INFO ] Model preloaded successfully in 4.828900ms: cube.obj
+[19:35:12.463] [INFO ] Model preloaded successfully in 4.844400ms: cube.obj
+[19:35:12.463] [INFO ] Preloading model: plane.obj
+[19:35:12.463] [INFO ] Preloading model: plane.obj
+[19:35:12.463] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/plane.obj
+[19:35:12.468] [INFO ] Model loaded: plane.obj (1 meshes, 25 vertices)
+[19:35:12.468] [INFO ] Model loaded and cached: plane.obj
+[19:35:12.468] [INFO ] Model preloaded successfully in 4.685900ms: plane.obj
+[19:35:12.468] [INFO ] Model preloaded successfully in 4.700300ms: plane.obj
+[19:35:12.468] [INFO ] Scene asset preloading complete: 2 models loaded successfully, 0 failures, 9.544700ms total
+[19:35:12.468] [INFO ] createProjectileTestScene() completing successfully
+[19:35:12.468] [INFO ] Starting GPU warm-up render to eliminate first-frame delay...
+[19:35:12.468] [INFO ] GPU warm-up render completed in 0.140000ms
+[19:35:12.468] [INFO ] GPU warm-up successful - driver optimizations should be loaded
+[19:35:12.468] [INFO ] GPU warm-up completed - first frame delay should be eliminated
+[19:35:12.468] [INFO ] VulkanMon ready!
+[19:35:12.481] [INFO ] Window shown - initialization complete, ready for rendering
+[19:35:12.481] [INFO ] Mouse cursor enabled - click to test projectile spawning, TAB to toggle camera mode
+[19:35:12.481] [INFO ] VulkanMon ready! Starting main loop...
+[19:35:12.481] [INFO ] About to enter main loop - checking window shouldClose()...
+[19:35:12.482] [INFO ] PhysicsSystem: Created 1 new Jolt physics bodies
+[19:35:12.593] [WARN ] SLOW FRAME (109.428001ms total): timing=0.001000ms, events=1.004600ms, input=0.010200ms, systems=0.051000ms, ecs=0.030200ms, imgui=0.154600ms, render=0.642400ms
+[19:35:12.659] [INFO ] Application Performance: 4826 FPS, 0.201500ms frame time
+[19:35:12.723] [INFO ] Application Performance: 4908 FPS, 0.196500ms frame time
+[19:35:12.792] [INFO ] Application Performance: 4225 FPS, 0.213800ms frame time
+[19:35:12.853] [INFO ] Application Performance: 4900 FPS, 0.199000ms frame time
+[19:35:12.916] [INFO ] Application Performance: 4890 FPS, 0.203700ms frame time
+[19:35:12.977] [INFO ] Application Performance: 4921 FPS, 0.199800ms frame time
+[19:35:12.977] [INFO ] === SpatialSystem Performance Report ===
+[19:35:12.977] [INFO ] Frame Stats:
+[19:35:12.977] [INFO ]   Entities tracked: 5
+[19:35:12.977] [INFO ]   Entities processed: 1
+[19:35:12.977] [INFO ]   Static entities skipped: 4
+[19:35:12.977] [INFO ]   Entities updated: 0
+[19:35:12.977] [INFO ]   Entities added: 0
+[19:35:12.977] [INFO ]   Entities removed: 0
+[19:35:12.977] [INFO ]   Frame update time: 0.003600ms
+[19:35:12.977] [INFO ] Spatial Manager:
+[19:35:12.977] [INFO ]   Total queries: 1799
+[19:35:12.977] [INFO ]   Average query time: 0.002746ms
+[19:35:12.977] [INFO ]   Total entities returned: 8995
+[19:35:12.977] [INFO ] Cache Performance:
+[19:35:12.977] [INFO ]   Cache hit rate: 99.944412%
+[19:35:12.977] [INFO ]   Cache size: 1 entries
+[19:35:12.977] [INFO ] Octree Structure:
+[19:35:12.977] [INFO ]   Nodes: 1
+[19:35:12.977] [INFO ]   Max depth: 0
+[19:35:12.977] [INFO ]   Total entities: 5
+[19:35:12.977] [INFO ] ==========================================
+[19:35:12.977] [INFO ] GPU Render Performance (Frame 1800):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.005ms (Cull:0.0011ms + Batch:0.0025ms + GPU:0.0002ms)
+[19:35:13.039] [INFO ] Application Performance: 4997 FPS, 0.197700ms frame time
+[19:35:13.100] [INFO ] Application Performance: 4848 FPS, 0.195500ms frame time
+[19:35:13.165] [INFO ] Application Performance: 4763 FPS, 0.200500ms frame time
+[19:35:13.227] [INFO ] Application Performance: 4824 FPS, 0.227900ms frame time
+[19:35:13.290] [INFO ] Application Performance: 4907 FPS, 0.204200ms frame time
+[19:35:13.351] [INFO ] Application Performance: 4884 FPS, 0.201100ms frame time
+[19:35:13.351] [INFO ] === SpatialSystem Performance Report ===
+[19:35:13.351] [INFO ] Frame Stats:
+[19:35:13.351] [INFO ]   Entities tracked: 5
+[19:35:13.351] [INFO ]   Entities processed: 1
+[19:35:13.351] [INFO ]   Static entities skipped: 4
+[19:35:13.351] [INFO ]   Entities updated: 0
+[19:35:13.351] [INFO ]   Entities added: 0
+[19:35:13.351] [INFO ]   Entities removed: 0
+[19:35:13.351] [INFO ]   Frame update time: 0.003600ms
+[19:35:13.351] [INFO ] Spatial Manager:
+[19:35:13.351] [INFO ]   Total queries: 3599
+[19:35:13.351] [INFO ]   Average query time: 0.002747ms
+[19:35:13.351] [INFO ]   Total entities returned: 17995
+[19:35:13.351] [INFO ] Cache Performance:
+[19:35:13.351] [INFO ]   Cache hit rate: 99.972214%
+[19:35:13.351] [INFO ]   Cache size: 1 entries
+[19:35:13.351] [INFO ] Octree Structure:
+[19:35:13.351] [INFO ]   Nodes: 1
+[19:35:13.351] [INFO ]   Max depth: 0
+[19:35:13.351] [INFO ]   Total entities: 5
+[19:35:13.351] [INFO ] ==========================================
+[19:35:13.351] [INFO ] GPU Render Performance (Frame 3600):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.005ms (Cull:0.0011ms + Batch:0.0025ms + GPU:0.0002ms)
+[19:35:13.412] [INFO ] Application Performance: 4881 FPS, 0.203900ms frame time
+[19:35:13.473] [INFO ] Application Performance: 4905 FPS, 0.204200ms frame time
+[19:35:13.537] [INFO ] Application Performance: 4618 FPS, 0.198200ms frame time
+[19:35:13.602] [INFO ] Application Performance: 4671 FPS, 0.194300ms frame time
+[19:35:13.670] [INFO ] Application Performance: 4555 FPS, 0.206500ms frame time
+[19:35:13.736] [INFO ] Application Performance: 4695 FPS, 0.192600ms frame time
+[19:35:13.736] [INFO ] === SpatialSystem Performance Report ===
+[19:35:13.737] [INFO ] Frame Stats:
+[19:35:13.737] [INFO ]   Entities tracked: 5
+[19:35:13.737] [INFO ]   Entities processed: 1
+[19:35:13.737] [INFO ]   Static entities skipped: 4
+[19:35:13.737] [INFO ]   Entities updated: 0
+[19:35:13.737] [INFO ]   Entities added: 0
+[19:35:13.737] [INFO ]   Entities removed: 0
+[19:35:13.737] [INFO ]   Frame update time: 0.003600ms
+[19:35:13.737] [INFO ] Spatial Manager:
+[19:35:13.737] [INFO ]   Total queries: 5399
+[19:35:13.737] [INFO ]   Average query time: 0.002750ms
+[19:35:13.737] [INFO ]   Total entities returned: 26995
+[19:35:13.737] [INFO ] Cache Performance:
+[19:35:13.737] [INFO ]   Cache hit rate: 99.962959%
+[19:35:13.737] [INFO ]   Cache size: 1 entries
+[19:35:13.737] [INFO ] Octree Structure:
+[19:35:13.737] [INFO ]   Nodes: 1
+[19:35:13.737] [INFO ]   Max depth: 0
+[19:35:13.737] [INFO ]   Total entities: 5
+[19:35:13.737] [INFO ] ==========================================
+[19:35:13.737] [INFO ] GPU Render Performance (Frame 5400):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.005ms (Cull:0.0011ms + Batch:0.0026ms + GPU:0.0003ms)
+[19:35:13.802] [INFO ] Application Performance: 4403 FPS, 0.198400ms frame time
+[19:35:13.870] [INFO ] Application Performance: 4235 FPS, 0.207500ms frame time
+[19:35:13.936] [INFO ] Application Performance: 4381 FPS, 0.198400ms frame time
+[19:35:14.006] [INFO ] Application Performance: 4249 FPS, 0.251100ms frame time
+[19:35:14.079] [INFO ] Application Performance: 3544 FPS, 0.214300ms frame time
+[19:35:14.149] [INFO ] Application Performance: 4284 FPS, 0.300000ms frame time
+[19:35:14.149] [INFO ] === SpatialSystem Performance Report ===
+[19:35:14.149] [INFO ] Frame Stats:
+[19:35:14.149] [INFO ]   Entities tracked: 5
+[19:35:14.149] [INFO ]   Entities processed: 1
+[19:35:14.149] [INFO ]   Static entities skipped: 4
+[19:35:14.149] [INFO ]   Entities updated: 0
+[19:35:14.149] [INFO ]   Entities added: 0
+[19:35:14.149] [INFO ]   Entities removed: 0
+[19:35:14.149] [INFO ]   Frame update time: 0.003900ms
+[19:35:14.149] [INFO ] Spatial Manager:
+[19:35:14.149] [INFO ]   Total queries: 7199
+[19:35:14.149] [INFO ]   Average query time: 0.002808ms
+[19:35:14.149] [INFO ]   Total entities returned: 35995
+[19:35:14.149] [INFO ] Cache Performance:
+[19:35:14.149] [INFO ]   Cache hit rate: 99.652733%
+[19:35:14.149] [INFO ]   Cache size: 24 entries
+[19:35:14.149] [INFO ] Octree Structure:
+[19:35:14.149] [INFO ]   Nodes: 1
+[19:35:14.149] [INFO ]   Max depth: 0
+[19:35:14.149] [INFO ]   Total entities: 5
+[19:35:14.149] [INFO ] ==========================================
+[19:35:14.149] [INFO ] GPU Render Performance (Frame 7200):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0058ms (Cull:0.0013ms + Batch:0.0031ms + GPU:0.0002ms)
+[19:35:14.217] [INFO ] Application Performance: 4271 FPS, 0.235500ms frame time
+[19:35:14.261] [INFO ] Projectile spawned - Entity: 6, Type: PHYSICS_OBJECT, Position: (-0.125861, 5.061424, 8.004910), Speed: 5.385165m/s
+[19:35:14.261] [INFO ] [INPUT] Projectile spawn requested (Left Click)
+[19:35:14.261] [INFO ] PhysicsSystem: Created 1 new Jolt physics bodies
+[19:35:14.309] [INFO ] Application Performance: 2295 FPS, 0.440600ms frame time
+[19:35:14.381] [INFO ] Loading 3D model: D:\ws\vulkanmon\assets/models/projectile_sphere.obj
+[19:35:14.386] [INFO ] Model loaded: projectile_sphere.obj (1 meshes, 17 vertices)
+[19:35:14.386] [INFO ] Model loaded and cached: projectile_sphere.obj
+[19:35:14.447] [INFO ] Application Performance: 2213 FPS, 0.394100ms frame time
+[19:35:14.581] [INFO ] Application Performance: 2359 FPS, 0.494800ms frame time
+[19:35:14.709] [INFO ] Application Performance: 2321 FPS, 0.473800ms frame time
+[19:35:14.843] [INFO ] Application Performance: 2275 FPS, 0.583600ms frame time
+[19:35:14.843] [INFO ] === SpatialSystem Performance Report ===
+[19:35:14.843] [INFO ] Frame Stats:
+[19:35:14.843] [INFO ]   Entities tracked: 6
+[19:35:14.843] [INFO ]   Entities processed: 2
+[19:35:14.843] [INFO ]   Static entities skipped: 4
+[19:35:14.843] [INFO ]   Entities updated: 0
+[19:35:14.843] [INFO ]   Entities added: 0
+[19:35:14.843] [INFO ]   Entities removed: 0
+[19:35:14.843] [INFO ]   Frame update time: 0.004200ms
+[19:35:14.843] [INFO ] Spatial Manager:
+[19:35:14.843] [INFO ]   Total queries: 8999
+[19:35:14.843] [INFO ]   Average query time: 0.003552ms
+[19:35:14.843] [INFO ]   Total entities returned: 46029
+[19:35:14.843] [INFO ] Cache Performance:
+[19:35:14.843] [INFO ]   Cache hit rate: 99.477722%
+[19:35:14.843] [INFO ]   Cache size: 46 entries
+[19:35:14.843] [INFO ] Octree Structure:
+[19:35:14.843] [INFO ]   Nodes: 1
+[19:35:14.843] [INFO ]   Max depth: 0
+[19:35:14.843] [INFO ]   Total entities: 6
+[19:35:14.843] [INFO ] ==========================================
+[19:35:14.844] [INFO ] GPU Render Performance (Frame 9000):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0055ms (Cull:0.0013ms + Batch:0.0028ms + GPU:0.0002ms)
+[19:35:14.972] [INFO ] Application Performance: 2306 FPS, 0.414500ms frame time
+[19:35:15.108] [INFO ] Application Performance: 2270 FPS, 0.412000ms frame time
+[19:35:15.181] [INFO ] Projectile spawned - Entity: 7, Type: PHYSICS_OBJECT, Position: (0.058450, 5.273355, 8.019631), Speed: 5.385165m/s
+[19:35:15.181] [INFO ] [INPUT] Projectile spawn requested (Left Click)
+[19:35:15.181] [INFO ] PhysicsSystem: Created 1 new Jolt physics bodies
+[19:35:15.239] [INFO ] Application Performance: 2293 FPS, 0.465400ms frame time
+[19:35:15.372] [INFO ] Application Performance: 2246 FPS, 0.426300ms frame time
+[19:35:15.505] [INFO ] Application Performance: 2279 FPS, 0.397600ms frame time
+[19:35:15.642] [INFO ] Application Performance: 2134 FPS, 0.413700ms frame time
+[19:35:15.642] [INFO ] === SpatialSystem Performance Report ===
+[19:35:15.642] [INFO ] Frame Stats:
+[19:35:15.642] [INFO ]   Entities tracked: 7
+[19:35:15.642] [INFO ]   Entities processed: 3
+[19:35:15.642] [INFO ]   Static entities skipped: 4
+[19:35:15.642] [INFO ]   Entities updated: 0
+[19:35:15.642] [INFO ]   Entities added: 0
+[19:35:15.642] [INFO ]   Entities removed: 0
+[19:35:15.642] [INFO ]   Frame update time: 0.004700ms
+[19:35:15.642] [INFO ] Spatial Manager:
+[19:35:15.642] [INFO ]   Total queries: 10799
+[19:35:15.642] [INFO ]   Average query time: 0.003940ms
+[19:35:15.642] [INFO ]   Total entities returned: 56924
+[19:35:15.642] [INFO ] Cache Performance:
+[19:35:15.642] [INFO ]   Cache hit rate: 99.370316%
+[19:35:15.642] [INFO ]   Cache size: 67 entries
+[19:35:15.642] [INFO ] Octree Structure:
+[19:35:15.642] [INFO ]   Nodes: 1
+[19:35:15.642] [INFO ]   Max depth: 0
+[19:35:15.642] [INFO ]   Total entities: 7
+[19:35:15.642] [INFO ] ==========================================
+[19:35:15.642] [INFO ] GPU Render Performance (Frame 10800):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0056ms (Cull:0.0012ms + Batch:0.0029ms + GPU:0.0003ms)
+[19:35:15.781] [INFO ] Projectile spawned - Entity: 8, Type: PHYSICS_OBJECT, Position: (0.384372, 5.218106, 8.049439), Speed: 5.385165m/s
+[19:35:15.781] [INFO ] [INPUT] Projectile spawn requested (Left Click)
+[19:35:15.781] [INFO ] PhysicsSystem: Created 1 new Jolt physics bodies
+[19:35:15.783] [INFO ] Application Performance: 2154 FPS, 0.476900ms frame time
+[19:35:15.922] [INFO ] Application Performance: 2185 FPS, 0.426900ms frame time
+[19:35:16.067] [INFO ] Application Performance: 2046 FPS, 0.441700ms frame time
+[19:35:16.217] [INFO ] Application Performance: 1906 FPS, 0.398400ms frame time
+[19:35:16.370] [INFO ] Application Performance: 1975 FPS, 0.533600ms frame time
+[19:35:16.523] [INFO ] Application Performance: 1962 FPS, 0.502000ms frame time
+[19:35:16.523] [INFO ] === SpatialSystem Performance Report ===
+[19:35:16.523] [INFO ] Frame Stats:
+[19:35:16.523] [INFO ]   Entities tracked: 8
+[19:35:16.523] [INFO ]   Entities processed: 4
+[19:35:16.523] [INFO ]   Static entities skipped: 4
+[19:35:16.523] [INFO ]   Entities updated: 0
+[19:35:16.523] [INFO ]   Entities added: 0
+[19:35:16.523] [INFO ]   Entities removed: 0
+[19:35:16.523] [INFO ]   Frame update time: 0.004300ms
+[19:35:16.523] [INFO ] Spatial Manager:
+[19:35:16.523] [INFO ]   Total queries: 12599
+[19:35:16.524] [INFO ]   Average query time: 0.003963ms
+[19:35:16.524] [INFO ]   Total entities returned: 70683
+[19:35:16.524] [INFO ] Cache Performance:
+[19:35:16.524] [INFO ]   Cache hit rate: 99.095169%
+[19:35:16.524] [INFO ]   Cache size: 52 entries
+[19:35:16.524] [INFO ] Octree Structure:
+[19:35:16.524] [INFO ]   Nodes: 1
+[19:35:16.524] [INFO ]   Max depth: 0
+[19:35:16.524] [INFO ]   Total entities: 8
+[19:35:16.524] [INFO ] ==========================================
+[19:35:16.524] [INFO ] GPU Render Performance (Frame 12600):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0062ms (Cull:0.0015ms + Batch:0.0032ms + GPU:0.0003ms)
+[19:35:16.679] [INFO ] Application Performance: 2013 FPS, 0.498500ms frame time
+[19:35:16.827] [INFO ] Application Performance: 1976 FPS, 0.485900ms frame time
+[19:35:16.980] [INFO ] Application Performance: 1871 FPS, 0.466100ms frame time
+[19:35:17.126] [INFO ] Application Performance: 2062 FPS, 0.491400ms frame time
+[19:35:17.273] [INFO ] Application Performance: 1975 FPS, 0.509600ms frame time
+[19:35:17.422] [INFO ] Application Performance: 1955 FPS, 0.502600ms frame time
+[19:35:17.423] [INFO ] === SpatialSystem Performance Report ===
+[19:35:17.423] [INFO ] Frame Stats:
+[19:35:17.423] [INFO ]   Entities tracked: 8
+[19:35:17.423] [INFO ]   Entities processed: 4
+[19:35:17.423] [INFO ]   Static entities skipped: 4
+[19:35:17.423] [INFO ]   Entities updated: 0
+[19:35:17.423] [INFO ]   Entities added: 0
+[19:35:17.423] [INFO ]   Entities removed: 0
+[19:35:17.423] [INFO ]   Frame update time: 0.005200ms
+[19:35:17.423] [INFO ] Spatial Manager:
+[19:35:17.423] [INFO ]   Total queries: 14399
+[19:35:17.423] [INFO ]   Average query time: 0.004049ms
+[19:35:17.423] [INFO ]   Total entities returned: 85083
+[19:35:17.423] [INFO ] Cache Performance:
+[19:35:17.423] [INFO ]   Cache hit rate: 99.131882%
+[19:35:17.423] [INFO ]   Cache size: 62 entries
+[19:35:17.423] [INFO ] Octree Structure:
+[19:35:17.423] [INFO ]   Nodes: 1
+[19:35:17.423] [INFO ]   Max depth: 0
+[19:35:17.423] [INFO ]   Total entities: 8
+[19:35:17.423] [INFO ] ==========================================
+[19:35:17.423] [INFO ] GPU Render Performance (Frame 14400):
+  Creatures: 0/0 (0% culled)
+  GPU Efficiency: 0 batches, 1 creatures/draw
+  Render Time: 0.0057ms (Cull:0.0014ms + Batch:0.0029ms + GPU:0.0003ms)
+[19:35:17.482] [INFO ] Spawned dynamic falling cube #1 at (-14.216271, 20.000000, 13.364639) with velocity (-0.119079, -1.512190)
+[19:35:17.482] [INFO ] PhysicsSystem: Created 1 new Jolt physics bodies
+[19:35:17.578] [INFO ] Application Performance: 1896 FPS, 0.532100ms frame time
+[19:35:17.734] [INFO ] Application Performance: 2034 FPS, 0.480100ms frame time
+[19:35:17.875] [INFO ] Application Performance: 2046 FPS, 0.466300ms frame time
+[19:35:18.030] [INFO ] Application Performance: 1951 FPS, 0.737200ms frame time
+[19:35:18.181] [INFO ] Application Performance: 2012 FPS, 0.479800ms frame time
+[19:35:18.310] [INFO ] Application finished successfully
+[19:35:18.310] [INFO ] Beginning Application cleanup...
+[19:35:18.310] [INFO ] Shutting down PhysicsSystem
+[19:35:18.310] [INFO ] Shutting down Jolt Physics...
+[19:35:18.317] [INFO ] Jolt Physics shutdown complete
+[19:35:18.317] [INFO ] PhysicsSystem shutdown complete
+[19:35:18.317] [INFO ] Clearing system references before renderer cleanup...
+[19:35:18.317] [INFO ] Cleaning up renderer...
+[19:35:18.317] [INFO ] Cleaning up ImGui debug interface...
+[19:35:18.319] [INFO ] ImGui debug interface cleanup complete
+[19:35:18.319] [INFO ] Beginning VulkanRenderer cleanup...
+[19:35:18.320] [INFO ] GPU instance buffer cleanup complete
+[19:35:18.339] [INFO ] VulkanRenderer cleanup completed
+[19:35:18.339] [INFO ] VulkanRenderer destroyed
+[Vulkan Loader] ERROR:          vkUnmapMemory: Invalid device [VUID-vkUnmapMemory-device-parameter]
+abort() has been called

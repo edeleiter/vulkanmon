@@ -73,6 +73,9 @@ add_executable(vulkanmon_tests
     performance/test_PerformanceRegression.cpp
     performance/test_CreatureDetectionRegression.cpp
 
+    # Projectile System tests (Phase 8)
+    test_ProjectileSystem.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
@@ -92,6 +95,8 @@ add_executable(vulkanmon_tests
     ../src/systems/CreatureRenderSystem.cpp  # Required by Application.cpp
     ../src/systems/CameraSystem.cpp
     ../src/systems/PhysicsSystem.cpp
+    ../src/systems/ProjectileSystem.cpp  # Required by Application.cpp
+    ../src/materials/ProjectileMaterials.cpp  # Required by ProjectileSystem.cpp
     ../src/spatial/SpatialManager.cpp
     ../src/spatial/WorldConfig.cpp
     ../src/spatial/LayerMask.cpp

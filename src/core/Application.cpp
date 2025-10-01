@@ -45,8 +45,9 @@ void Application::initialize() {
         initializeCoreEngineSystems();
         initializeRenderer();
         initializeECS();            // Initialize ECS after renderer is ready
+        connectDeferredSystems();   // Connect systems that need renderer resources
         initializeInputSystem();
-        createTestScene();          // Create test entities after ECS is set up
+        createProjectileTestScene(); // Create clean projectile test scene
 
         // Perform GPU warm-up to eliminate first-frame delay
         if (renderer_ && renderer_->performGPUWarmup()) {
@@ -258,8 +259,10 @@ void Application::updateECS(float deltaTime) {
         // Entity rotation can be controlled per-entity through Transform components
         // Global rotation animation was removed in favor of individual entity control
 
-        // PERFORMANCE TEST: Only essential systems enabled (CameraSystem + RenderSystem)
-        world_->update(deltaTime);
+        // CRITICAL FIX: Convert deltaTime from milliseconds to seconds for ECS systems
+        // frameTime_ is in milliseconds, but World expects seconds
+        float deltaTimeSeconds = deltaTime / 1000.0f;
+        world_->update(deltaTimeSeconds);
     }
 }
 
