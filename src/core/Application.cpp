@@ -49,6 +49,13 @@ void Application::initialize() {
         initializeInputSystem();
         createProjectileTestScene(); // Create clean projectile test scene
 
+#ifdef DEBUG_BUILD
+        // Initialize debug server
+        debugServer_ = std::make_unique<Debug::DebugServer>(this);
+        debugServer_->Start(3000);
+        VKMON_INFO("Debug server started on port 3000");
+#endif
+
         // Perform GPU warm-up to eliminate first-frame delay
         if (renderer_ && renderer_->performGPUWarmup()) {
             VKMON_INFO("GPU warm-up completed - first frame delay should be eliminated");
@@ -128,6 +135,13 @@ void Application::processFrame() {
 
         processInput(frameTime_);
         auto inputEnd = std::chrono::high_resolution_clock::now();
+
+#ifdef DEBUG_BUILD
+        // Process debug commands from HTTP server
+        if (debugServer_) {
+            debugServer_->ProcessCommands();
+        }
+#endif
 
         updateSystems(frameTime_);
         auto systemsEnd = std::chrono::high_resolution_clock::now();
@@ -675,6 +689,14 @@ void Application::cleanup() {
     VKMON_INFO("Beginning Application cleanup...");
 
     // Cleanup in reverse order of initialization
+#ifdef DEBUG_BUILD
+    if (debugServer_) {
+        VKMON_DEBUG("Stopping debug server...");
+        debugServer_->Stop();
+        debugServer_.reset();
+    }
+#endif
+
     if (ecsInspector_) {
         VKMON_DEBUG("Cleaning up ECS Inspector...");
         ecsInspector_.reset();

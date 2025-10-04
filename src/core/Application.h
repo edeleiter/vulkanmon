@@ -24,6 +24,10 @@
 #include "../debug/ECSInspector.h"
 #include "../config/CameraConfig.h"
 
+#ifdef DEBUG_BUILD
+#include "../debug/debug_server.h"
+#endif
+
 #include <memory>
 #include <chrono>
 #include <functional>
@@ -169,6 +173,17 @@ public:
      */
     void handleWindowResize(int width, int height);
 
+    /**
+     * Get ECS World for debug access
+     * @return Pointer to current World instance
+     */
+    World* getWorld() { return world_.get(); }
+
+    /**
+     * Get VulkanRenderer for frame capture
+     * @return Pointer to renderer instance
+     */
+    VulkanRenderer* getRenderer() { return renderer_.get(); }
 
 private:
     // Application state
@@ -208,6 +223,11 @@ private:
 
     // Debug tools
     std::unique_ptr<Debug::ECSInspector> ecsInspector_;
+
+#ifdef DEBUG_BUILD
+    // Debug server
+    std::unique_ptr<Debug::DebugServer> debugServer_;
+#endif
 
     // Current loaded model
     std::shared_ptr<Model> currentModel_;

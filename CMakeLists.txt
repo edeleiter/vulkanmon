@@ -19,6 +19,8 @@ find_package(Stb REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(httplib CONFIG REQUIRED)
 
 # Create executable
 # Use CMake's Vulkan component for glslangValidator
@@ -91,6 +93,19 @@ target_link_libraries(vulkanmon PRIVATE
     imgui::imgui
     Jolt::Jolt
 )
+
+# Debug Server (Debug builds only)
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    target_sources(vulkanmon PRIVATE
+        src/debug/debug_server.cpp
+        src/debug/frame_capture.cpp
+    )
+    target_compile_definitions(vulkanmon PRIVATE DEBUG_BUILD)
+    target_link_libraries(vulkanmon PRIVATE
+        nlohmann_json::nlohmann_json
+        httplib::httplib
+    )
+endif()
 
 # Include directories
 target_include_directories(vulkanmon PRIVATE
