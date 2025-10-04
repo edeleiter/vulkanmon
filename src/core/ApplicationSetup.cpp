@@ -7,6 +7,7 @@
 #include "../components/RigidBodyComponent.h"
 #include "../components/CollisionComponent.h"
 #include "../components/CreaturePhysicsComponent.h"
+#include "../game/PlayerController.h"
 #include "../spatial/WorldConfig.h"
 #include "../config/CameraConfig.h"
 #include <stdexcept>
@@ -179,6 +180,10 @@ void Application::initializeECS() {
     physicsSystem_->initialize(world_->getEntityManager()); // Initialize with default gravity
     VKMON_INFO("PhysicsSystem added to World and initialized");
 
+    // Add character controller system for player movement
+    characterControllerSystem_ = world_->addSystem<CharacterControllerSystem>();
+    VKMON_INFO("CharacterControllerSystem added to World");
+
     // Add projectile system for mouse-click projectile spawning
     // Note: MaterialSystem will be connected after renderer systems are available
     projectileSystem_ = world_->addSystem<ProjectileSystem>(cameraSystem_, nullptr);
@@ -322,32 +327,47 @@ void Application::createProjectileTestScene() {
 
     VKMON_INFO("Created 3 target cubes for projectile testing");
     // =========================================================================
-    // CAMERA SETUP - Positioned for projectile testing
+    // PLAYER + CAMERA SETUP - Playable Pokemon Demo (Phase 8.2)
     // =========================================================================
-    VKMON_INFO("Setting up camera for projectile testing...");
+    VKMON_INFO("Creating player entity with third-person camera...");
 
-    EntityID cameraEntity = world_->createEntity();
+    // Create player and camera using PlayerController factory
+    auto [player, camera] = PlayerController::createPlayer(world_->getEntityManager());
+    playerEntity_ = player;
 
-    Transform cameraTransform;
-    cameraTransform.position = glm::vec3(0.0f, 5.0f, 10.0f);  // Good position to see targets
-    cameraTransform.setRotationEuler(-15.0f, 0.0f, 0.0f);      // Look down slightly
-    world_->addComponent(cameraEntity, cameraTransform);
+    VKMON_INFO("Player entity created: ID=" + std::to_string(playerEntity_));
+    VKMON_INFO("Camera entity created: ID=" + std::to_string(camera));
 
-    Camera camera;
-    camera.fov = 75.0f;
-    camera.nearPlane = 0.1f;
-    camera.farPlane = 1000.0f;
-    camera.priority = 1;
-    camera.isActive = true;
-    world_->addComponent(cameraEntity, camera);
+    // Verify player has CharacterControllerComponent
+    if (world_->hasComponent<CharacterControllerComponent>(playerEntity_)) {
+        VKMON_INFO("Player has CharacterControllerComponent - VERIFIED");
+    } else {
+        VKMON_ERROR("Player MISSING CharacterControllerComponent!");
+    }
 
+    // Add spatial component to player
+    SpatialComponent playerSpatial;
+    playerSpatial.spatialLayers = LayerMask::Player;
+    playerSpatial.boundingRadius = 1.0f;
+    playerSpatial.behavior = SpatialBehavior::DYNAMIC;
+    world_->addComponent(playerEntity_, playerSpatial);
+
+    // Add spatial component to camera
     SpatialComponent cameraSpatial;
     cameraSpatial.spatialLayers = LayerMask::Camera;
     cameraSpatial.boundingRadius = 1.0f;
     cameraSpatial.behavior = SpatialBehavior::DYNAMIC;
-    world_->addComponent(cameraEntity, cameraSpatial);
+    world_->addComponent(camera, cameraSpatial);
 
-    totalEntities++;
+    // Connect InputHandler to player entity
+    if (inputHandler_) {
+        inputHandler_->setPlayerEntity(playerEntity_);
+        VKMON_INFO("InputHandler connected to player entity " + std::to_string(playerEntity_));
+    } else {
+        VKMON_ERROR("InputHandler is NULL - cannot connect player!");
+    }
+
+    totalEntities += 2; // Player + Camera
 
     VKMON_INFO("Clean Projectile Test Scene Layout:");
     VKMON_INFO("  - Ground plane at Y=-2.0");

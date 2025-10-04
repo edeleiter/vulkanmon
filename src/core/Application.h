@@ -17,6 +17,7 @@
 #include "../systems/SpatialSystem.h"
 #include "../systems/PhysicsSystem.h"
 #include "../systems/ProjectileSystem.h"
+#include "../systems/CharacterControllerSystem.h"
 #include "../game/CreatureDetectionSystem.h"
 #include "../components/Transform.h"
 #include "../components/Renderable.h"
@@ -200,6 +201,10 @@ private:
     PhysicsSystem* physicsSystem_ = nullptr;  // Owned by World
     ProjectileSystem* projectileSystem_ = nullptr;  // Owned by World
     CreatureDetectionSystem* creatureDetectionSystem_ = nullptr;  // Owned by World
+    CharacterControllerSystem* characterControllerSystem_ = nullptr;  // Owned by World
+
+    // Player entity for playable demo
+    EntityID playerEntity_ = 0;
 
     // Debug tools
     std::unique_ptr<Debug::ECSInspector> ecsInspector_;

@@ -2,6 +2,7 @@
 #include "../utils/Logger.h"
 #include "../systems/LightingSystem.h"
 #include "../components/Transform.h"
+#include "../components/CharacterControllerComponent.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -153,7 +154,13 @@ void InputHandler::processContinuousInput(GLFWwindow* window, float deltaTime) {
         return;
     }
 
-    handleCameraMovement(window, deltaTime);
+    // Handle player movement if player entity is set
+    if (playerEntity_ != 0) {
+        handlePlayerMovement(window, deltaTime);
+    } else {
+        // Fallback to camera movement for development/testing
+        handleCameraMovement(window, deltaTime);
+    }
 }
 
 void InputHandler::setShaderReloadCallback(ShaderReloadCallback callback) {
@@ -246,6 +253,55 @@ void InputHandler::handleCameraMovement(GLFWwindow* window, float deltaTime) {
         float sprintMultiplier = 2.0f;
         // Apply sprint to any movement that happened this frame
         // This is a simple way to add sprint functionality
+    }
+}
+
+void InputHandler::handlePlayerMovement(GLFWwindow* window, float deltaTime) {
+    // Check if player entity exists and has CharacterControllerComponent
+    if (!world_->hasComponent<CharacterControllerComponent>(playerEntity_)) {
+        return;
+    }
+
+    auto& controller = world_->getComponent<CharacterControllerComponent>(playerEntity_);
+
+    // Calculate input direction in world space
+    glm::vec3 inputDirection(0.0f);
+
+    // WASD input
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        inputDirection.z -= 1.0f; // Forward (negative Z)
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        inputDirection.z += 1.0f; // Backward (positive Z)
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        inputDirection.x -= 1.0f; // Left (negative X)
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        inputDirection.x += 1.0f; // Right (positive X)
+    }
+
+    // Normalize input direction if not zero
+    if (glm::length(inputDirection) > 0.0f) {
+        inputDirection = glm::normalize(inputDirection);
+        static int logCount = 0;
+        if (logCount++ < 3) {
+            VKMON_INFO("Player input detected: (" +
+                      std::to_string(inputDirection.x) + "," +
+                      std::to_string(inputDirection.y) + "," +
+                      std::to_string(inputDirection.z) + ")");
+        }
+    }
+
+    // Set input direction on controller
+    controller.inputDirection = inputDirection;
+
+    // Handle sprint (Left Shift)
+    controller.wantsToSprint = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
+
+    // Handle jump (Space)
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        controller.wantsToJump = true;
     }
 }
 

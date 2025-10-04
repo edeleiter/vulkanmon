@@ -58,6 +58,29 @@ Debug\vulkanmon_tests.exe         # Windows
 
 ## Architecture
 
+### Directory Structure & Code Organization
+
+**Engine vs Game Separation** (See `docs/ARCHITECTURE_DECISION_ENGINE_VS_GAME.md` for full details):
+
+```
+src/
+  components/        # Generic engine components (Transform, Renderable, etc.)
+  systems/           # Generic engine systems (RenderSystem, PhysicsSystem, etc.)
+  game/              # Pokemon-specific C++ code (CreatureDetectionSystem, PokemonParty, etc.)
+  core/              # Engine core (Application, World, EntityManager)
+  rendering/         # Vulkan renderer
+  spatial/           # Spatial partitioning (Octree)
+
+game/                # Pokemon game data/config (future - YAML/JSON files)
+  data/              # Pokemon species, moves, items (data-driven)
+  config/            # Balance configuration
+
+assets/              # 3D models, textures, shaders
+examples/            # Example/tutorial code
+```
+
+**Key Principle**: All C++ code (both engine and game-specific) lives in `src/`. The top-level `game/` directory is reserved for data files (YAML/JSON) for future data-driven content.
+
 ### ECS Architecture & Ownership Model
 VulkanMon uses a **single World ownership pattern** designed for game engine simplicity and performance:
 

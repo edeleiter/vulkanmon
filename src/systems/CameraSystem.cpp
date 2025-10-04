@@ -35,6 +35,15 @@ void CameraSystem::update(float deltaTime, EntityManager& entityManager) {
         activeCameraEntity = bestCamera;
     }
 
+    // Process camera follow behavior for cameras with CameraFollowComponent
+    auto followCameras = entityManager.getEntitiesWithComponent<CameraFollowComponent>();
+    for (EntityID entity : followCameras) {
+        if (entityManager.hasComponent<Transform>(entity) &&
+            entityManager.hasComponent<Camera>(entity)) {
+            processCameraFollow(entity, entityManager, deltaTime);
+        }
+    }
+
     // Update view and projection matrices for all cameras
     for (size_t i = 0; i < cameras.size(); ++i) {
         EntityID entity = entityIds[i];
@@ -54,6 +63,132 @@ void CameraSystem::update(float deltaTime, EntityManager& entityManager) {
             );
         }
     }
+}
+
+void CameraSystem::processCameraFollow(EntityID entity, EntityManager& entityManager, float deltaTime) {
+    // deltaTime is already in seconds (World::update converts from ms)
+    float deltaSeconds = deltaTime;
+
+    auto& follow = entityManager.getComponent<CameraFollowComponent>(entity);
+    auto& cameraTransform = entityManager.getComponent<Transform>(entity);
+
+    // Check if follow is active and has valid target
+    if (!follow.isActive()) {
+        return;
+    }
+
+    // Validate target exists and has Transform
+    if (!entityManager.hasComponent<Transform>(follow.targetEntity)) {
+        VKMON_WARNING("CameraFollowComponent: Target entity " + std::to_string(follow.targetEntity) +
+                      " does not have Transform component");
+        return;
+    }
+
+    const auto& targetTransform = entityManager.getComponent<Transform>(follow.targetEntity);
+
+    // Calculate desired camera position based on follow mode
+    glm::vec3 desiredPosition = calculateFollowPosition(targetTransform, follow);
+
+    // Apply position smoothing
+    cameraTransform.position = smoothPosition(cameraTransform.position, desiredPosition,
+                                             follow.positionSmoothness, deltaSeconds);
+
+    // Calculate look-at position (target position + look-at offset)
+    glm::vec3 lookAtPosition = targetTransform.position + follow.lookAtOffset;
+
+    // Update camera orientation to look at target
+    glm::vec3 forward = glm::normalize(lookAtPosition - cameraTransform.position);
+    glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 up = glm::cross(right, forward);
+
+    // Apply rotation smoothing if needed
+    if (follow.rotationSmoothness > 0.0f) {
+        // Smooth rotation by lerping the forward vector
+        glm::vec3 currentForward = cameraTransform.getForward();
+        forward = glm::normalize(glm::mix(forward, currentForward, follow.rotationSmoothness));
+
+        // Recalculate right and up after smoothing
+        right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+        up = glm::cross(right, forward);
+    }
+
+    // Calculate rotation quaternion from forward and up vectors
+    // Build rotation matrix from basis vectors
+    glm::mat3 rotationMatrix;
+    rotationMatrix[0] = right;    // X-axis
+    rotationMatrix[1] = up;       // Y-axis
+    rotationMatrix[2] = -forward; // Z-axis (negated because forward is -Z in camera space)
+
+    // Convert to quaternion and set rotation
+    cameraTransform.setRotation(glm::quat_cast(rotationMatrix));
+}
+
+glm::vec3 CameraSystem::calculateFollowPosition(const Transform& targetTransform,
+                                                const CameraFollowComponent& follow) {
+    glm::vec3 position;
+
+    switch (follow.mode) {
+        case CameraFollowComponent::FollowMode::ThirdPerson: {
+            // Position camera relative to target's rotation if followRotation is true
+            if (follow.followRotation) {
+                // Transform offset by target's rotation
+                glm::mat4 rotationMatrix = glm::mat4_cast(targetTransform.rotation);
+                glm::vec3 rotatedOffset = glm::vec3(rotationMatrix * glm::vec4(follow.offset, 0.0f));
+                position = targetTransform.position + rotatedOffset;
+            } else {
+                // Use world-space offset
+                position = targetTransform.position + follow.offset;
+            }
+            break;
+        }
+
+        case CameraFollowComponent::FollowMode::Orbit: {
+            // Maintain distance from target, following rotation
+            glm::mat4 rotationMatrix = glm::mat4_cast(targetTransform.rotation);
+            glm::vec3 rotatedOffset = glm::vec3(rotationMatrix * glm::vec4(follow.offset, 0.0f));
+            position = targetTransform.position + rotatedOffset;
+            break;
+        }
+
+        case CameraFollowComponent::FollowMode::TopDown: {
+            // Follow XZ position, maintain fixed Y offset
+            position = glm::vec3(targetTransform.position.x,
+                               targetTransform.position.y + follow.offset.y,
+                               targetTransform.position.z);
+            break;
+        }
+
+        case CameraFollowComponent::FollowMode::FirstPerson: {
+            // Match target position with small offset
+            glm::mat4 rotationMatrix = glm::mat4_cast(targetTransform.rotation);
+            glm::vec3 rotatedOffset = glm::vec3(rotationMatrix * glm::vec4(follow.offset, 0.0f));
+            position = targetTransform.position + rotatedOffset;
+            break;
+        }
+
+        case CameraFollowComponent::FollowMode::Free:
+        case CameraFollowComponent::FollowMode::Custom:
+        default: {
+            // No follow behavior for Free/Custom modes
+            position = targetTransform.position + follow.offset;
+            break;
+        }
+    }
+
+    return position;
+}
+
+glm::vec3 CameraSystem::smoothPosition(const glm::vec3& current, const glm::vec3& target,
+                                       float smoothness, float deltaTime) {
+    if (smoothness <= 0.0f) {
+        // No smoothing - instant movement
+        return target;
+    }
+
+    // Exponential smoothing using lerp
+    // Higher smoothness = slower movement
+    float t = 1.0f - glm::exp(-deltaTime / glm::max(smoothness, 0.001f));
+    return glm::mix(current, target, t);
 }
 
 Camera* CameraSystem::getActiveCamera(EntityManager& entityManager) {

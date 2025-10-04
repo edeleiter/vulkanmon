@@ -94,6 +94,7 @@ add_executable(vulkanmon_tests
     ../src/systems/RenderSystem.cpp
     ../src/systems/CreatureRenderSystem.cpp  # Required by Application.cpp
     ../src/systems/CameraSystem.cpp
+    ../src/systems/CharacterControllerSystem.cpp
     ../src/systems/PhysicsSystem.cpp
     ../src/systems/ProjectileSystem.cpp  # Required by Application.cpp
     ../src/materials/ProjectileMaterials.cpp  # Required by ProjectileSystem.cpp

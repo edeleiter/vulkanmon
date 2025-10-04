@@ -3,6 +3,7 @@
 #include "../core/SystemImpl.h"
 #include "../components/Transform.h"
 #include "../components/Camera.h"
+#include "../components/CameraFollowComponent.h"
 #include "../core/EntityManager.h"
 #include "../spatial/SpatialManager.h"
 
@@ -11,6 +12,13 @@ namespace VulkanMon {
 class CameraSystem : public System<Transform, Camera> {
 private:
     EntityID activeCameraEntity = INVALID_ENTITY;
+
+    // Camera follow processing
+    void processCameraFollow(EntityID entity, EntityManager& entityManager, float deltaTime);
+    glm::vec3 calculateFollowPosition(const Transform& targetTransform,
+                                     const CameraFollowComponent& follow);
+    glm::vec3 smoothPosition(const glm::vec3& current, const glm::vec3& target,
+                            float smoothness, float deltaTime);
 
 public:
     void update(float deltaTime, EntityManager& entityManager) override;

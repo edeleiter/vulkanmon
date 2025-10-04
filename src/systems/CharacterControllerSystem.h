@@ -25,7 +25,7 @@ class PhysicsSystem;
  * - Physics integration without coupling to game-specific logic
  * - Performance optimization for large numbers of characters
  */
-class CharacterControllerSystem : public System {
+class CharacterControllerSystem : public SystemBase {
 public:
     CharacterControllerSystem() = default;
     ~CharacterControllerSystem() = default;

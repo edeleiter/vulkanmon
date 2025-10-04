@@ -53,6 +53,12 @@ public:
         CameraSystem* cameraSystem,
         World* world
     );
+
+    /**
+     * Set player entity for character controller input
+     * @param playerEntity Player entity ID to control with WASD
+     */
+    void setPlayerEntity(EntityID playerEntity) { playerEntity_ = playerEntity; }
     
     /**
      * Destructor - no special cleanup needed
@@ -186,14 +192,17 @@ private:
     std::shared_ptr<Window> window_;
     CameraSystem* cameraSystem_;
     World* world_;
-    
+
+    // Player entity (for character controller input)
+    EntityID playerEntity_ = 0;
+
     // Mouse input state
     bool firstMouse_ = true;
     float lastMouseX_ = 400.0f;  // Default to window center
     float lastMouseY_ = 300.0f;  // Default to window center
     float mouseSensitivity_ = 0.005f;  // Pokemon-style action game sensitivity (reduced from 0.01f)
     bool mouseLocked_ = true;
-    
+
     // Camera movement configuration
     float cameraSpeed_ = 2.5f;
 
@@ -207,9 +216,10 @@ private:
     MaterialControlCallback materialControlCallback_;
     InspectorToggleCallback inspectorToggleCallback_;
     ProjectileSpawnCallback projectileSpawnCallback_;
-    
+
     // Input processing helpers
     void handleCameraMovement(GLFWwindow* window, float deltaTime);
+    void handlePlayerMovement(GLFWwindow* window, float deltaTime);
     void handleSystemControls(int key);
     void handleLightingControls(int key);
     void handleMaterialControls(int key);
