@@ -231,6 +231,55 @@ public:
      */
     float getFrameTime() const { return lastFrameTime_; }
 
+    /**
+     * Get Vulkan physical device handle
+     * Used for frame capture and debug operations
+     *
+     * @return Vulkan physical device handle
+     */
+    VkPhysicalDevice getPhysicalDevice() const { return physicalDevice_; }
+
+    /**
+     * Get Vulkan command pool
+     * Used for frame capture and debug operations
+     *
+     * @return Vulkan command pool handle
+     */
+    VkCommandPool getCommandPool() const { return commandPool_; }
+
+    /**
+     * Get Vulkan graphics queue
+     * Used for frame capture and debug operations
+     *
+     * @return Vulkan graphics queue handle
+     */
+    VkQueue getGraphicsQueue() const { return graphicsQueue_; }
+
+    /**
+     * Get current swapchain image for frame capture
+     *
+     * @return Current swapchain image handle (VK_NULL_HANDLE if no frame active)
+     */
+    VkImage getCurrentSwapchainImage() const {
+        if (currentImageIndex_ >= swapChainImages_.size()) {
+            return VK_NULL_HANDLE;
+        }
+        return swapChainImages_[currentImageIndex_];
+    }
+
+    /**
+     * Get swapchain image format
+     *
+     * @return Swapchain image format
+     */
+    VkFormat getSwapchainFormat() const { return swapChainImageFormat_; }
+
+    /**
+     * Get swapchain extent (width and height)
+     *
+     * @return Swapchain extent
+     */
+    VkExtent2D getSwapchainExtent() const { return swapChainExtent_; }
 
     // ===== SYSTEM ACCESS INTERFACE =====
 

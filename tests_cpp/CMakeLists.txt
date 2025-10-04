@@ -80,6 +80,7 @@ add_executable(vulkanmon_tests
 
     # Debug Server tests (NEW)
     test_DebugServer.cpp
+    test_FrameCapture.cpp
 
     # Test utilities
     fixtures/TestHelpers.cpp

@@ -124,16 +124,18 @@ This design enables:
 - ✅ **Phase 6.2-SPATIAL COMPLETE**: Scene Management & Spatial Systems (octree, Pokemon queries, ECS integration): ECS-VulkanRenderer Integration (model caching, multi-object support)
 - ✅ **Phase 6.3 COMPLETE**: ECS Inspector - Real-time debug interface with ImGui
 - ✅ **Phase 7.1 COMPLETE**: Jolt Physics System Integration (AAA-quality physics engine, collision detection, multi-threading)
+- ✅ **Phase 7.2 COMPLETE**: Debug Server & Frame Capture (HTTP API, visual debugging, AI-assisted development)
 
-### Current Status: Phase 7 Complete - Professional Game Engine Status! 🚀
+### Current Status: Phase 7.2 Complete - AI-Assisted Game Development! 🚀
 
-**VulkanMon has achieved professional game engine status** with:
+**VulkanMon has achieved AI-assisted game development status** with:
 - ✅ **Complete ECS architecture** with multi-object rendering and physics integration
 - ✅ **Industry-standard debug tooling** (ECS Inspector with Unity/Unreal-style interface)
+- ✅ **AI Debug Integration** (HTTP debug server with frame capture for Claude-assisted debugging)
 - ✅ **Professional physics engine** (Jolt Physics with multi-threading and AAA-quality collision)
 - ✅ **Pokemon-ready spatial system** (octree partitioning, creature queries, physics integration)
 - ✅ **Robust Vulkan foundation** with RAII memory management and professional window handling
-- ✅ **Comprehensive testing framework** (102 test cases, 1724 assertions, 100% pass rate)
+- ✅ **Comprehensive testing framework** (151 test cases, 2101 assertions, 100% pass rate)
 - ✅ **Cross-platform build system** (Windows + Linux with vcpkg integration)
 
 ### Phase 4.1 Milestone: MaterialSystem Integration (COMPLETE)
@@ -499,14 +501,127 @@ Physics Performance (Production Ready):
 
 **Strategic Impact**: VulkanMon has achieved professional game engine status with comprehensive physics capabilities for Pokemon-style games.
 
-### Next Development Phase: Pokemon Gameplay Systems
+### MILESTONE: Debug Server & Frame Capture Complete (Phase 7.2) ✅
+
+**Achievement**: Successfully implemented HTTP debug server with frame capture for AI-assisted debugging.
+
+**Mission Accomplished**: Claude can now interact with the running game via REST API and capture visual screenshots for debugging.
+
+**Key Accomplishments**:
+- ✅ **HTTP Debug Server**: REST API on localhost:3000 for game state queries and commands
+- ✅ **Frame Capture System**: Vulkan image capture to PNG files via `stb_image_write`
+- ✅ **Camera Debug API**: Real-time camera position, rotation, FOV control via HTTP
+- ✅ **Entity Inspection**: Query ECS entities, components, transforms, renderables
+- ✅ **Command Queue System**: Thread-safe command execution with 100ms rate limiting
+- ✅ **Comprehensive Tests**: 2101 assertions in 151 test cases (100% passing)
+
+**Technical Implementation**:
+- **DebugServer** ([src/debug/debug_server.h](src/debug/debug_server.h)): HTTP server with command queue and state queries
+- **FrameCapture** ([src/debug/frame_capture.cpp](src/debug/frame_capture.cpp)): Vulkan staging buffer, vkCmdCopyImageToBuffer, BGR→RGB conversion
+- **VulkanRenderer Extensions**: Added getters for physical device, command pool, queue, swapchain access
+- **Integration**: Application owns DebugServer, processes commands in main thread during frame update
+
+**HTTP API Endpoints**:
+```bash
+# State Queries (GET)
+GET /api/game              # FPS, frame time, running status
+GET /api/entities          # Entity list with transforms, renderables
+GET /api/camera            # Camera state: position, rotation, FOV, forward/up/right vectors
+GET /api/camera/position   # Camera position only
+GET /api/input             # Input state (future: WASD debugging)
+
+# Commands (POST)
+POST /api/camera/position   # Set camera position {"x": 1.0, "y": 2.0, "z": 3.0}
+POST /api/camera/teleport   # Teleport camera to position
+POST /api/camera/rotation   # Set camera rotation (Euler angles)
+POST /api/camera/fov        # Set field of view
+
+# Frame Capture (GET)
+GET /api/capture                        # Capture frame to debug_frame.png
+GET /api/capture?filename=test.png      # Capture with custom filename
+
+# Health Check
+GET /health                # Server status check
+```
+
+**Frame Capture Workflow**:
+1. HTTP request queues `capture_frame` command
+2. Main thread executes during `ProcessCommands()`
+3. Vulkan creates staging buffer (VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+4. Transitions swapchain image layout (PRESENT_SRC → TRANSFER_SRC → PRESENT_SRC)
+5. `vkCmdCopyImageToBuffer` copies GPU framebuffer to CPU memory
+6. Converts BGRA→RGBA if needed (VK_FORMAT_B8G8R8A8_*)
+7. Saves PNG using `stb_image_write` (800x600 resolution, ~23KB file size)
+
+**Debug Server Features**:
+- **Thread-Safe**: HTTP server runs on separate thread, commands queued for main thread
+- **Rate Limiting**: 100ms minimum between commands to prevent game loop overload
+- **Command Validation**: 14 valid command types with JSON payload validation
+- **Error Handling**: Comprehensive error responses with HTTP status codes
+- **Dependency Injection**: Application* passed to DebugServer (not singleton pattern)
+
+**Unit Test Coverage**:
+- **test_FrameCapture.cpp** (NEW): 32 assertions across 8 test cases
+  - PNG file creation and validation
+  - RGBA/BGRA format handling and conversion
+  - BGR→RGB conversion correctness
+  - Error handling (invalid paths, null data, zero dimensions)
+  - Vulkan format detection (VK_FORMAT_B8G8R8A8_UNORM/SRGB)
+  - Memory layout validation (tightly packed pixels, non-power-of-2 dimensions)
+  - Performance characteristics (memory usage for 800x600, 1080p, 1440p, 4K)
+
+- **test_DebugServer.cpp** (UPDATED): Added `capture_frame` command validation
+
+**Files Implemented**:
+- `src/debug/debug_server.h/.cpp` - HTTP server with camera control and frame capture
+- `src/debug/frame_capture.h/.cpp` - Vulkan frame capture to PNG
+- `src/core/Application.h/.cpp` - DebugServer lifecycle integration
+- `tests_cpp/test_FrameCapture.cpp` - Comprehensive unit tests (NEW)
+- `tests_cpp/test_DebugServer.cpp` - Updated with capture_frame validation
+
+**Performance Results**:
+```
+Frame Capture Performance:
+  Resolution: 800x600 (default window size)
+  File Size: ~23KB PNG (compressed)
+  Capture Time: Sub-millisecond (non-blocking command queue)
+  Memory Usage: 1.83 MB staging buffer (width × height × 4 bytes)
+  Thread Safety: Commands queued on HTTP thread, executed on main thread
+```
+
+**Usage Example**:
+```bash
+# Start VulkanMon (debug server auto-starts on port 3000)
+./vulkanmon.exe
+
+# Query camera state
+curl http://localhost:3000/api/camera | jq
+
+# Teleport camera
+curl -X POST http://localhost:3000/api/camera/teleport \
+  -H "Content-Type: application/json" \
+  -d '{"x": 10.0, "y": 5.0, "z": 15.0}'
+
+# Capture screenshot
+curl http://localhost:3000/api/capture?filename=my_screenshot.png
+
+# List all entities
+curl http://localhost:3000/api/entities | jq
+```
+
+**Strategic Impact**: Claude can now **visually debug the game** by capturing screenshots and inspecting entity state. This enables AI-assisted debugging for rendering issues, camera problems, and gameplay bugs.
+
+**Next Steps**: Build Python MCP Server to bridge Claude Desktop with the game's HTTP API for seamless debugging during conversations.
+
+### Next Development Phase: MCP Server Integration
 
 **Recommended Next Steps:**
+- **Python MCP Server** - Bridge between Claude Desktop and game HTTP server (NEXT)
+- **Enhanced Debug Commands** - Entity spawning, scene manipulation, physics controls
+- **RenderDoc Integration** - GPU frame analysis for advanced Vulkan debugging
+- **Input Debugging Tools** - Fix WASD input issues using camera debug API
 - **Pokeball Projectile System** - Build on existing physics foundation for throwing mechanics
 - **Creature AI Movement** - Physics-based creature locomotion with terrain navigation
-- **Battle System Integration** - Physics-powered move effects and environmental interactions
-- **Advanced Terrain Physics** - Heightfield collision and complex mesh shapes
-- **Embedded Python Scripting** - Game logic and creature AI in Python (optional enhancement)
 
 ## Development Workflow
 

@@ -1,4 +1,5 @@
 #include "debug_server.h"
+#include "frame_capture.h"
 #include "../core/Application.h"
 #include "../core/World.h"
 #include "../utils/Logger.h"
@@ -34,7 +35,8 @@ const std::set<std::string> DebugServer::VALID_COMMANDS = {
     "set_camera_fov",
     "teleport_camera",
     "simulate_key_press",
-    "simulate_mouse_move"
+    "simulate_mouse_move",
+    "capture_frame"
 };
 
 DebugServer::DebugServer(Application* app)
@@ -229,6 +231,48 @@ void DebugServer::ExecuteCommand(const DebugCommand& cmd) {
                         }
                     }
                 }
+            }
+
+        } else if (cmd.type == "capture_frame") {
+            // Capture current frame to PNG file
+            std::string filename = "debug_frame.png";
+            if (payload.contains("filename")) {
+                filename = payload["filename"].get<std::string>();
+            }
+
+            auto* renderer = app_->getRenderer();
+            if (!renderer) {
+                Logger::getInstance().error("[DebugServer] Renderer not available for frame capture");
+                return;
+            }
+
+            VkImage image = renderer->getCurrentSwapchainImage();
+            if (image == VK_NULL_HANDLE) {
+                Logger::getInstance().warning("[DebugServer] No active frame to capture");
+                return;
+            }
+
+            VkExtent2D extent = renderer->getSwapchainExtent();
+
+            bool success = FrameCapture::CaptureToFile(
+                renderer->getDevice(),
+                renderer->getPhysicalDevice(),
+                renderer->getCommandPool(),
+                renderer->getGraphicsQueue(),
+                image,
+                renderer->getSwapchainFormat(),
+                extent.width,
+                extent.height,
+                filename
+            );
+
+            if (success) {
+                Logger::getInstance().info(
+                    "[DebugServer] Frame captured successfully: " + filename +
+                    " (" + std::to_string(extent.width) + "x" + std::to_string(extent.height) + ")"
+                );
+            } else {
+                Logger::getInstance().error("[DebugServer] Frame capture failed");
             }
         }
 
@@ -602,6 +646,46 @@ void DebugServer::ServerThread() {
     // Input debug endpoints
     server.Get("/api/input", [this](const httplib::Request&, httplib::Response& res) {
         res.set_content(GetInputState(), "application/json");
+    });
+
+    // Frame capture endpoint
+    server.Get("/api/capture", [this](const httplib::Request& req, httplib::Response& res) {
+        try {
+            std::string filename = "debug_frame.png";
+
+            // Check for custom filename parameter
+            if (req.has_param("filename")) {
+                filename = req.get_param_value("filename");
+            }
+
+            // Queue capture command for main thread execution
+            DebugCommand cmd;
+            cmd.type = "capture_frame";
+
+            json payload;
+            payload["filename"] = filename;
+            cmd.payload = payload.dump();
+
+            bool queued = QueueCommand(cmd);
+
+            json response;
+            response["success"] = queued;
+            if (queued) {
+                response["message"] = "Frame capture command queued";
+                response["filename"] = filename;
+                response["note"] = "Frame will be captured on next frame render";
+            } else {
+                response["error"] = "Command queue rejected (rate limit or server not ready)";
+            }
+            res.set_content(response.dump(2), "application/json");
+
+        } catch (const std::exception& e) {
+            json error;
+            error["success"] = false;
+            error["error"] = e.what();
+            res.set_content(error.dump(2), "application/json");
+            res.status = 500;
+        }
     });
 
     // Health check

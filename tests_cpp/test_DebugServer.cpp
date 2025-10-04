@@ -48,6 +48,7 @@ TEST_CASE("DebugServer command validation", "[DebugServer][Validation]") {
             "spawn_entity",
             "set_time_scale",
             "reload_shader",
+            "capture_frame",
             "set_material",
             "toggle_physics",
             "clear_scene",
