@@ -28,7 +28,13 @@ const std::set<std::string> DebugServer::VALID_COMMANDS = {
     "reload_shader",
     "set_material",
     "toggle_physics",
-    "clear_scene"
+    "clear_scene",
+    "set_camera_position",
+    "set_camera_rotation",
+    "set_camera_fov",
+    "teleport_camera",
+    "simulate_key_press",
+    "simulate_mouse_move"
 };
 
 DebugServer::DebugServer(Application* app)
@@ -142,6 +148,88 @@ void DebugServer::ExecuteCommand(const DebugCommand& cmd) {
             // TODO: Trigger shader reload
             // app_->getRenderer()->reloadShaders();
             Logger::getInstance().info("[DebugServer] TODO: Implement reload_shader");
+
+        } else if (cmd.type == "set_camera_position" || cmd.type == "teleport_camera") {
+            // Set camera position
+            auto* world = app_->getWorld();
+            if (world) {
+                auto& em = world->getEntityManager();
+                auto* cameraSystem = world->getSystem<CameraSystem>();
+
+                if (cameraSystem) {
+                    EntityID camEntity = cameraSystem->getActiveCameraEntity();
+                    if (camEntity != INVALID_ENTITY && em.hasComponent<Transform>(camEntity)) {
+                        auto& transform = em.getComponent<Transform>(camEntity);
+
+                        if (payload.contains("x")) transform.position.x = payload["x"].get<float>();
+                        if (payload.contains("y")) transform.position.y = payload["y"].get<float>();
+                        if (payload.contains("z")) transform.position.z = payload["z"].get<float>();
+
+                        Logger::getInstance().info(
+                            "[DebugServer] Camera position set to: (" +
+                            std::to_string(transform.position.x) + ", " +
+                            std::to_string(transform.position.y) + ", " +
+                            std::to_string(transform.position.z) + ")"
+                        );
+                    }
+                }
+            }
+
+        } else if (cmd.type == "set_camera_rotation") {
+            // Set camera rotation (expects Euler angles in degrees: pitch, yaw, roll)
+            auto* world = app_->getWorld();
+            if (world) {
+                auto& em = world->getEntityManager();
+                auto* cameraSystem = world->getSystem<CameraSystem>();
+
+                if (cameraSystem) {
+                    EntityID camEntity = cameraSystem->getActiveCameraEntity();
+                    if (camEntity != INVALID_ENTITY && em.hasComponent<Transform>(camEntity)) {
+                        auto& transform = em.getComponent<Transform>(camEntity);
+
+                        // Get current Euler angles or use defaults
+                        glm::vec3 euler = glm::degrees(glm::eulerAngles(transform.rotation));
+
+                        if (payload.contains("pitch")) euler.x = payload["pitch"].get<float>();
+                        if (payload.contains("yaw")) euler.y = payload["yaw"].get<float>();
+                        if (payload.contains("roll")) euler.z = payload["roll"].get<float>();
+
+                        // Set rotation from Euler angles
+                        transform.setRotationEuler(euler.x, euler.y, euler.z);
+
+                        Logger::getInstance().info(
+                            "[DebugServer] Camera rotation set to (pitch, yaw, roll): (" +
+                            std::to_string(euler.x) + ", " +
+                            std::to_string(euler.y) + ", " +
+                            std::to_string(euler.z) + ") degrees"
+                        );
+                    }
+                }
+            }
+
+        } else if (cmd.type == "set_camera_fov") {
+            // Set camera FOV
+            auto* world = app_->getWorld();
+            if (world) {
+                auto& em = world->getEntityManager();
+                auto* cameraSystem = world->getSystem<CameraSystem>();
+
+                if (cameraSystem) {
+                    EntityID camEntity = cameraSystem->getActiveCameraEntity();
+                    if (camEntity != INVALID_ENTITY && em.hasComponent<Camera>(camEntity)) {
+                        auto& camera = em.getComponent<Camera>(camEntity);
+
+                        if (payload.contains("fov")) {
+                            camera.fov = payload["fov"].get<float>();
+                            camera.updateProjectionMatrix();
+
+                            Logger::getInstance().info(
+                                "[DebugServer] Camera FOV set to: " + std::to_string(camera.fov)
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         Logger::getInstance().info("[DebugServer] Command executed: " + cmd.type);
@@ -249,6 +337,126 @@ std::string DebugServer::GetVulkanStats() const {
     return stats.dump(2);
 }
 
+// Camera debug queries
+std::string DebugServer::GetCameraState() const {
+    json camera;
+
+    auto* world = app_->getWorld();
+    if (!world) {
+        camera["error"] = "World not initialized";
+        return camera.dump(2);
+    }
+
+    auto& em = world->getEntityManager();
+    auto* cameraSystem = world->getSystem<CameraSystem>();
+
+    if (!cameraSystem) {
+        camera["error"] = "Camera system not available";
+        return camera.dump(2);
+    }
+
+    EntityID activeCamEntity = cameraSystem->getActiveCameraEntity();
+    if (activeCamEntity == INVALID_ENTITY) {
+        camera["error"] = "No active camera";
+        return camera.dump(2);
+    }
+
+    // Get camera transform
+    if (em.hasComponent<Transform>(activeCamEntity)) {
+        const auto& transform = em.getComponent<Transform>(activeCamEntity);
+        camera["position"] = {
+            transform.position.x,
+            transform.position.y,
+            transform.position.z
+        };
+
+        // Get Euler angles from quaternion for debugging
+        glm::vec3 euler = glm::eulerAngles(transform.rotation);
+        camera["rotation_euler_rad"] = {
+            euler.x,
+            euler.y,
+            euler.z
+        };
+
+        // Get direction vectors
+        glm::vec3 forward = transform.getForward();
+        glm::vec3 up = transform.getUp();
+        glm::vec3 right = transform.getRight();
+
+        camera["forward"] = { forward.x, forward.y, forward.z };
+        camera["up"] = { up.x, up.y, up.z };
+        camera["right"] = { right.x, right.y, right.z };
+    }
+
+    // Get camera component
+    if (em.hasComponent<Camera>(activeCamEntity)) {
+        const auto& cam = em.getComponent<Camera>(activeCamEntity);
+        camera["fov"] = cam.fov;
+        camera["near_plane"] = cam.nearPlane;
+        camera["far_plane"] = cam.farPlane;
+        camera["aspect_ratio"] = cam.aspectRatio;
+        camera["is_active"] = cam.isActive;
+        camera["priority"] = cam.priority;
+        camera["type"] = (cam.type == Camera::Type::PERSPECTIVE) ? "perspective" : "orthographic";
+    }
+
+    camera["entity_id"] = activeCamEntity;
+
+    return camera.dump(2);
+}
+
+std::string DebugServer::GetCameraPosition() const {
+    json pos;
+
+    auto* world = app_->getWorld();
+    if (!world) {
+        pos["error"] = "World not initialized";
+        return pos.dump(2);
+    }
+
+    auto& em = world->getEntityManager();
+    auto* cameraSystem = world->getSystem<CameraSystem>();
+
+    if (!cameraSystem) {
+        pos["error"] = "Camera system not available";
+        return pos.dump(2);
+    }
+
+    EntityID activeCamEntity = cameraSystem->getActiveCameraEntity();
+    if (activeCamEntity == INVALID_ENTITY) {
+        pos["error"] = "No active camera";
+        return pos.dump(2);
+    }
+
+    if (em.hasComponent<Transform>(activeCamEntity)) {
+        const auto& transform = em.getComponent<Transform>(activeCamEntity);
+        pos["x"] = transform.position.x;
+        pos["y"] = transform.position.y;
+        pos["z"] = transform.position.z;
+    }
+
+    return pos.dump(2);
+}
+
+// Input debug queries
+std::string DebugServer::GetInputState() const {
+    json input;
+
+    // TODO: Add InputHandler state tracking
+    // For now, return basic info
+    input["note"] = "Input state monitoring requires InputHandler integration";
+    input["controls"] = {
+        {"WASD", "Camera/Player movement"},
+        {"Mouse", "Camera look"},
+        {"M", "Cycle materials"},
+        {"1-6", "Lighting controls"},
+        {"I", "Toggle inspector"},
+        {"R", "Reload shaders"}
+    };
+
+    return input.dump(2);
+}
+
 // RenderDoc Integration (stubbed for now)
 void DebugServer::InitRenderDoc() {
     // TODO: Implement when renderdoc_app.h is available
@@ -336,6 +544,64 @@ void DebugServer::ServerThread() {
         response["success"] = true;
         response["attached"] = IsRenderDocAttached();
         res.set_content(response.dump(2), "application/json");
+    });
+
+    // Camera debug endpoints
+    server.Get("/api/camera", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(GetCameraState(), "application/json");
+    });
+
+    server.Get("/api/camera/position", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(GetCameraPosition(), "application/json");
+    });
+
+    server.Post("/api/camera/position", [this](const httplib::Request& req, httplib::Response& res) {
+        try {
+            auto j = json::parse(req.body);
+            DebugCommand cmd;
+            cmd.type = "set_camera_position";
+            cmd.payload = req.body;
+
+            bool queued = QueueCommand(cmd);
+
+            json response;
+            response["success"] = queued;
+            response["message"] = queued ? "Camera position command queued" : "Command rejected";
+            res.set_content(response.dump(2), "application/json");
+        } catch (const std::exception& e) {
+            json error;
+            error["success"] = false;
+            error["error"] = e.what();
+            res.set_content(error.dump(2), "application/json");
+            res.status = 400;
+        }
+    });
+
+    server.Post("/api/camera/teleport", [this](const httplib::Request& req, httplib::Response& res) {
+        try {
+            auto j = json::parse(req.body);
+            DebugCommand cmd;
+            cmd.type = "teleport_camera";
+            cmd.payload = req.body;
+
+            bool queued = QueueCommand(cmd);
+
+            json response;
+            response["success"] = queued;
+            response["message"] = queued ? "Camera teleport command queued" : "Command rejected";
+            res.set_content(response.dump(2), "application/json");
+        } catch (const std::exception& e) {
+            json error;
+            error["success"] = false;
+            error["error"] = e.what();
+            res.set_content(error.dump(2), "application/json");
+            res.status = 400;
+        }
+    });
+
+    // Input debug endpoints
+    server.Get("/api/input", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(GetInputState(), "application/json");
     });
 
     // Health check

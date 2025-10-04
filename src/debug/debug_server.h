@@ -47,6 +47,13 @@ public:
     std::string GetFrameStats() const;
     std::string GetVulkanStats() const;
 
+    // Camera debug queries
+    std::string GetCameraState() const;
+    std::string GetCameraPosition() const;
+
+    // Input debug queries
+    std::string GetInputState() const;
+
     // Commands (queued for main thread)
     bool QueueCommand(const DebugCommand& cmd);
 

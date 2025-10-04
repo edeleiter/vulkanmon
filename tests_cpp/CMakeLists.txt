@@ -18,6 +18,8 @@ find_package(assimp CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(httplib CONFIG REQUIRED)
 
 # Include directories for VulkanMon source files
 include_directories(../src)
@@ -76,6 +78,9 @@ add_executable(vulkanmon_tests
     # Projectile System tests (Phase 8)
     test_ProjectileSystem.cpp
 
+    # Debug Server tests (NEW)
+    test_DebugServer.cpp
+
     # Test utilities
     fixtures/TestHelpers.cpp
     
@@ -106,6 +111,8 @@ add_executable(vulkanmon_tests
     ../src/io/ModelLoader.cpp
     ../src/utils/Logger.cpp
     ../src/debug/ECSInspector.cpp
+    ../src/debug/debug_server.cpp
+    ../src/debug/frame_capture.cpp
 )
 
 # Link libraries
@@ -117,6 +124,8 @@ target_link_libraries(vulkanmon_tests PRIVATE
     Catch2::Catch2WithMain
     imgui::imgui
     Jolt::Jolt
+    nlohmann_json::nlohmann_json
+    httplib::httplib
 )
 
 # Include directories
